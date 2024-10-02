@@ -1,0 +1,57 @@
+name: WuppieFuzz CI Pipeline
+
+on:
+  push:
+    branches:
+      - main  # Trigger the workflow on push to the main branch
+  pull_request:
+    branches:
+      - main  # Trigger the workflow on pull request to the main branch
+
+jobs:
+  build_and_fuzz:
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3  # Check out the repository code
+
+      - name: Clone Vulnerable REST API repository
+        run: git clone http://github.com/bnematzadeh/vulnerable-rest-api.git  # Clone the vulnerable REST API repository
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2  # Set up Docker Buildx for building multi-platform images
+
+      - name: Build Vulnerable RESTAPI Docker image
+        run: docker build -t vulnerablerestapi ./vulnerable-rest-api  # Build the Docker image for the vulnerable REST API
+
+      - name: Run Vulnerable RESTAPI Docker image
+        run: docker run -d -p 5000:5000 --name vulnerablerestapi vulnerablerestapi  # Run the Docker container for the vulnerable REST API
+
+      - name: Wait for API to start
+        run: sleep 10  # Wait for the API to start
+
+      - name: Install Python and dependencies
+        run: |
+          sudo apt-get update  # Update package lists
+          sudo apt-get install -y python3 python3-pip  # Install Python and pip
+
+      - name: Install WuppieFuzz
+        run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git  # Install WuppieFuzz from the GitHub repository
+
+      - name: Run WuppieFuzz
+        run: wuppiefuzz -c wuppiefuzz_config.yml  # Run WuppieFuzz with the specified configuration file
+
+      - name: Upload WuppieFuzz report
+        uses: actions/upload-artifact@v3  # Upload the WuppieFuzz report as an artifact
+        with:
+          name: wuppiefuzz-report  # Name of the artifact
+          path: |
+            wuppiefuzz_reports.html  # Path to the report file
+            wuppiefuzz_logs.txt  # Path to the log file
+
+      - name: Stop and remove Vulnerable RESTAPI Docker image
+        if: always()  # Ensure this step runs even if previous steps fail
+        run: |
+          docker stop vulnerablerestapi  # Stop the Docker container
+          docker rm vulnerablerestapi  # Remove the Docker container
