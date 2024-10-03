@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_and_fuzz:
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+    runs-on: self-hosted  # Use the self-hosted
 
     steps:
       # Step 1: Checkout the repository
