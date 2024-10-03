@@ -52,42 +52,54 @@ jobs:
           nohup npm start &
           cd ..
 
-      # Step 5: Wait for the server to start
+      # Step 5: Wait for server to start
       - name: Wait for server to start
         run: sleep 15  # Wait for the server to start
 
-      # Step 6: Install Python and dependencies
-      - name: Install Python and dependencies
+      # Step 6: Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # Step 7: Clone WuppieFuzz repository
+      - name: Clone WuppieFuzz repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
+
+      # Step 8: Build WuppieFuzz
+      - name: Build WuppieFuzz
         run: |
-          sudo apt-get update
-          sudo apt-get install -y python3 python3-pip
+          cd WuppieFuzz
+          cargo build --release
+          cd ..
 
-      # Step 7: Install WuppieFuzz
-      - name: Install WuppieFuzz
-        run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git
+      # Step 9: Add WuppieFuzz to PATH
+      - name: Add WuppieFuzz to PATH
+        run: echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
-      # Step 8: Prepare OpenAPI specification
+      # Step 10: Prepare OpenAPI specification
       - name: Prepare OpenAPI specification
         run: |
           cp server/swagger.yaml openapi.yaml
 
-      # Step 9: Generate initial corpus
+      # Step 11: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
 
-      # Step 10: Run WuppieFuzz fuzzing
+      # Step 12: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory --timeout 300 --openapi-spec openapi.yaml --base-url http://localhost:3001
 
-      # Step 11: Upload WuppieFuzz report
+      # Step 13: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
         uses: actions/upload-artifact@v3  # Upload the WuppieFuzz report as an artifact
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Step 12: Stop server and cleanup
+      # Step 14: Stop server and cleanup
       - name: Stop server and cleanup
         if: always()  # Ensure this step runs even if previous steps fail
         run: |
