@@ -3,55 +3,74 @@ name: WuppieFuzz CI Pipeline
 on:
   push:
     branches:
-      - main  # Trigger the workflow on push to the main branch
+      - main
   pull_request:
     branches:
-      - main  # Trigger the workflow on pull request to the main branch
+      - main
 
 jobs:
   build_and_fuzz:
-    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+    runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v3  # Check out the repository code
+        uses: actions/checkout@v3
 
+      # Step 2: Clone the Vulnerable REST API repository
       - name: Clone Vulnerable REST API repository
-        run: git clone http://github.com/bnematzadeh/vulnerable-rest-api.git  # Clone the vulnerable REST API repository
+        run: git clone https://github.com/bnematzadeh/vulnerable-rest-api.git
 
+      # Step 3: Set up Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2  # Set up Docker Buildx for building multi-platform images
+        uses: docker/setup-buildx-action@v2
 
-      - name: Build Vulnerable RESTAPI Docker image
-        run: docker build -t vulnerablerestapi ./vulnerable-rest-api  # Build the Docker image for the vulnerable REST API
+      # Step 4: Build the Vulnerable REST API Docker image
+      - name: Build Vulnerable REST API Docker image
+        run: docker build -t vulnerablerestapi ./vulnerable-rest-api
 
-      - name: Run Vulnerable RESTAPI Docker image
-        run: docker run -d -p 5000:5000 --name vulnerablerestapi vulnerablerestapi  # Run the Docker container for the vulnerable REST API
+      # Step 5: Run the Vulnerable REST API Docker container
+      - name: Run Vulnerable REST API Docker container
+        run: docker run -d -p 5000:5000 --name vulnerablerestapi vulnerablerestapi
 
+      # Step 6: Wait for the API to start
       - name: Wait for API to start
-        run: sleep 10  # Wait for the API to start
+        run: sleep 10
 
+      # Step 7: Install Python and dependencies
       - name: Install Python and dependencies
         run: |
-          sudo apt-get update  # Update package lists
-          sudo apt-get install -y python3 python3-pip  # Install Python and pip
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
 
+      # Step 8: Install WuppieFuzz
       - name: Install WuppieFuzz
-        run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git  # Install WuppieFuzz from the GitHub repository
+        run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git
 
-      - name: Run WuppieFuzz
-        run: wuppiefuzz -c wuppiefuzz_config.yml  # Run WuppieFuzz with the specified configuration file
-
-      - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v3  # Upload the WuppieFuzz report as an artifact
-        with:
-          name: wuppiefuzz-report  # Name of the artifact
-          path: |
-            wuppiefuzz_reports.html  # Path to the report file
-            wuppiefuzz_logs.txt  # Path to the log file
-
-      - name: Stop and remove Vulnerable RESTAPI Docker image
-        if: always()  # Ensure this step runs even if previous steps fail
+      # Step 9: Prepare OpenAPI specification
+      - name: Prepare OpenAPI specification
         run: |
-          docker stop vulnerablerestapi  # Stop the Docker container
-          docker rm vulnerablerestapi  # Remove the Docker container
+          cp ./vulnerable-rest-api/swagger.yaml ./openapi.yaml
+
+      # Step 10: Generate initial corpus
+      - name: Generate initial corpus
+        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
+
+      # Step 11: Run WuppieFuzz fuzzing
+      - name: Run WuppieFuzz
+        run: |
+          wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory --timeout 60 --openapi-spec openapi.yaml
+
+      # Step 12: Upload WuppieFuzz report
+      - name: Upload WuppieFuzz report
+        uses: actions/upload-artifact@v3
+        with:
+          name: wuppiefuzz-report
+          path: reports/
+
+      # Step 13: Stop and remove Vulnerable REST API Docker container
+      - name: Stop and remove Vulnerable REST API Docker container
+        if: always()
+        run: |
+          docker stop vulnerablerestapi
+          docker rm vulnerablerestapi
