@@ -3,74 +3,92 @@ name: WuppieFuzz CI Pipeline
 on:
   push:
     branches:
-      - main
+      - main  # Trigger the workflow on push to the main branch
   pull_request:
     branches:
-      - main
+      - main  # Trigger the workflow on pull request to the main branch
 
 jobs:
   build_and_fuzz:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
 
     steps:
       # Step 1: Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # Check out the repository code
 
-      # Step 2: Clone the Vulnerable REST API repository
-      - name: Clone Vulnerable REST API repository
-        run: git clone https://github.com/bnematzadeh/vulnerable-rest-api.git
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '14'  # Use Node.js version 14
 
-      # Step 3: Set up Docker Buildx
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      # Step 3: Install MongoDB
+      - name: Install MongoDB
+        uses: supercharge/mongodb-github-action@1.8.0
+        with:
+          mongodb-version: '5.0'  # Use MongoDB version 5.0
 
-      # Step 4: Build the Vulnerable REST API Docker image
-      - name: Build Vulnerable REST API Docker image
-        run: docker build -t vulnerablerestapi ./vulnerable-rest-api
+      # Step 4: Build and run the server
+      - name: Build and run the server
+        env:
+          # Use dummy SMTP credentials or set actual credentials in repository secrets
+          SMTP_USER: 'dummy_user'
+          SMTP_PASS: 'dummy_pass'
+          SMTP_HOST: 'smtp.example.com'
+          SMTP_PORT: '587'
+        run: |
+          cd server
+          npm install
+          npm install migrate-mongo --save-dev
+          # Set up SMTP credentials
+          echo "smtp_user=$SMTP_USER" > smtp_config.list
+          echo "smtp_pass=$SMTP_PASS" >> smtp_config.list
+          echo "smtp_host=$SMTP_HOST" >> smtp_config.list
+          echo "smtp_port=$SMTP_PORT" >> smtp_config.list
+          # Run database migrations
+          npm run db:up
+          # Start the server in the background
+          nohup npm start &
+          cd ..
 
-      # Step 5: Run the Vulnerable REST API Docker container
-      - name: Run Vulnerable REST API Docker container
-        run: docker run -d -p 5000:5000 --name vulnerablerestapi vulnerablerestapi
+      # Step 5: Wait for the server to start
+      - name: Wait for server to start
+        run: sleep 15  # Wait for the server to start
 
-      # Step 6: Wait for the API to start
-      - name: Wait for API to start
-        run: sleep 10
-
-      # Step 7: Install Python and dependencies
+      # Step 6: Install Python and dependencies
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
 
-      # Step 8: Install WuppieFuzz
+      # Step 7: Install WuppieFuzz
       - name: Install WuppieFuzz
         run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git
 
-      # Step 9: Prepare OpenAPI specification
+      # Step 8: Prepare OpenAPI specification
       - name: Prepare OpenAPI specification
         run: |
-          cp ./vulnerable-rest-api/swagger.yaml ./openapi.yaml
+          cp server/swagger.yaml openapi.yaml
 
-      # Step 10: Generate initial corpus
+      # Step 9: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
 
-      # Step 11: Run WuppieFuzz fuzzing
+      # Step 10: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         run: |
-          wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory --timeout 60 --openapi-spec openapi.yaml
+          wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory --timeout 300 --openapi-spec openapi.yaml --base-url http://localhost:3001
 
-      # Step 12: Upload WuppieFuzz report
+      # Step 11: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3  # Upload the WuppieFuzz report as an artifact
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Step 13: Stop and remove Vulnerable REST API Docker container
-      - name: Stop and remove Vulnerable REST API Docker container
-        if: always()
+      # Step 12: Stop server and cleanup
+      - name: Stop server and cleanup
+        if: always()  # Ensure this step runs even if previous steps fail
         run: |
-          docker stop vulnerablerestapi
-          docker rm vulnerablerestapi
+          pkill -f 'node' || true  # Stop any running Node.js processes
