@@ -74,7 +74,8 @@ jobs:
       
       # Step 11: Generate initial corpus
       - name: Generate initial corpus
-        run: wuppiefuzz output-corpus openapi.yaml corpus_directory
+        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
+
       
       # Step 12: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
