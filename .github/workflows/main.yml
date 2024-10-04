@@ -79,7 +79,8 @@ jobs:
       - name: Run WuppieFuzz
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
-          --timeout 300 openapi.yaml --base-url http://localhost:3001
+          --timeout 300 openapi.yaml
+
 
       # Step 13: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
