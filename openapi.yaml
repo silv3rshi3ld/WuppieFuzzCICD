@@ -1,0 +1,13 @@
+openapi: 3.0.0
+info:
+  title: Your API Title
+  version: '1.0'
+servers:
+  - url: http://localhost:3001
+paths:
+  /your/endpoint:
+    get:
+      summary: Your endpoint description
+      responses:
+        '200':
+          description: Successful response
