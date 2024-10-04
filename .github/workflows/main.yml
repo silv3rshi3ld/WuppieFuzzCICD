@@ -65,10 +65,12 @@ jobs:
       - name: Add WuppieFuzz to PATH
         run: echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
+     
       # Step 10: Prepare OpenAPI specification
-      - name: Prepare OpenAPI specification
-        run: |
-          cp openapi.yaml openapi.yaml
+      # - name: Prepare OpenAPI specification
+      #   run: |
+      #     cp openapi.yaml openapi.yaml
+
       
       # Step 11: Generate initial corpus
       - name: Generate initial corpus
