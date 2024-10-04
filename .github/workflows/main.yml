@@ -66,21 +66,21 @@ jobs:
         run: echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
       # Step 10: Prepare OpenAPI specification
-        # Ensure that 'server/swagger.yaml' exists in your repository
       - name: Prepare OpenAPI specification
         run: |
-          cp server/swagger.yaml openapi.yaml
-
+          cp openapi.yaml openapi.yaml
+      
       # Step 11: Generate initial corpus
       - name: Generate initial corpus
-        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
-
+        run: wuppiefuzz output-corpus openapi.yaml corpus_directory
+      
       # Step 12: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
+        env:
+          RUST_BACKTRACE: 1
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
           --timeout 300 openapi.yaml
-
 
       # Step 13: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
