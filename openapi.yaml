@@ -1,13 +1,276 @@
 openapi: 3.0.0
 info:
-  title: Vulnerable REST API
+  title: Your API Title
   version: '1.0.0'
 servers:
   - url: http://localhost:3001
 paths:
-  /users:
+  /api/authors:
     get:
-      summary: Retrieve a list of users
+      summary: Get a list of authors
+      responses:
+        '200':
+          description: A list of authors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Author'
+    post:
+      summary: Create a new author
+      requestBody:
+        description: Author data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorCreate'
+      responses:
+        '201':
+          description: Author created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+  /api/authors/{id}:
+    get:
+      summary: Get an author by ID
+      parameters:
+        - in: path
+          name: id
+          description: Author ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Author details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+        '404':
+          description: Author not found
+    put:
+      summary: Update an author by ID
+      parameters:
+        - in: path
+          name: id
+          description: Author ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Updated author data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorUpdate'
+      responses:
+        '200':
+          description: Author updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+        '404':
+          description: Author not found
+    delete:
+      summary: Delete an author by ID
+      parameters:
+        - in: path
+          name: id
+          description: Author ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Author deleted successfully
+        '404':
+          description: Author not found
+
+  /api/books:
+    get:
+      summary: Get a list of books
+      responses:
+        '200':
+          description: A list of books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Book'
+    post:
+      summary: Create a new book
+      requestBody:
+        description: Book data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookCreate'
+      responses:
+        '201':
+          description: Book created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+
+  /api/books/{id}:
+    get:
+      summary: Get a book by ID
+      parameters:
+        - in: path
+          name: id
+          description: Book ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: Book not found
+    put:
+      summary: Update a book by ID
+      parameters:
+        - in: path
+          name: id
+          description: Book ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Updated book data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookUpdate'
+      responses:
+        '200':
+          description: Book updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: Book not found
+    delete:
+      summary: Delete a book by ID
+      parameters:
+        - in: path
+          name: id
+          description: Book ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Book deleted successfully
+        '404':
+          description: Book not found
+
+  /api/categories:
+    get:
+      summary: Get a list of categories
+      responses:
+        '200':
+          description: A list of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+    post:
+      summary: Create a new category
+      requestBody:
+        description: Category data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryCreate'
+      responses:
+        '201':
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+
+  /api/categories/{id}:
+    get:
+      summary: Get a category by ID
+      parameters:
+        - in: path
+          name: id
+          description: Category ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          description: Category not found
+    put:
+      summary: Update a category by ID
+      parameters:
+        - in: path
+          name: id
+          description: Category ID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Updated category data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryUpdate'
+      responses:
+        '200':
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '404':
+          description: Category not found
+    delete:
+      summary: Delete a category by ID
+      parameters:
+        - in: path
+          name: id
+          description: Category ID
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Category deleted successfully
+        '404':
+          description: Category not found
+
+  /api/users:
+    get:
+      summary: Get a list of users
       responses:
         '200':
           description: A list of users
@@ -20,7 +283,7 @@ paths:
     post:
       summary: Create a new user
       requestBody:
-        description: User object that needs to be added
+        description: User data
         required: true
         content:
           application/json:
@@ -33,22 +296,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-        '400':
-          description: Bad request
-  /users/{id}:
+
+  /api/users/{id}:
     get:
-      summary: Retrieve a single user by ID
+      summary: Get a user by ID
       parameters:
         - in: path
           name: id
-          description: ID of the user to retrieve
+          description: User ID
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
       responses:
         '200':
-          description: A single user
+          description: User details
           content:
             application/json:
               schema:
@@ -56,17 +317,16 @@ paths:
         '404':
           description: User not found
     put:
-      summary: Update an existing user
+      summary: Update a user by ID
       parameters:
         - in: path
           name: id
-          description: ID of the user to update
+          description: User ID
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
       requestBody:
-        description: User object with updated information
+        description: Updated user data
         required: true
         content:
           application/json:
@@ -82,279 +342,232 @@ paths:
         '404':
           description: User not found
     delete:
-      summary: Delete a user
+      summary: Delete a user by ID
       parameters:
         - in: path
           name: id
-          description: ID of the user to delete
+          description: User ID
           required: true
           schema:
-            type: integer
-            format: int64
+            type: string
       responses:
         '204':
           description: User deleted successfully
         '404':
           description: User not found
-  /login:
+
+  /api/auth:
     post:
-      summary: Authenticate a user
+      summary: User authentication
       requestBody:
-        description: Credentials for login
+        description: User login credentials
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginCredentials'
+              $ref: '#/components/schemas/UserLogin'
       responses:
         '200':
-          description: Login successful
+          description: Authentication successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Unauthorized
-  /register:
+
+  /api/adminAuth:
     post:
-      summary: Register a new user
+      summary: Admin authentication
       requestBody:
-        description: User registration data
+        description: Admin login credentials
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserCreate'
+              $ref: '#/components/schemas/AdminLogin'
       responses:
-        '201':
-          description: User registered successfully
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Unauthorized
+
+  /api/system:
+    get:
+      summary: Get system information
+      responses:
+        '200':
+          description: System information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+
+  /api/logs:
+    get:
+      summary: Get system logs
+      responses:
+        '200':
+          description: System logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+
+  /api/me:
+    get:
+      summary: Get current user information
+      responses:
+        '200':
+          description: Current user details
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-        '400':
-          description: Bad request
-  /posts:
-    get:
-      summary: Retrieve a list of posts
-      responses:
-        '200':
-          description: A list of posts
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Post'
-    post:
-      summary: Create a new post
-      requestBody:
-        description: Post object that needs to be added
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCreate'
-      responses:
-        '201':
-          description: Post created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Post'
-        '400':
-          description: Bad request
-  /posts/{id}:
-    get:
-      summary: Retrieve a single post by ID
-      parameters:
-        - in: path
-          name: id
-          description: ID of the post to retrieve
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: A single post
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Post'
-        '404':
-          description: Post not found
-    put:
-      summary: Update an existing post
-      parameters:
-        - in: path
-          name: id
-          description: ID of the post to update
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        description: Post object with updated information
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostUpdate'
-      responses:
-        '200':
-          description: Post updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Post'
-        '404':
-          description: Post not found
-    delete:
-      summary: Delete a post
-      parameters:
-        - in: path
-          name: id
-          description: ID of the post to delete
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '204':
-          description: Post deleted successfully
-        '404':
-          description: Post not found
-  /comments:
-    get:
-      summary: Retrieve a list of comments
-      responses:
-        '200':
-          description: A list of comments
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Comment'
-    post:
-      summary: Create a new comment
-      requestBody:
-        description: Comment object that needs to be added
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CommentCreate'
-      responses:
-        '201':
-          description: Comment created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Comment'
-        '400':
-          description: Bad request
-  /comments/{id}:
-    get:
-      summary: Retrieve a single comment by ID
-      parameters:
-        - in: path
-          name: id
-          description: ID of the comment to retrieve
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: A single comment
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Comment'
-        '404':
-          description: Comment not found
-    put:
-      summary: Update an existing comment
-      parameters:
-        - in: path
-          name: id
-          description: ID of the comment to update
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        description: Comment object with updated information
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CommentUpdate'
-      responses:
-        '200':
-          description: Comment updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Comment'
-        '404':
-          description: Comment not found
-    delete:
-      summary: Delete a comment
-      parameters:
-        - in: path
-          name: id
-          description: ID of the comment to delete
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '204':
-          description: Comment deleted successfully
-        '404':
-          description: Comment not found
-  /upload:
-    post:
-      summary: Upload a file
-      requestBody:
-        description: File to upload
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties:
-                file:
-                  type: string
-                  format: binary
-      responses:
-        '201':
-          description: File uploaded successfully
-        '400':
-          description: Bad request
+
 components:
   schemas:
+    Author:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        biography:
+          type: string
+        birthDate:
+          type: string
+          format: date
+      required:
+        - id
+        - name
+
+    AuthorCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        biography:
+          type: string
+        birthDate:
+          type: string
+          format: date
+      required:
+        - name
+
+    AuthorUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        biography:
+          type: string
+        birthDate:
+          type: string
+          format: date
+
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        authorId:
+          type: string
+        categoryId:
+          type: string
+      required:
+        - id
+        - title
+        - authorId
+
+    BookCreate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        authorId:
+          type: string
+        categoryId:
+          type: string
+      required:
+        - title
+        - authorId
+
+    BookUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        authorId:
+          type: string
+        categoryId:
+          type: string
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - id
+        - name
+
+    CategoryCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    CategoryUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
     User:
       type: object
       properties:
         id:
-          type: integer
-          format: int64
+          type: string
         username:
           type: string
         email:
           type: string
           format: email
-        created_at:
-          type: string
-          format: date-time
+        roles:
+          type: array
+          items:
+            type: string
       required:
         - id
         - username
         - email
+
     UserCreate:
       type: object
       properties:
@@ -370,6 +583,7 @@ components:
         - username
         - email
         - password
+
     UserUpdate:
       type: object
       properties:
@@ -381,7 +595,8 @@ components:
         password:
           type: string
           format: password
-    LoginCredentials:
+
+    UserLogin:
       type: object
       properties:
         username:
@@ -392,8 +607,53 @@ components:
       required:
         - username
         - password
-    LoginResponse:
+
+    AdminLogin:
+      type: object
+      properties:
+        adminCode:
+          type: string
+        password:
+          type: string
+          format: password
+      required:
+        - adminCode
+        - password
+
+    AuthResponse:
       type: object
       properties:
         token:
           type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    SystemInfo:
+      type: object
+      properties:
+        uptime:
+          type: number
+          format: float
+        status:
+          type: string
+        version:
+          type: string
+      required:
+        - uptime
+        - status
+        - version
+
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+        message:
+          type: string
+      required:
+        - timestamp
+        - level
+        - message
