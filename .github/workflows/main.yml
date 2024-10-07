@@ -10,25 +10,25 @@ on:
 
 jobs:
   build_and_fuzz:
-    runs-on: self-hosted  # Gebruik 'ubuntu-latest' als je geen self-hosted runner hebt
+    runs-on: self-hosted  # Use 'ubuntu-latest' if you don't have a self-hosted runner
 
     steps:
-      # Stap 1: Checkout de repository
+      # Step 1: Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Updated to v4-beta for Node.js 20 support
 
-      # Stap 2: Installeer Docker Compose
+      # Step 2: Install Docker Compose
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      # Stap 3: Set up Docker Buildx
+      # Step 3: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Stap 4: Build en run services met Docker Compose
+      # Step 4: Build and run services with Docker Compose
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: 'dummy_user'
@@ -38,49 +38,46 @@ jobs:
         run: |
           docker-compose up -d --build
 
-      # Stap 5: Wacht tot services zijn gestart
+      # Step 5: Wait for services to start
       - name: Wait for services to start
         run: sleep 15
 
-      # Stap 6: Test API-connectiviteit
+      # Step 6: Test API Connectivity
       - name: Test API Connectivity
         run: |
           curl -I http://localhost:3001
 
-      # Stap 7: Installeer Rust toolchain
+      # Step 7: Install Rust toolchain
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
-      # Stap 8: Installeer afhankelijkheden voor WuppieFuzz
+      # Step 8: Install dependencies for WuppieFuzz
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      # Stap 9: Clone WuppieFuzz repository
+      # Step 9: Clone WuppieFuzz repository
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
-      # Stap 10: Build WuppieFuzz
+      # Step 10: Build WuppieFuzz
       - name: Build WuppieFuzz
         run: |
           cd WuppieFuzz
           cargo build --release
           cd ..
 
-      # Stap 11: Voeg WuppieFuzz toe aan PATH
+      # Step 11: Add WuppieFuzz to PATH
       - name: Add WuppieFuzz to PATH
-        run: echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
+        run: |
+          echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
-      # Stap 12: Genereer initiële corpus
+      # Step 12: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
 
-      # Stap 13: Voer WuppieFuzz fuzzing uit
+      # Step 13: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         env:
           RUST_BACKTRACE: 1
@@ -88,14 +85,14 @@ jobs:
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
           --timeout 300 openapi.yaml
 
-      # Stap 14: Upload WuppieFuzz rapport
+      # Step 14: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # Updated to v4
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Stap 15: Stop en verwijder Docker containers
+      # Step 15: Stop and remove Docker containers
       - name: Stop and remove Docker containers
         if: always()
         run: docker-compose down
