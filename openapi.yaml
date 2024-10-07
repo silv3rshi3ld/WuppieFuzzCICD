@@ -397,4 +397,3 @@ components:
       properties:
         token:
           type: string
-    Post
