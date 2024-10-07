@@ -3,11 +3,25 @@ info:
   title: Vulnerable REST API
   version: '1.0.0'
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:3001
 paths:
-  /:
+  /users:
     get:
-      summary: Root endpoint
+      summary: Haal een lijst van gebruikers op
       responses:
         '200':
-          description: Successful response
+          description: Een lijst van gebruikers
+  /users/{id}:
+    get:
+      summary: Haal een gebruiker op met ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Gevonden gebruiker
+        '404':
+          description: Gebruiker niet gevonden
