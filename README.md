@@ -261,21 +261,3 @@ Contributions are welcome! Please open an issue or submit a pull request for any
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 **Disclaimer:** This project is intended for educational and testing purposes only. The use of vulnerable software should be done responsibly and ethically.
-```
-
----
-
-**Instructions:**
-
-- **Copy the entire content above**, excluding the triple backticks at the beginning and end.
-- **Paste it into your `README.md` file** in your repository.
-- **Commit and push** the changes to GitHub.
-
-When you view your repository on GitHub, the `README.md` should display with the correct layout, including headers, bold text, code blocks, and bullet points.
-
-**Note:**
-
-- The code blocks are enclosed in triple backticks with language specifiers (e.g., `bash`, `yaml`, `markdown`) to ensure proper syntax highlighting on GitHub.
-- Make sure to replace placeholders like `your-username` and `your-repository` with your actual GitHub username and repository name.
-
-If you have any issues or need further assistance, feel free to ask!
