@@ -1,6 +1,6 @@
 # CI/CD Pipeline with WuppieFuzz and Vulnerable REST API
 
-Welcome to my CI/CD project integrating **WuppieFuzz** for automated API fuzz testing against a **Vulnerable REST API**. This repository demonstrates how to set up a continuous integration and deployment (CI/CD) pipeline that builds a vulnerable API, runs security tests using WuppieFuzz, and generates reports for analysis.
+Welcome to my CI/CD project, which integrates **WuppieFuzz** for automated API fuzz testing against a **Vulnerable REST API**. This repository demonstrates how to set up a continuous integration and deployment (CI/CD) pipeline that builds a vulnerable API, runs security tests using WuppieFuzz, and generates reports for analysis—all without manual setup!
 
 ## Table of Contents
 
@@ -8,24 +8,21 @@ Welcome to my CI/CD project integrating **WuppieFuzz** for automated API fuzz te
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
-  - [Clone the Repository](#clone-the-repository)
-  - [Set Up Environment Variables](#set-up-environment-variables)
-  - [Build and Run Services](#build-and-run-services)
-- [CI/CD Pipeline Overview](#cicd-pipeline-overview)
+  - [Setting Up a Self-Hosted Runner](#setting-up-a-self-hosted-runner)
+  - [Workflow Overview](#workflow-overview)
+- [CI/CD Pipeline Details](#cicd-pipeline-details)
   - [Workflow Steps](#workflow-steps)
 - [WuppieFuzz Integration](#wuppiefuzz-integration)
-  - [Including WuppieFuzz Source Code](#including-wuppiefuzz-source-code)
 - [Vulnerable REST API](#vulnerable-rest-api)
   - [Including Vulnerable API Source Code](#including-vulnerable-api-source-code)
   - [Security Considerations](#security-considerations)
 - [Visualizing Fuzzing Results](#visualizing-fuzzing-results)
-- [Cleanup](#cleanup)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Introduction
 
-This project sets up a CI/CD pipeline that automates the process of building a **Vulnerable RESTful API**, performing security fuzz testing using **WuppieFuzz**, and generating reports. The goal is to demonstrate how fuzz testing can be integrated into the development lifecycle to identify and address potential vulnerabilities.
+This project sets up a CI/CD pipeline using **GitHub Actions** to automate the process of building a **Vulnerable RESTful API**, performing security fuzz testing using **WuppieFuzz**, and generating reports. The goal is to demonstrate how fuzz testing can be seamlessly integrated into the development lifecycle to identify and address potential vulnerabilities.
 
 ## Project Structure
 
@@ -39,49 +36,53 @@ This project sets up a CI/CD pipeline that automates the process of building a *
 
 ## Prerequisites
 
-- **Docker** and **Docker Compose** installed on your machine.
-- **Git** installed for cloning the repository.
-- **Rust** toolchain (if building WuppieFuzz from source).
+- **Docker** and **Docker Compose** installed on the machine that will host the **self-hosted GitHub Actions runner**.
 - **GitHub Actions** enabled if running the CI/CD pipeline on GitHub.
 
 ## Getting Started
 
-### Clone the Repository
+### Setting Up a Self-Hosted Runner
+
+To run this CI/CD pipeline, you need to set up a **self-hosted runner** on the machine where Docker is installed. This runner will handle all steps in the CI/CD pipeline.
+
+#### Step 1: Create a Self-Hosted Runner on GitHub
+
+1. Navigate to your repository on GitHub.
+2. Click on **Settings**.
+3. In the left sidebar, click on **Actions**.
+4. Click on **Runners** and then click **Add runner**.
+5. Follow the instructions to download the runner package, configure it, and start the runner.
+
+#### Step 2: Configure the Self-Hosted Runner
+
+After setting up the runner on GitHub, follow the steps provided to configure the runner:
 
 ```bash
-git clone https://github.com/your-username/your-repository.git
-cd your-repository
+./config.sh --url https://github.com/your-username/your-repository --token <your_runner_token>
 ```
 
-### Set Up Environment Variables
+This command will link the runner to your repository.
 
-Create a `.env` file in the root directory and add the following variables:
+#### Step 3: Start the Runner
 
-```env
-SMTP_USER=dummy_user
-SMTP_PASS=dummy_pass
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-```
-
-These variables are used by the API for email functionalities.
-
-### Build and Run Services
-
-Use Docker Compose to build and run the API and its dependencies:
+Run the following command to start the runner:
 
 ```bash
-docker-compose up -d --build
+./run.sh
 ```
 
-This command will build both the Vulnerable REST API and any other services defined in the `docker-compose.yml` file.
+Your self-hosted runner should now be active and ready to execute the CI/CD pipeline.
 
-## CI/CD Pipeline Overview
+### Workflow Overview
+
+Once the runner is set up and active, pushing code to the `main` branch or creating a pull request will automatically trigger the CI/CD pipeline. The pipeline will handle all the setup, build, and testing steps, ensuring a fully automated process.
+
+## CI/CD Pipeline Details
 
 The CI/CD pipeline is defined using GitHub Actions in `.github/workflows/ci.yml`. The pipeline performs the following tasks:
 
 1. **Checkout Code**: Retrieves the latest code from the repository.
-2. **Set Up Dependencies**: Installs Docker Compose and Rust toolchain.
+2. **Set Up Dependencies**: Installs Docker Compose.
 3. **Build and Run Services**: Uses Docker Compose to build and run the Vulnerable REST API.
 4. **Wait for Services**: Ensures the API is up and running before testing.
 5. **Test API Connectivity**: Verifies that the API is accessible.
@@ -108,7 +109,7 @@ on:
 
 jobs:
   build_and_fuzz:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
@@ -135,16 +136,6 @@ jobs:
       - name: Test API Connectivity
         run: |
           curl -I http://localhost:3001
-
-      - name: Install Rust toolchain
-        uses: actions/setup-rust@v1
-        with:
-          rust-version: stable
-
-      - name: Install dependencies for WuppieFuzz
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
 
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
@@ -182,82 +173,30 @@ jobs:
 
 ## WuppieFuzz Integration
 
-### Including WuppieFuzz Source Code
-
-The WuppieFuzz source code is included in the repository under the `WuppieFuzz/` directory. This allows for direct access and potential customization of the fuzzer.
-
-**Building WuppieFuzz:**
-
-```bash
-cd WuppieFuzz
-cargo build --release
-cd ..
-```
-
-**Adding WuppieFuzz to PATH:**
-
-```bash
-export PATH="${PWD}/WuppieFuzz/target/release:$PATH"
-```
+The CI/CD pipeline automates the process of building and running WuppieFuzz, so no manual steps are needed.
 
 ## Vulnerable REST API
+
+The CI/CD pipeline automatically builds and deploys the Vulnerable REST API using Docker Compose. The source code is included in the repository under the `vulnerable-rest-api/` directory.
 
 ### Including Vulnerable API Source Code
 
 The source code for the Vulnerable REST API is included in the repository under the `vulnerable-rest-api/` directory. This API is intentionally designed with vulnerabilities for educational and testing purposes.
 
-**Building and Running the API:**
-
-The API is built and run using Docker Compose as part of the CI/CD pipeline.
-
-**Manual Build:**
-
-```bash
-cd vulnerable-rest-api
-docker build -t vulnerable-rest-api .
-docker run -d -p 3001:3001 vulnerable-rest-api
-```
-
-### Security Considerations
-
-- **Warning:** This API is intentionally vulnerable and should **not** be exposed to the internet or used in production environments.
-- **Use with Caution:** Run the API in a controlled environment, such as a local machine or isolated network.
-- **Legal Compliance:** Ensure compliance with all relevant laws and policies when testing with vulnerable software.
-
 ## Visualizing Fuzzing Results
 
-After fuzzing, WuppieFuzz generates reports in the `reports/` directory.
-
-### Viewing the HTML Report
+The pipeline outputs the fuzzing reports in the `reports/` directory. To view the results:
 
 1. Locate the `index.html` file in the `reports/` directory.
 2. Open it in your web browser to view the fuzzing results.
 
-### Exploring Detailed Data
-
-The `report.db` file contains detailed data about the fuzzing process.
-
-**Using a SQLite Viewer:**
-
-1. Install [DB Browser for SQLite](https://sqlitebrowser.org/).
-2. Open `report.db` with the SQLite viewer to explore detailed data.
-
-## Cleanup
-
-To stop and remove the Docker containers:
-
-```bash
-docker-compose down
-```
-
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
-
-**Note:** When contributing, please ensure that any changes adhere to ethical guidelines and do not introduce unauthorized vulnerabilities.
 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 **Disclaimer:** This project is intended for educational and testing purposes only. The use of vulnerable software should be done responsibly and ethically.
+```
