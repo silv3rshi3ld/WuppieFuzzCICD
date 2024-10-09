@@ -16,17 +16,3 @@ services:
     image: mongo:latest
     ports:
       - "27017:27017"
-
-  grafana-dashboard:
-    image: grafana/grafana-enterprise
-    container_name: grafana-dashboard
-    ports:
-      #maybe conflicting ports as grafana is 3000
-      - "3002:3002"
-    environment:
-      - GF_INSTALL_PLUGINS=frser-sqlite-datasource
-    volumes:
-      - ./reports/grafana/report.db:/var/lib/grafana/datasources/report.db
-      - ./provisioning/dashboards:/var/lib/grafana/dashboards
-      - ./grafana.ini:/etc/grafana/grafana.ini
-      - ./provisioning:/etc/grafana/provisioning
