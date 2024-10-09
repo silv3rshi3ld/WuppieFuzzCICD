@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - Grafana-Dashboard
   pull_request:
     branches:
       - main
+      - Grafana-Dashboard
 
 jobs:
   build_and_fuzz:
