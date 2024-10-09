@@ -32,7 +32,7 @@ jobs:
 
       # Step 4: Cache Rust dependencies and build artifacts
       - name: Cache Rust dependencies and build artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v4.1.1
         with:
           path: |
             ~/.cargo/registry
