@@ -10,14 +10,33 @@ on:
 
 jobs:
   build_and_fuzz:
-    runs-on: self-hosted  # Use 'ubuntu-latest' if you don't have a self-hosted runner
+    runs-on: self-hosted
 
     steps:
       # Step 1: Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v4 # Updated to v4-beta for Node.js 20 support
+        uses: actions/checkout@v4
 
-      # Step 2: Install Docker Compose
+      # Step 2: Get WuppieFuzz commit hash
+      - name: Get WuppieFuzz commit hash
+        id: wuppiefuzz_commit
+        run: |
+          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
+          echo "::set-output name=commit_hash::$(cat wuppiefuzz_commit.txt)"
+
+      # Step 3: Cache Rust dependencies and build
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ steps.wuppiefuzz_commit.outputs.commit_hash }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # Step 4: Install Docker Compose
       - name: Install Docker Compose
         run: |
           # Update package lists and install Docker Compose
@@ -25,11 +44,11 @@ jobs:
           sudo apt-get install -y docker-compose
           docker-compose --version  # Verify the installation
 
-      # Step 3: Set up Docker Buildx
+      # Step 5: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3 # Use Docker Buildx for advanced multi-platform builds
 
-      # Step 4: Build and run services with Docker Compose
+      # Step 6: Build and run services with Docker Compose
       - name: Build and run services with Docker Compose
         env:
           # Use secrets stored in GitHub to provide secure access to SMTP credentials
@@ -41,73 +60,70 @@ jobs:
           # Build and start the Docker services defined in the Docker Compose file
           docker-compose up -d --build
 
-      # Step 5: Wait for services to start
+      # Step 7: Wait for services to start
       - name: Wait for services to start
         run: sleep 15  # Wait for 15 seconds to allow services to initialize
 
-      # Step 6: Test API Connectivity
+      # Step 8: Test API Connectivity
       - name: Test API Connectivity
         run: |
           # Test if the API service is running by sending a HEAD request
           curl -I http://localhost:3001
 
-      # Step 7: Install Rust toolchain
+      # Step 9: Install Rust toolchain
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable # Use the stable Rust toolchain for building WuppieFuzz
+        uses: dtolnay/rust-toolchain@stable
 
-      # Step 8: Install dependencies for WuppieFuzz
+      # Step 10: Install dependencies for WuppieFuzz
       - name: Install dependencies for WuppieFuzz
         run: |
-          # Update package lists and install necessary dependencies for building WuppieFuzz
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      # Step 9: Clone WuppieFuzz repository
+      # Step 11: Clone WuppieFuzz repository
       - name: Clone WuppieFuzz repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz.git # Clone the WuppieFuzz Git repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
-      # Step 10: Build WuppieFuzz
+      # Step 12: Build WuppieFuzz with cached dependencies
       - name: Build WuppieFuzz
         run: |
-          # Build WuppieFuzz in release mode
           cd WuppieFuzz
           cargo build --release
           cd ..
 
-      # Step 11: Add WuppieFuzz to PATH
+      # Step 13: Add WuppieFuzz to PATH
       - name: Add WuppieFuzz to PATH
         run: |
           # Add the WuppieFuzz binary to the system PATH for easy execution
           echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
-      # Step 12: Generate initial corpus
+      # Step 14: Generate initial corpus
       - name: Generate initial corpus
-        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory # Generate an initial fuzzing corpus
+        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
 
-      # Step 13: Run WuppieFuzz fuzzing
+      # Step 15: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         env:
-          RUST_BACKTRACE: 1 # Enable backtrace for debugging any errors
+          RUST_BACKTRACE: 1
         run: |
-          # Run the WuppieFuzz fuzzer with the specified parameters
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
           --timeout 700 openapi.yaml
 
-      # Step 14: Upload WuppieFuzz report
+      # Step 16: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v4  # Upload the generated report as an artifact
+        uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Step 15: Upload report.db artifact
+      # Step 17: Upload report.db artifact
       - name: Upload report.db
-        uses: actions/upload-artifact@v4 # Upload the report database as an artifact for later analysis
+        uses: actions/upload-artifact@v4
         with:
           name: report-db
           path: reports/report.db
 
-      # Step 16: Stop and remove Docker containers
+      # Step 18: Stop and remove Docker containers
       - name: Stop and remove Docker containers
-        if: always() # Always run this step, even if previous steps fail
-        run: docker-compose down # Stop and remove all running Docker containers
+        if: always()
+        run: docker-compose down
