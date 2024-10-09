@@ -25,63 +25,60 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Step 4: Build the Vulnerable REST API Docker image
-      - name: Build Vulnerable REST API Docker image
-        run: docker build -t vulnerablerestapi ./vulnerable-rest-api
+      # Step 4: Run Docker Compose to start the services
+      - name: Run Docker Compose
+        run: |
+          cd vulnerable-rest-api
+          docker-compose up -d --build
 
-      # Step 5: Run the Vulnerable REST API Docker container
-      - name: Run Vulnerable REST API Docker container
-        run: docker run -d -p 5000:5000 --name vulnerablerestapi vulnerablerestapi
-
-      # Step 6: Wait for the API to start
+      # Step 5: Wait for the API to start
       - name: Wait for API to start
         run: sleep 10
 
-      # Step 7: Install Python and dependencies
+      # Step 6: Install Python and dependencies
       - name: Install Python and dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
 
-      # Step 8: Install WuppieFuzz
+      # Step 7: Install WuppieFuzz
       - name: Install WuppieFuzz
         run: pip3 install git+https://github.com/TNO-S3/WuppieFuzz.git
 
-      # Step 9: Prepare OpenAPI specification
+      # Step 8: Prepare OpenAPI specification
       - name: Prepare OpenAPI specification
         run: |
           cp ./vulnerable-rest-api/swagger.yaml ./openapi.yaml
 
-      # Step 10: Generate initial corpus
+      # Step 9: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
 
-      # Step 11: Run WuppieFuzz fuzzing
+      # Step 10: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory --timeout 60 --openapi-spec openapi.yaml
 
-      # Step 12: Upload WuppieFuzz report
+      # Step 11: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
         uses: actions/upload-artifact@v3
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Step 13: Copy report.db to Grafana reports directory
+      # Step 12: Copy report.db to Grafana reports directory
       - name: Copy report.db to Grafana reports directory
         run: |
           mkdir -p ./reports/grafana
           cp reports/report.db ./reports/grafana/
 
-      # Step 14: Restart Grafana container to load new data
+      # Step 13: Restart Grafana container to load new data
       - name: Restart Grafana Container
         run: |
           docker-compose up -d --force-recreate grafana-dashboard
 
-      # Step 15: Stop and remove Vulnerable REST API Docker container
+      # Step 14: Stop and remove Vulnerable REST API Docker container
       - name: Stop and remove Vulnerable REST API Docker container
         if: always()
         run: |
-          docker stop vulnerablerestapi
-          docker rm vulnerablerestapi
+          docker-compose down
