@@ -173,10 +173,11 @@ jobs:
 
       # Step 4: Provision Grafana dashboards
       - name: Provision Grafana dashboards
-      run: |
-        docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
-        docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
+        run: |
+          docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
+          docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
 
       # Step 5: List Grafana provisioning directory (Debugging Step)
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
+
