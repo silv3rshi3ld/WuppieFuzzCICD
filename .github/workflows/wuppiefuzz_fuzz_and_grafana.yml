@@ -97,15 +97,15 @@ jobs:
 
       # Step 14: Generate initial corpus
       - name: Generate initial corpus
-        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
-      
+        run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
+
       # Step 15: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         env:
           RUST_BACKTRACE: 1
         run: |
-          wuppiefuzz fuzz openapi.yaml --report reports/ --log-level info --initial-corpus corpus_directory \
-          --timeout 60
+          wuppiefuzz fuzz --report=reports/ --log-level=info --initial-corpus=corpus_directory \
+          --timeout=60 openapi.yaml
 
       # Step 16: List reports directory (Debugging Step)
       - name: List reports directory
@@ -142,7 +142,6 @@ jobs:
       - name: Set up Grafana
         run: |
           docker network create wuppycicd_network || true
-
           # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
           cat <<EOF > docker-compose-grafana.yml
           version: '3'
@@ -163,7 +162,6 @@ jobs:
             wuppycicd_network:
               external: true
           EOF
-
           # Start Grafana using Docker Compose
           docker-compose -f docker-compose-grafana.yml up -d
 
@@ -180,4 +178,3 @@ jobs:
       # Step 5: List Grafana provisioning directory (Debugging Step)
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
-
