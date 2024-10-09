@@ -104,7 +104,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
         run: |
-          wuppiefuzz fuzz --report=reports/ --log-level=info --initial-corpus=corpus_directory \
+          wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory \
           --timeout=60 openapi.yaml
 
       # Step 16: List reports directory (Debugging Step)
