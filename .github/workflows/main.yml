@@ -3,11 +3,11 @@ name: WuppieFuzz CI Pipeline
 on:
   push:
     branches:
-      - main
+      #- main
       - Grafana-Dashboard
   pull_request:
     branches:
-      - main
+      #- main
       - Grafana-Dashboard
 
 jobs:
