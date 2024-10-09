@@ -21,6 +21,7 @@ services:
     image: grafana/grafana-enterprise
     container_name: grafana-dashboard
     ports:
+      #maybe conflicting ports as grafana is 3000
       - "3002:3002"
     environment:
       - GF_INSTALL_PLUGINS=frser-sqlite-datasource
