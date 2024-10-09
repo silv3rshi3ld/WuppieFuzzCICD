@@ -13,24 +13,20 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure all files are fetched
+          fetch-depth: 0
 
-      # Step 2: Get WuppieFuzz commit hash
       - name: Get WuppieFuzz commit hash
         id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
-      # Step 3: Clone WuppieFuzz repository
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
-      # Step 4: Cache Rust dependencies and build artifacts
       - name: Cache Rust dependencies and build artifacts
         uses: actions/cache@v4.1.1
         with:
@@ -42,18 +38,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # Step 5: Install Docker Compose
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
-          docker-compose --version  # Verify the installation
+          docker-compose --version
 
-      # Step 6: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Step 7: Build and run services with Docker Compose
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -64,42 +57,34 @@ jobs:
           docker network create wuppycicd_network || true
           docker-compose up -d --build
 
-      # Step 8: Wait for services to start
       - name: Wait for services to start
-        run: sleep 15  # Wait for 15 seconds to allow services to initialize
+        run: sleep 15
 
-      # Step 9: Test API Connectivity
       - name: Test API Connectivity
         run: |
           curl -I http://localhost:3001
 
-      # Step 10: Install Rust toolchain
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # Step 11: Install dependencies for WuppieFuzz
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
-      # Step 12: Build WuppieFuzz with cached dependencies
       - name: Build WuppieFuzz
         run: |
           cd WuppieFuzz
           cargo build --release
           cd ..
 
-      # Step 13: Add WuppieFuzz to PATH
       - name: Add WuppieFuzz to PATH
         run: |
           echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
-      # Step 14: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
 
-      # Step 15: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         env:
           RUST_BACKTRACE: 1
@@ -107,25 +92,21 @@ jobs:
           wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory \
           --timeout=60 openapi.yaml
 
-      # Step 16: List reports directory (Debugging Step)
       - name: List reports directory
         run: ls -la reports/
 
-      # Step 17: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-report
           path: reports/
 
-      # Step 18: Upload report.db artifact
       - name: Upload report.db
         uses: actions/upload-artifact@v4
         with:
           name: report-db
           path: reports/report.db
 
-      # Step 19: Stop and remove Docker containers
       - name: Stop and remove Docker containers
         if: always()
         run: docker-compose down
@@ -134,47 +115,40 @@ jobs:
     runs-on: self-hosted
     needs: build_and_fuzz
     steps:
-      # Step 1: Checkout repository (Ensure provisioning files are available)
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Grafana with SQLite plugin using Docker Compose
       - name: Set up Grafana
         run: |
           docker network create wuppycicd_network || true
-          # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
           cat <<EOF > docker-compose-grafana.yml
           version: '3'
           services:
             grafana:
               image: grafana/grafana:latest
               ports:
-                - "3000:3000" # Expose Grafana on port 3000
+                - "3000:3000"
               networks:
                 - wuppycicd_network
               volumes:
-                - ./reports/report.db:/var/lib/grafana/data/report.db # Adjusted path
-                - ./grafana.ini:/etc/grafana/grafana.ini # Use a custom Grafana configuration
+                - ./reports/report.db:/var/lib/grafana/data/report.db
+                - ./grafana.ini:/etc/grafana/grafana.ini
               environment:
-                - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }} # Set Grafana admin password securely
-                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource # Install the SQLite plugin for Grafana
+                - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource
           networks:
             wuppycicd_network:
               external: true
           EOF
-          # Start Grafana using Docker Compose
           docker-compose -f docker-compose-grafana.yml up -d
 
-      # Step 3: Wait for Grafana to start
       - name: Wait for Grafana to start
-        run: sleep 15 # Wait for 15 seconds to ensure Grafana is ready
+        run: sleep 15
 
-      # Step 4: Provision Grafana dashboards
       - name: Provision Grafana dashboards
         run: |
           docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
           docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
 
-      # Step 5: List Grafana provisioning directory (Debugging Step)
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
