@@ -107,7 +107,7 @@ jobs:
           RUST_BACKTRACE: 1
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
-          --timeout 700 openapi.yaml
+          --timeout 70 openapi.yaml
 
       # Step 16: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
