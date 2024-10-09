@@ -98,14 +98,14 @@ jobs:
       # Step 14: Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
-
+      
       # Step 15: Run WuppieFuzz fuzzing
       - name: Run WuppieFuzz
         env:
           RUST_BACKTRACE: 1
         run: |
-          wuppiefuzz fuzz --report reports/ --log-level info --initial-corpus corpus_directory \
-          --timeout 60 openapi.yaml
+          wuppiefuzz fuzz openapi.yaml --report reports/ --log-level info --initial-corpus corpus_directory \
+          --timeout 60
 
       # Step 16: List reports directory (Debugging Step)
       - name: List reports directory
