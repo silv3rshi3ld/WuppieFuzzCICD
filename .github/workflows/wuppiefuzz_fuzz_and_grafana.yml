@@ -57,6 +57,9 @@ jobs:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
+          # Create a shared Docker network
+          docker network create wuppycicd_network || true
+
           # Build and start the Docker services defined in the Docker Compose file
           docker-compose up -d --build
 
@@ -135,6 +138,9 @@ jobs:
       # Step 1: Set up Grafana with SQLite plugin using Docker Compose
       - name: Set up Grafana
         run: |
+          # Create a shared Docker network
+          docker network create wuppycicd_network || true
+
           # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
           cat <<EOF > docker-compose-grafana.yml
           version: '3'
@@ -143,12 +149,17 @@ jobs:
               image: grafana/grafana:latest
               ports:
                 - "3000:3000" # Expose Grafana on port 3000
+              networks:
+                - wuppycicd_network
               volumes:
                 - ./report.db:/var/lib/grafana/data/report.db # Mount the report.db file for Grafana to access
                 - ./grafana.ini:/etc/grafana/grafana.ini # Use a custom Grafana configuration
               environment:
                 - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }} # Set Grafana admin password securely
                 - GF_INSTALL_PLUGINS=grafana-sqlite-datasource # Install the SQLite plugin for Grafana
+          networks:
+            wuppycicd_network:
+              external: true
           EOF
 
           # Start Grafana using Docker Compose
