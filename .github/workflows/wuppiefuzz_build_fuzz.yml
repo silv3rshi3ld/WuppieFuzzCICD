@@ -107,40 +107,7 @@ jobs:
           name: report-db
           path: reports/report.db
 
-      # Step 16: Set up Grafana with SQLite plugin using Docker Compose
-      - name: Set up Grafana
-        run: |
-          # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
-          cat <<EOF > docker-compose-grafana.yml
-          version: '3'
-          services:
-            grafana:
-              image: grafana/grafana:latest
-              ports:
-                - "3000:3000" # Expose Grafana on port 3000
-              volumes:
-                - ./reports/report.db:/var/lib/grafana/data/report.db # Mount the report.db file for Grafana to access
-                - ./grafana.ini:/etc/grafana/grafana.ini # Use a custom Grafana configuration
-              environment:
-                - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }} # Set Grafana admin password securely
-                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource # Install the SQLite plugin for Grafana
-          EOF
-
-          # Start Grafana using Docker Compose
-          docker-compose -f docker-compose-grafana.yml up -d
-
-      # Step 17: Wait for Grafana to start
-      - name: Wait for Grafana to start
-        run: sleep 15 # Wait for 15 seconds to ensure Grafana is ready
-
-      # Step 18: Provision Grafana dashboards
-      - name: Provision Grafana dashboards
-        run: |
-          # Copy the pre-configured dashboards and data source settings into the Grafana container
-          docker cp dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
-          docker cp datasources.yaml grafana:/etc/grafana/provisioning/datasources/
-
-      # Step 19: Stop and remove Docker containers
+      # Step 16: Stop and remove Docker containers
       - name: Stop and remove Docker containers
         if: always() # Always run this step, even if previous steps fail
         run: docker-compose down # Stop and remove all running Docker containers
