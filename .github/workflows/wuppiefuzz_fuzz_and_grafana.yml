@@ -24,65 +24,62 @@ jobs:
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
-      # Step 3: Cache Rust target directory
-      - name: Cache Rust target directory
+      # Step 3: Clone WuppieFuzz repository
+      - name: Clone WuppieFuzz repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
+
+      # Step 4: Cache Rust dependencies and build artifacts
+      - name: Cache Rust dependencies and build artifacts
         uses: actions/cache@v3
         with:
-          path: WuppieFuzz/target
-          key: ${{ runner.os }}-rust-target-${{ hashFiles('WuppieFuzz/Cargo.lock') }}-${{ env.commit_hash }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            WuppieFuzz/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('WuppieFuzz/Cargo.lock') }}-${{ env.commit_hash }}
           restore-keys: |
-            ${{ runner.os }}-rust-target-
+            ${{ runner.os }}-cargo-
 
-      # Step 4: Install Docker Compose
+      # Step 5: Install Docker Compose
       - name: Install Docker Compose
         run: |
-          # Update package lists and install Docker Compose
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version  # Verify the installation
 
-      # Step 5: Set up Docker Buildx
+      # Step 6: Set up Docker Buildx
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3 # Use Docker Buildx for advanced multi-platform builds
+        uses: docker/setup-buildx-action@v3
 
-      # Step 6: Build and run services with Docker Compose
+      # Step 7: Build and run services with Docker Compose
       - name: Build and run services with Docker Compose
         env:
-          # Use secrets stored in GitHub to provide secure access to SMTP credentials
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
-          # Create a shared Docker network
-          docker network inspect wuppycicd_network > /dev/null 2>&1 || docker network create wuppycicd_network
-
-          # Build and start the Docker services defined in the Docker Compose file
+          docker network create wuppycicd_network || true
           docker-compose up -d --build
 
-      # Step 7: Wait for services to start
+      # Step 8: Wait for services to start
       - name: Wait for services to start
         run: sleep 15  # Wait for 15 seconds to allow services to initialize
 
-      # Step 8: Test API Connectivity
+      # Step 9: Test API Connectivity
       - name: Test API Connectivity
         run: |
-          # Test if the API service is running by sending a HEAD request
           curl -I http://localhost:3001
 
-      # Step 9: Install Rust toolchain
+      # Step 10: Install Rust toolchain
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      # Step 10: Install dependencies for WuppieFuzz
+      # Step 11: Install dependencies for WuppieFuzz
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-
-      # Step 11: Clone WuppieFuzz repository
-      - name: Clone WuppieFuzz repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
       # Step 12: Build WuppieFuzz with cached dependencies
       - name: Build WuppieFuzz
@@ -94,7 +91,6 @@ jobs:
       # Step 13: Add WuppieFuzz to PATH
       - name: Add WuppieFuzz to PATH
         run: |
-          # Add the WuppieFuzz binary to the system PATH for easy execution
           echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
       # Step 14: Generate initial corpus
@@ -135,7 +131,6 @@ jobs:
       # Step 1: Set up Grafana with SQLite plugin using Docker Compose
       - name: Set up Grafana
         run: |
-          # Create a shared Docker network
           docker network create wuppycicd_network || true
 
           # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
