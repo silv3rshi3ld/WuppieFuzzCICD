@@ -22,7 +22,7 @@ jobs:
         id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
-          echo "::set-output name=commit_hash::$(cat wuppiefuzz_commit.txt)"
+          echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
       # Step 3: Cache Rust dependencies and build
       - name: Cache Rust dependencies
@@ -32,7 +32,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ steps.wuppiefuzz_commit.outputs.commit_hash }}
+          key: ${{ runner.os }}-cargo-${{ env.commit_hash }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -107,7 +107,7 @@ jobs:
           RUST_BACKTRACE: 1
         run: |
           wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
-          --timeout 70 openapi.yaml
+          --timeout 60 openapi.yaml
 
       # Step 16: Upload WuppieFuzz report
       - name: Upload WuppieFuzz report
@@ -127,3 +127,40 @@ jobs:
       - name: Stop and remove Docker containers
         if: always()
         run: docker-compose down
+
+  grafana_setup:
+    runs-on: self-hosted
+    needs: build_and_fuzz
+    steps:
+      # Step 1: Set up Grafana with SQLite plugin using Docker Compose
+      - name: Set up Grafana
+        run: |
+          # Create a Docker Compose file to set up Grafana with the SQLite data source plugin
+          cat <<EOF > docker-compose-grafana.yml
+          version: '3'
+          services:
+            grafana:
+              image: grafana/grafana:latest
+              ports:
+                - "3000:3000" # Expose Grafana on port 3000
+              volumes:
+                - ./report.db:/var/lib/grafana/data/report.db # Mount the report.db file for Grafana to access
+                - ./grafana.ini:/etc/grafana/grafana.ini # Use a custom Grafana configuration
+              environment:
+                - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }} # Set Grafana admin password securely
+                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource # Install the SQLite plugin for Grafana
+          EOF
+
+          # Start Grafana using Docker Compose
+          docker-compose -f docker-compose-grafana.yml up -d
+
+      # Step 2: Wait for Grafana to start
+      - name: Wait for Grafana to start
+        run: sleep 15 # Wait for 15 seconds to ensure Grafana is ready
+
+      # Step 3: Provision Grafana dashboards
+      - name: Provision Grafana dashboards
+        run: |
+          # Copy the pre-configured dashboards and data source settings into the Grafana container
+          docker cp dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
+          docker cp datasources.yaml grafana:/etc/grafana/provisioning/datasources/
