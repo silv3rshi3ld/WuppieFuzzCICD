@@ -217,7 +217,12 @@ jobs:
       - name: Wait for Grafana to start
         run: sleep 15
 
-      - name: Provision Grafana dashboards
+      - name: Create provisioning directories in Grafana container
+        run: |
+          docker exec grafana mkdir -p /etc/grafana/provisioning/dashboards/
+          docker exec grafana mkdir -p /etc/grafana/provisioning/datasources/
+
+      - name: Copy provisioning files into Grafana container
         run: |
           docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
           docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
