@@ -17,6 +17,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          clean: false  # Prevents the action from failing due to permission issues
+
+      - name: Manually clean untracked files
+        run: |
+          sudo rm -rf reports/
+          git clean -ffdx
 
       - name: Get WuppieFuzz commit hash
         id: wuppiefuzz_commit
@@ -116,23 +122,31 @@ jobs:
         if: always()
         run: docker-compose down
 
-      - name: Adjust permissions of reports directory
+      - name: Adjust permissions of workspace
         if: always()
         run: |
-          sudo chown -R $USER:$USER reports/
-          sudo chmod -R u+rwX reports/
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+          sudo chmod -R u+rwX $GITHUB_WORKSPACE
 
   grafana_setup:
     runs-on: self-hosted
     needs: build_and_fuzz
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false  # Prevents the action from failing due to permission issues
+
+      - name: Manually clean untracked files
+        run: |
+          sudo rm -rf reports/
+          git clean -ffdx
 
       - name: Set up Grafana
         run: |
           docker network create wuppycicd_network || true
-          REPORT_DB_PATH=$(find reports/ -name report.db)
           UID=$(id -u)
           GID=$(id -g)
           cat > docker-compose-grafana.yml <<EOF
@@ -172,8 +186,8 @@ jobs:
         if: always()
         run: docker-compose -f docker-compose-grafana.yml down
 
-      - name: Adjust permissions of reports directory
+      - name: Adjust permissions of workspace
         if: always()
         run: |
-          sudo chown -R $USER:$USER reports/
-          sudo chmod -R u+rwX reports/
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+          sudo chmod -R u+rwX $GITHUB_WORKSPACE
