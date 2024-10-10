@@ -92,6 +92,11 @@ jobs:
           wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory \
           --timeout=60 openapi.yaml
 
+      - name: Copy report.db to reports/
+        run: |
+          REPORT_DB_PATH=$(find reports/ -name report.db)
+          cp "$REPORT_DB_PATH" reports/
+
       - name: List reports directory
         run: ls -la reports/
 
@@ -121,7 +126,8 @@ jobs:
       - name: Set up Grafana
         run: |
           docker network create wuppycicd_network || true
-          cat <<EOF > docker-compose-grafana.yml
+          REPORT_DB_PATH=$(find reports/ -name report.db)
+          cat > docker-compose-grafana.yml <<EOF
           version: '3'
           services:
             grafana:
@@ -131,7 +137,7 @@ jobs:
               networks:
                 - wuppycicd_network
               volumes:
-                - ./reports/report.db:/var/lib/grafana/data/report.db
+                - ${REPORT_DB_PATH}:/var/lib/grafana/data/report.db
                 - ./grafana.ini:/etc/grafana/grafana.ini
               environment:
                 - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
