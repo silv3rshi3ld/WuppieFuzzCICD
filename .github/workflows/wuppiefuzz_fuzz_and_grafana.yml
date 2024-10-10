@@ -13,6 +13,12 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Clean up Docker networks and containers
+        if: always()
+        run: |
+          docker-compose down --remove-orphans
+          docker network rm wuppycicd_network || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -60,7 +66,8 @@ jobs:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
-          docker network create wuppycicd_network || true
+          # Check if the network exists before creating it
+          docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose up -d --build
 
       - name: Wait for services to start
@@ -120,7 +127,9 @@ jobs:
 
       - name: Stop and remove Docker containers
         if: always()
-        run: docker-compose down
+        run: |
+          docker-compose down --remove-orphans
+          docker network rm wuppycicd_network || true
 
       - name: Adjust permissions of workspace
         if: always()
@@ -133,6 +142,12 @@ jobs:
     needs: build_and_fuzz
 
     steps:
+      - name: Clean up Docker networks and containers
+        if: always()
+        run: |
+          docker-compose -f docker-compose-grafana.yml down --remove-orphans
+          docker network rm wuppycicd_network || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -144,17 +159,33 @@ jobs:
           sudo rm -rf reports/
           git clean -ffdx
 
+      - name: Download report.db
+        uses: actions/download-artifact@v4
+        with:
+          name: report-db
+
       - name: Set up Grafana
+        env:
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
-          docker network create wuppycicd_network || true
-          UID=$(id -u)
-          GID=$(id -g)
+          # Check if the network exists before creating it
+          docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
+
+          # Use different variable names instead of UID and GID
+          MY_UID=$(id -u)
+          MY_GID=$(id -g)
+
+          # Move report.db to reports directory
+          mkdir -p reports
+          mv report-db/report.db reports/
+
+          # Create docker-compose-grafana.yml with the correct user and group IDs
           cat > docker-compose-grafana.yml <<EOF
           version: '3'
           services:
             grafana:
               image: grafana/grafana:latest
-              user: "${UID}:${GID}"
+              user: "${MY_UID}:${MY_GID}"
               ports:
                 - "3000:3000"
               networks:
@@ -163,12 +194,14 @@ jobs:
                 - ./reports:/var/lib/grafana/data
                 - ./grafana.ini:/etc/grafana/grafana.ini
               environment:
-                - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+                - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
                 - GF_INSTALL_PLUGINS=grafana-sqlite-datasource
           networks:
             wuppycicd_network:
               external: true
           EOF
+
+          # Start the Grafana container
           docker-compose -f docker-compose-grafana.yml up -d
 
       - name: Wait for Grafana to start
@@ -184,7 +217,9 @@ jobs:
 
       - name: Stop and remove Grafana container
         if: always()
-        run: docker-compose -f docker-compose-grafana.yml down
+        run: |
+          docker-compose -f docker-compose-grafana.yml down --remove-orphans
+          docker network rm wuppycicd_network || true
 
       - name: Adjust permissions of workspace
         if: always()
