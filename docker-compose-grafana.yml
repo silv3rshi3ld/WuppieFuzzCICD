@@ -1,13 +1,13 @@
 version: '3'
 services:
-  # Existing services
-
   grafana-dashboard:
     image: grafana/grafana-enterprise
     container_name: grafana-dashboard
+    user: "${MY_UID}:${MY_GID}"
     ports:
       - "3000:3000"
     environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GF_INSTALL_PLUGINS=frser-sqlite-datasource
     volumes:
       - ./reports/grafana/report.db:/var/lib/grafana/datasources/report.db
