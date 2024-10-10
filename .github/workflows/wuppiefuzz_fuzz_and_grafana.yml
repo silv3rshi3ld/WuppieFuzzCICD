@@ -116,6 +116,12 @@ jobs:
         if: always()
         run: docker-compose down
 
+      - name: Adjust permissions of reports directory
+        if: always()
+        run: |
+          sudo chown -R $USER:$USER reports/
+          sudo chmod -R u+rwX reports/
+
   grafana_setup:
     runs-on: self-hosted
     needs: build_and_fuzz
@@ -127,17 +133,20 @@ jobs:
         run: |
           docker network create wuppycicd_network || true
           REPORT_DB_PATH=$(find reports/ -name report.db)
+          UID=$(id -u)
+          GID=$(id -g)
           cat > docker-compose-grafana.yml <<EOF
           version: '3'
           services:
             grafana:
               image: grafana/grafana:latest
+              user: "${UID}:${GID}"
               ports:
                 - "3000:3000"
               networks:
                 - wuppycicd_network
               volumes:
-                - ${REPORT_DB_PATH}:/var/lib/grafana/data/report.db
+                - ./reports:/var/lib/grafana/data
                 - ./grafana.ini:/etc/grafana/grafana.ini
               environment:
                 - GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
@@ -158,3 +167,13 @@ jobs:
 
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
+
+      - name: Stop and remove Grafana container
+        if: always()
+        run: docker-compose -f docker-compose-grafana.yml down
+
+      - name: Adjust permissions of reports directory
+        if: always()
+        run: |
+          sudo chown -R $USER:$USER reports/
+          sudo chmod -R u+rwX reports/
