@@ -108,7 +108,8 @@ jobs:
       - name: Copy report.db to reports/grafana/
         run: |
           mkdir -p reports/grafana
-          REPORT_DB_PATH=$(find reports/ -name report.db)
+          REPORT_DB_PATH=$(find reports/ -maxdepth 1 -type f -name report.db)
+          echo "Found report.db at: $REPORT_DB_PATH"
           cp "$REPORT_DB_PATH" reports/grafana/
 
       - name: Verify report.db exists
