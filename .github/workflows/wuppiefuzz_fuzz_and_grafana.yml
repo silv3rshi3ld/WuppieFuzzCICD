@@ -105,13 +105,14 @@ jobs:
           wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory \
           --timeout=60 openapi.yaml
 
-      - name: Copy report.db to reports/
+      - name: Copy report.db to reports/grafana/
         run: |
+          mkdir -p reports/grafana
           REPORT_DB_PATH=$(find reports/ -name report.db)
-          cp "$REPORT_DB_PATH" reports/
+          cp "$REPORT_DB_PATH" reports/grafana/
 
       - name: Verify report.db exists
-        run: ls -la reports/report.db
+        run: ls -la reports/grafana/report.db
 
       - name: Upload WuppieFuzz report
         uses: actions/upload-artifact@v4
@@ -123,7 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-db
-          path: reports/report.db
+          path: reports/grafana/report.db
 
       - name: Stop and remove Docker containers
         if: always()
@@ -165,70 +166,39 @@ jobs:
           name: report-db
           path: report-db  # Downloads artifact into the 'report-db' directory
 
-      - name: Verify report.db exists after download
-        run: ls -la report-db/
-
-      - name: Move report.db to reports directory
+      - name: Move report.db to reports/grafana directory
         run: |
-          mkdir -p reports
+          mkdir -p reports/grafana
           if [ -f report-db/report.db ]; then
-            mv report-db/report.db reports/
+            mv report-db/report.db reports/grafana/report.db
           else
             echo "Error: report-db/report.db not found."
             exit 1
           fi
 
+      - name: Get UID and GID
+        id: get_uid_gid
+        run: |
+          echo "MY_UID=$(id -u)" >> $GITHUB_ENV
+          echo "MY_GID=$(id -g)" >> $GITHUB_ENV
+
       - name: Set up Grafana
         env:
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          MY_UID: ${{ env.MY_UID }}
+          MY_GID: ${{ env.MY_GID }}
         run: |
           # Check if the network exists before creating it
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
 
-          # Use different variable names instead of UID and GID
-          MY_UID=$(id -u)
-          MY_GID=$(id -g)
-
-          # Create docker-compose-grafana.yml with the correct user and group IDs
-          cat > docker-compose-grafana.yml <<EOF
-          version: '3'
-          services:
-            grafana:
-              image: grafana/grafana:latest
-              user: "${MY_UID}:${MY_GID}"
-              ports:
-                - "3000:3000"
-              networks:
-                - wuppycicd_network
-              volumes:
-                - ./reports:/var/lib/grafana/data
-                - ./grafana.ini:/etc/grafana/grafana.ini
-              environment:
-                - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource
-          networks:
-            wuppycicd_network:
-              external: true
-          EOF
-
-          # Start the Grafana container
+          # Start the Grafana container using the docker-compose-grafana.yml from the repository
           docker-compose -f docker-compose-grafana.yml up -d
 
       - name: Wait for Grafana to start
         run: sleep 15
 
-      - name: Create provisioning directories in Grafana container
-        run: |
-          docker exec grafana mkdir -p /etc/grafana/provisioning/dashboards/
-          docker exec grafana mkdir -p /etc/grafana/provisioning/datasources/
-
-      - name: Copy provisioning files into Grafana container
-        run: |
-          docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
-          docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
-
       - name: List Grafana provisioning directory
-        run: docker exec grafana ls -la /etc/grafana/provisioning/
+        run: docker exec grafana-dashboard ls -la /etc/grafana/provisioning/
 
       - name: Stop and remove Grafana container
         if: always()
