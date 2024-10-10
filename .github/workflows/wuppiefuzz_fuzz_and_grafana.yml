@@ -110,8 +110,8 @@ jobs:
           REPORT_DB_PATH=$(find reports/ -name report.db)
           cp "$REPORT_DB_PATH" reports/
 
-      - name: List reports directory
-        run: ls -la reports/
+      - name: Verify report.db exists
+        run: ls -la reports/report.db
 
       - name: Upload WuppieFuzz report
         uses: actions/upload-artifact@v4
@@ -163,6 +163,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: report-db
+          path: report-db  # Downloads artifact into the 'report-db' directory
+
+      - name: Verify report.db exists after download
+        run: ls -la report-db/
+
+      - name: Move report.db to reports directory
+        run: |
+          mkdir -p reports
+          if [ -f report-db/report.db ]; then
+            mv report-db/report.db reports/
+          else
+            echo "Error: report-db/report.db not found."
+            exit 1
+          fi
 
       - name: Set up Grafana
         env:
@@ -174,10 +188,6 @@ jobs:
           # Use different variable names instead of UID and GID
           MY_UID=$(id -u)
           MY_GID=$(id -g)
-
-          # Move report.db to reports directory
-          mkdir -p reports
-          mv report-db/report.db reports/
 
           # Create docker-compose-grafana.yml with the correct user and group IDs
           cat > docker-compose-grafana.yml <<EOF
