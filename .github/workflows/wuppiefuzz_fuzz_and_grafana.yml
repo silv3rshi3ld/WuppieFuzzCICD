@@ -164,11 +164,17 @@ jobs:
             exit 1
           fi
 
+      - name: Get current UID and GID
+        id: get_ids
+        run: |
+          echo "MY_UID=$(id -u)" >> $GITHUB_ENV
+          echo "MY_GID=$(id -g)" >> $GITHUB_ENV
+
       - name: Set up Grafana
         env:
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-          MY_UID: $(id -u)
-          MY_GID: $(id -g)
+          MY_UID: ${{ env.MY_UID }}
+          MY_GID: ${{ env.MY_GID }}
         run: |
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose -f docker-compose-grafana.yml up -d
