@@ -122,12 +122,6 @@ jobs:
           name: report-db
           path: reports/report.db
 
-      - name: Stop and remove Docker containers
-        if: always()
-        run: |
-          docker-compose down --remove-orphans
-          docker network rm wuppycicd_network || true
-
       - name: Adjust permissions of workspace
         if: always()
         run: |
@@ -208,6 +202,8 @@ jobs:
 
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
+
+      # Removed the step to stop and remove the Grafana container
 
       - name: Adjust permissions of workspace
         if: always()
