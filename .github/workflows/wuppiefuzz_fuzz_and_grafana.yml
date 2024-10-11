@@ -18,6 +18,7 @@ jobs:
         run: |
           docker-compose down --remove-orphans
           docker network rm wuppycicd_network || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -28,11 +29,13 @@ jobs:
         run: |
           sudo rm -rf reports/
           git clean -ffdx
+
       - name: Get WuppieFuzz commit hash
         id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
+
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
@@ -46,11 +49,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('WuppieFuzz/Cargo.lock') }}-${{ env.commit_hash }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -64,12 +69,14 @@ jobs:
           # Check if the network exists before creating it
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose up -d --build
+
       - name: Wait for services to start
         run: sleep 15
 
       - name: Test API Connectivity
         run: |
           curl -I http://localhost:3001
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -77,14 +84,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
+
       - name: Build WuppieFuzz
         run: |
           cd WuppieFuzz
           cargo build --release
           cd ..
+
       - name: Add WuppieFuzz to PATH
         run: |
           echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
+
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
 
@@ -94,10 +104,12 @@ jobs:
         run: |
           wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory \
           --timeout=60 openapi.yaml
+
       - name: Copy report.db to reports/
         run: |
           REPORT_DB_PATH=$(find reports/ -name report.db)
           cp "$REPORT_DB_PATH" reports/
+
       - name: Verify report.db exists
         run: ls -la reports/report.db
 
@@ -118,31 +130,24 @@ jobs:
         run: |
           docker-compose down --remove-orphans
           docker network rm wuppycicd_network || true
+
       - name: Adjust permissions of workspace
         if: always()
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
+
   grafana_setup:
     runs-on: self-hosted
     needs: build_and_fuzz
 
     steps:
-      - name: Clean up Docker networks and containers
-        if: always()
-        run: |
-          docker-compose -f docker-compose-grafana.yml down --remove-orphans
-          docker network rm wuppycicd_network || true
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           clean: false  # Prevents the action from failing due to permission issues
 
-      - name: Manually clean untracked files
-        run: |
-          sudo rm -rf reports/
-          git clean -ffdx
       - name: Download report.db
         uses: actions/download-artifact@v4
         with:
@@ -161,6 +166,7 @@ jobs:
             echo "Error: report-db/report.db not found."
             exit 1
           fi
+
       - name: Set up Grafana
         env:
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
@@ -172,27 +178,30 @@ jobs:
           MY_GID=$(id -g)
           # Create docker-compose-grafana.yml with the correct user and group IDs
           cat > docker-compose-grafana.yml <<EOF
-          version: '3'
-          services:
-            grafana:
-              image: grafana/grafana:latest
-              user: "${MY_UID}:${MY_GID}"
-              ports:
-                - "3000:3000"
-              networks:
-                - wuppycicd_network
-              volumes:
-                - ./reports:/var/lib/grafana/data
-                - ./grafana.ini:/etc/grafana/grafana.ini
-              environment:
-                - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-                - GF_INSTALL_PLUGINS=grafana-sqlite-datasource
-          networks:
-            wuppycicd_network:
-              external: true
-          EOF
+version: '3'
+services:
+  grafana:
+    image: grafana/grafana:latest
+    user: "${MY_UID}:${MY_GID}"
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - wuppycicd_network
+    volumes:
+      - ./reports:/var/lib/grafana/data
+      - ./grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-sqlite-datasource
+networks:
+  wuppycicd_network:
+    external: true
+EOF
           # Start the Grafana container
           docker-compose -f docker-compose-grafana.yml up -d
+          docker ps -a
+
       - name: Wait for Grafana to start
         run: sleep 15
 
@@ -200,18 +209,15 @@ jobs:
         run: |
           docker exec grafana mkdir -p /etc/grafana/provisioning/dashboards/
           docker exec grafana mkdir -p /etc/grafana/provisioning/datasources/
+
       - name: Copy provisioning files into Grafana container
         run: |
           docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
           docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
+
       - name: List Grafana provisioning directory
         run: docker exec grafana ls -la /etc/grafana/provisioning/
 
-      - name: Stop and remove Grafana container
-        if: always()
-        run: |
-          docker-compose -f docker-compose-grafana.yml down --remove-orphans
-          docker network rm wuppycicd_network || true
       - name: Adjust permissions of workspace
         if: always()
         run: |
