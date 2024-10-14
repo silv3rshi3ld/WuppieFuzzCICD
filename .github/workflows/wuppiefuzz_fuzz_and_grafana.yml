@@ -100,7 +100,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
         run: |
-          wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=600 openapi.yaml
+          wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=1800 openapi.yaml
 
       - name: Copy report.db to reports/
         run: |
