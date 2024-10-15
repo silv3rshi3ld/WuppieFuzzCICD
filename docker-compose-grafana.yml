@@ -8,7 +8,9 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana.ini:/etc/grafana/grafana.ini
-      - ./provisioning/:/etc/grafana/provisioning/
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./provisioning/plugins:/etc/grafana/provisioning/plugins
       - ./reports/report.db:/var/lib/grafana/datasources/report.db
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
