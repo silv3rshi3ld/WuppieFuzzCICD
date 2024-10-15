@@ -142,7 +142,7 @@ jobs:
       - name: Modify datasources.yaml
         run: |
           # Replace the database path in datasources.yaml
-          sed -i 's|database:.*|database: /var/lib/grafana/datasources/report.db|' WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml
+          sed -i 's|database:.*|database: /var/lib/grafana/datasources/report.db|' WuppieFuzz-dashboard/provisioning/datasources.yaml
 
       - name: Download report directory
         uses: actions/download-artifact@v4
@@ -153,9 +153,8 @@ jobs:
       - name: Prepare provisioning files
         run: |
           mkdir -p provisioning/dashboards
-          mkdir -p provisioning/datasources
-          cp WuppieFuzz-dashboard/provisioning/dashboards.yaml provisioning/dashboards/
-          cp WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml provisioning/datasources/
+          cp WuppieFuzz-dashboard/provisioning/dashboards.yaml provisioning/
+          cp WuppieFuzz-dashboard/provisioning/datasources.yaml provisioning/
           cp WuppieFuzz-dashboard/grafana.ini ./grafana.ini
           cp -r WuppieFuzz-dashboard/dashboards/*.json provisioning/dashboards/
 
