@@ -204,19 +204,40 @@ jobs:
       - name: Adjust permissions for AFLTriage
         run: chmod +x AFLTriage/target/release/afltriage
 
-      # **Added the step to install GDB**
       - name: Install GDB
         run: sudo apt-get update && sudo apt-get install -y gdb
 
+      
+      - name: List contents of reports directory
+        run: |
+          echo "Listing contents of reports directory:"
+          ls -l reports/
+          echo "Listing contents of reports/crashes directory:"
+          ls -l reports/crashes/ || echo "No crashes directory found."
+
+      
+      - name: Check for crashes
+        id: check_crashes
+        run: |
+          if [ -d "reports/crashes" ] && [ "$(ls -A reports/crashes)" ]; then
+            echo "crashes_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "crashes_found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Triage reports with AFLTriage
+        if: steps.check_crashes.outputs.crashes_found == 'true'
         run: |
           AFLTriage/target/release/afltriage -i reports/crashes/ -o triaged_reports/ python3 api_fuzz_wrapper.py @@
 
       - name: Upload triaged reports
+        if: steps.check_crashes.outputs.crashes_found == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: triaged-reports
           path: triaged_reports/
+
+
 
   grafana_setup:
     runs-on: self-hosted
