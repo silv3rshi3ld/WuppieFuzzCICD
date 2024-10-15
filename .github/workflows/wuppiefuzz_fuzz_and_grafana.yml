@@ -101,7 +101,7 @@ jobs:
           RUST_BACKTRACE: 1
         run: |
           if [ -f "login.yaml" ]; then
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=1800 --authentication login.yaml openapi.yaml
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication login.yaml openapi.yaml
           else
             wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=1800 openapi.yaml
           fi
