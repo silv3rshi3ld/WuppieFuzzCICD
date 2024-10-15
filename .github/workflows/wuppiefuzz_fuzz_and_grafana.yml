@@ -40,7 +40,7 @@ jobs:
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
       - name: Cache Rust dependencies and build artifacts
-        uses: actions/cache@v4.1.1
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -102,25 +102,20 @@ jobs:
         run: |
           wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=1800 openapi.yaml
 
-      - name: Copy report.db to reports/
+      - name: Copy report.db to reports/grafana
         run: |
+          mkdir -p reports/grafana
           REPORT_DB_PATH=$(find reports/ -name report.db)
-          cp "$REPORT_DB_PATH" reports/
+          cp "$REPORT_DB_PATH" reports/grafana/
 
       - name: Verify report.db exists
-        run: ls -la reports/report.db
-
-      - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-report
-          path: reports/
+        run: ls -la reports/grafana/report.db
 
       - name: Upload report.db
         uses: actions/upload-artifact@v4
         with:
           name: report-db
-          path: reports/report.db
+          path: reports/grafana/report.db
 
       - name: Adjust permissions of workspace
         if: always()
@@ -143,32 +138,70 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: report-db
-          path: report-db
+          path: reports/grafana
 
       - name: Verify report.db exists after download
-        run: ls -la report-db/
+        run: ls -la reports/grafana/
 
-      - name: Move report.db to reports directory
+      - name: Prepare provisioning files
         run: |
-          mkdir -p reports
-          if [ -f report-db/report.db ]; then
-            mv report-db/report.db reports/
-          else
-            echo "Error: report-db/report.db not found."
-            exit 1
-          fi
+          mkdir -p provisioning/dashboards
+          mkdir -p provisioning/datasources
+          cp WuppieFuzz-dashboard/provisioning/dashboards.yaml provisioning/dashboards/
+          cp WuppieFuzz-dashboard/provisioning/datasources.yaml provisioning/datasources/
+          cp WuppieFuzz-dashboard/grafana.ini ./grafana.ini
+          cp -r WuppieFuzz-dashboard/dashboards/*.json provisioning/dashboards/
 
-      - name: Get current UID and GID
-        id: get_ids
+      - name: Adjust permissions for Grafana files
         run: |
-          echo "MY_UID=$(id -u)" >> $GITHUB_ENV
-          echo "MY_GID=$(id -g)" >> $GITHUB_ENV
+          sudo chown -R 472:472 reports/grafana
+          sudo chown -R 472:472 provisioning
+          sudo chown 472:472 grafana.ini
+
+      - name: Build custom Grafana image with SQLite plugin
+        run: |
+          echo 'FROM grafana/grafana-enterprise
+          RUN grafana-cli plugins install frser-sqlite-datasource
+          ' > Dockerfile
+          docker build -t custom-grafana .
+
+      - name: Create docker-compose-grafana.yml
+        run: |
+          echo 'version: "3.8"
+
+          services:
+            grafana-dashboard:
+              image: custom-grafana
+              container_name: grafana-dashboard
+              ports:
+                - "3000:3000"
+              environment:
+                - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+              volumes:
+                - type: bind
+                  source: ${GITHUB_WORKSPACE}/reports/grafana/report.db
+                  target: /var/lib/grafana/datasources/report.db
+                - type: bind
+                  source: ${GITHUB_WORKSPACE}/provisioning/dashboards
+                  target: /var/lib/grafana/dashboards
+                - type: bind
+                  source: ${GITHUB_WORKSPACE}/grafana.ini
+                  target: /etc/grafana/grafana.ini
+                - type: bind
+                  source: ${GITHUB_WORKSPACE}/provisioning
+                  target: /etc/grafana/provisioning
+              networks:
+                default:
+                  name: wuppycicd_network
+
+          networks:
+            default:
+              external: true
+          ' > docker-compose-grafana.yml
 
       - name: Set up Grafana
         env:
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-          MY_UID: ${{ env.MY_UID }}
-          MY_GID: ${{ env.MY_GID }}
         run: |
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose -f docker-compose-grafana.yml up -d
@@ -177,7 +210,7 @@ jobs:
       - name: Wait for Grafana to start
         run: |
           for i in {1..10}; do
-            if docker inspect -f '{{.State.Running}}' grafana | grep true; then
+            if docker inspect -f '{{.State.Running}}' grafana-dashboard | grep true; then
               echo "Grafana is running"
               break
             else
@@ -186,24 +219,8 @@ jobs:
             fi
           done
 
-      - name: Output Grafana logs if not running
-        if: failure()
-        run: docker logs grafana
-
-      - name: Create provisioning directories in Grafana container
-        run: |
-          docker exec grafana mkdir -p /etc/grafana/provisioning/dashboards/
-          docker exec grafana mkdir -p /etc/grafana/provisioning/datasources/
-
-      - name: Copy provisioning files into Grafana container
-        run: |
-          docker cp provisioning/dashboards.yaml grafana:/etc/grafana/provisioning/dashboards/
-          docker cp provisioning/datasources.yaml grafana:/etc/grafana/provisioning/datasources/
-
-      - name: List Grafana provisioning directory
-        run: docker exec grafana ls -la /etc/grafana/provisioning/
-
-      # Removed the step to stop and remove the Grafana container
+      - name: Output Grafana logs
+        run: docker logs grafana-dashboard
 
       - name: Adjust permissions of workspace
         if: always()
