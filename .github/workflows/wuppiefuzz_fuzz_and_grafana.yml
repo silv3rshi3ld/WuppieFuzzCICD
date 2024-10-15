@@ -13,32 +13,38 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      # Clean up Docker networks and containers
       - name: Clean up Docker networks and containers
         if: always()
         run: |
           docker-compose down --remove-orphans
           docker network rm wuppycicd_network || true
 
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           clean: false
 
+      # Manually clean untracked files
       - name: Manually clean untracked files
         run: |
           sudo rm -rf reports/
           git clean -ffdx
 
+      # Get WuppieFuzz commit hash
       - name: Get WuppieFuzz commit hash
         id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
+      # Clone WuppieFuzz repository
       - name: Clone WuppieFuzz repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
+      # Cache Rust dependencies and build artifacts
       - name: Cache Rust dependencies and build artifacts
         uses: actions/cache@v4
         with:
@@ -50,15 +56,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      # Install Docker Compose
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version
 
+      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Build and run services with Docker Compose
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -69,33 +78,41 @@ jobs:
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose up -d --build
 
+      # Wait for services to start
       - name: Wait for services to start
         run: sleep 15
 
+      # Test API Connectivity
       - name: Test API Connectivity
         run: curl -I http://localhost:3001
 
+      # Install Rust toolchain
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      # Install dependencies for WuppieFuzz
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
+      # Build WuppieFuzz
       - name: Build WuppieFuzz
         run: |
           cd WuppieFuzz
           cargo build --release
           cd ..
 
+      # Add WuppieFuzz to PATH
       - name: Add WuppieFuzz to PATH
         run: |
           echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
+      # Generate initial corpus
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
 
+      # Run WuppieFuzz
       - name: Run WuppieFuzz
         env:
           RUST_BACKTRACE: 1
@@ -106,12 +123,14 @@ jobs:
             wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
           fi
 
+      # Upload report directory
       - name: Upload report directory
         uses: actions/upload-artifact@v4
         with:
           name: report-directory
           path: reports/
 
+      # Adjust permissions of workspace
       - name: Adjust permissions of workspace
         if: always()
         run: |
@@ -123,18 +142,21 @@ jobs:
     needs: build_and_fuzz
 
     steps:
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           clean: false
 
+      # Download report directory
       - name: Download report directory
         uses: actions/download-artifact@v4
         with:
           name: report-directory
           path: reports/
 
+      # Install Python dependencies
       - name: Install Python dependencies
         run: |
           sudo apt-get update
@@ -142,6 +164,7 @@ jobs:
           pip3 install --upgrade pip
           pip3 install requests
 
+      # Create API Fuzz Wrapper Script
       - name: Create API Fuzz Wrapper Script
         run: |
           cat <<EOF > api_fuzz_wrapper.py
@@ -171,51 +194,7 @@ jobs:
           EOF
           chmod +x api_fuzz_wrapper.py
 
-      - name: Get AFLTriage commit hash
-        id: afltriage_commit
-        run: |
-          git ls-remote https://github.com/quic/AFLTriage.git HEAD | awk '{print $1}' > afltriage_commit.txt
-          echo "commit_hash=$(cat afltriage_commit.txt)" >> $GITHUB_ENV
-
-      - name: Cache AFLTriage Rust dependencies and build artifacts
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            AFLTriage/target
-          key: ${{ runner.os }}-afltriage-cargo-${{ hashFiles('AFLTriage/Cargo.lock') }}-${{ env.commit_hash }}
-          restore-keys: |
-            ${{ runner.os }}-afltriage-cargo-
-
-      - name: Clone AFLTriage repository
-        run: git clone https://github.com/quic/AFLTriage.git
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build AFLTriage
-        run: |
-          cd AFLTriage
-          cargo build --release
-          cd ..
-
-      - name: Adjust permissions for AFLTriage
-        run: chmod +x AFLTriage/target/release/afltriage
-
-      - name: Install GDB
-        run: sudo apt-get update && sudo apt-get install -y gdb
-
-      
-      - name: List contents of reports directory
-        run: |
-          echo "Listing contents of reports directory:"
-          ls -l reports/
-          echo "Listing contents of reports/crashes directory:"
-          ls -l reports/crashes/ || echo "No crashes directory found."
-
-      
+      # Check for crashes
       - name: Check for crashes
         id: check_crashes
         run: |
@@ -225,11 +204,30 @@ jobs:
             echo "crashes_found=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Triage reports with AFLTriage
+      # Start API Service
+      - name: Start API Service
+        run: |
+          docker-compose up -d api_service
+
+      # Build AFLTriage Docker Image
+      - name: Build AFLTriage Docker Image
+        run: |
+          docker build -f Dockerfile.afltriage -t afltriage .
+
+      # Run AFLTriage in Docker Container
+      - name: Run AFLTriage in Docker Container
         if: steps.check_crashes.outputs.crashes_found == 'true'
         run: |
-          AFLTriage/target/release/afltriage -i reports/crashes/ -o triaged_reports/ python3 api_fuzz_wrapper.py @@
+          docker run --rm \
+            --network host \
+            -v ${{ github.workspace }}/reports:/app/reports \
+            -v ${{ github.workspace }}/triaged_reports:/app/triaged_reports \
+            afltriage \
+            -i /app/reports/crashes/ \
+            -o /app/triaged_reports/ \
+            python3 /app/api_fuzz_wrapper.py @@
 
+      # Upload triaged reports
       - name: Upload triaged reports
         if: steps.check_crashes.outputs.crashes_found == 'true'
         uses: actions/upload-artifact@v4
@@ -237,37 +235,53 @@ jobs:
           name: triaged-reports
           path: triaged_reports/
 
+      # Stop API Service
+      - name: Stop API Service
+        if: always()
+        run: |
+          docker-compose down
 
+      # Adjust permissions of workspace
+      - name: Adjust permissions of workspace
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+          sudo chmod -R u+rwX $GITHUB_WORKSPACE
 
   grafana_setup:
     runs-on: self-hosted
     needs: triage_reports
 
     steps:
+      # Clean up Docker networks and containers
       - name: Clean up Docker networks and containers
         if: always()
         run: |
           docker-compose -f docker-compose-grafana.yml down --remove-orphans
           docker network rm wuppycicd_network || true
 
+      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           clean: false
 
+      # Download report directory
       - name: Download report directory
         uses: actions/download-artifact@v4
         with:
           name: report-directory
           path: reports/
 
+      # Download triaged reports
       - name: Download triaged reports
         uses: actions/download-artifact@v4
         with:
           name: triaged-reports
           path: triaged_reports/
 
+      # Prepare provisioning files
       - name: Prepare provisioning files
         run: |
           mkdir -p provisioning/dashboards
@@ -277,6 +291,7 @@ jobs:
           cp WuppieFuzz-dashboard/grafana.ini ./grafana.ini
           cp -r WuppieFuzz-dashboard/dashboards/*.json provisioning/dashboards/
 
+      # Adjust permissions for Grafana files
       - name: Adjust permissions for Grafana files
         run: |
           sudo chown -R 472:472 reports
@@ -284,6 +299,7 @@ jobs:
           sudo chown -R 472:472 provisioning
           sudo chown 472:472 grafana.ini
 
+      # Build custom Grafana image with SQLite plugin
       - name: Build custom Grafana image with SQLite plugin
         run: |
           echo 'FROM grafana/grafana-enterprise
@@ -291,6 +307,7 @@ jobs:
           ' > Dockerfile
           docker build -t custom-grafana .
 
+      # Set up Grafana
       - name: Set up Grafana
         env:
           GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
@@ -299,6 +316,7 @@ jobs:
           docker-compose -f docker-compose-grafana.yml up -d
           docker ps -a
 
+      # Wait for Grafana to start
       - name: Wait for Grafana to start
         run: |
           for i in {1..10}; do
@@ -311,9 +329,11 @@ jobs:
             fi
           done
 
+      # Output Grafana logs
       - name: Output Grafana logs
         run: docker logs grafana-dashboard
 
+      # Adjust permissions of workspace
       - name: Adjust permissions of workspace
         if: always()
         run: |
