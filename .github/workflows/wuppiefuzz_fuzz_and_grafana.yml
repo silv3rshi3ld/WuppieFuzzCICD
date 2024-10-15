@@ -103,7 +103,7 @@ jobs:
           if [ -f "login.yaml" ]; then
             wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication login.yaml openapi.yaml
           else
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=1800 openapi.yaml
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
           fi
 
       - name: Upload report directory
