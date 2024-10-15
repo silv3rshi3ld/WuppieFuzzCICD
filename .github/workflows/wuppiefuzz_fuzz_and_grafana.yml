@@ -136,6 +136,14 @@ jobs:
           fetch-depth: 0
           clean: false
 
+      - name: Clone WuppieFuzz-dashboard repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
+
+      - name: Modify datasources.yaml
+        run: |
+          # Replace the database path in datasources.yaml
+          sed -i 's|database:.*|database: /var/lib/grafana/datasources/report.db|' WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml
+
       - name: Download report directory
         uses: actions/download-artifact@v4
         with:
@@ -147,7 +155,7 @@ jobs:
           mkdir -p provisioning/dashboards
           mkdir -p provisioning/datasources
           cp WuppieFuzz-dashboard/provisioning/dashboards.yaml provisioning/dashboards/
-          cp WuppieFuzz-dashboard/provisioning/datasources.yaml provisioning/datasources/
+          cp WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml provisioning/datasources/
           cp WuppieFuzz-dashboard/grafana.ini ./grafana.ini
           cp -r WuppieFuzz-dashboard/dashboards/*.json provisioning/dashboards/
 
@@ -192,3 +200,4 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
+

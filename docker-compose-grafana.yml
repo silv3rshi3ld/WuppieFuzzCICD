@@ -9,7 +9,7 @@ services:
     volumes:
       - ./grafana.ini:/etc/grafana/grafana.ini
       - ./provisioning/:/etc/grafana/provisioning/
-      - ./reports/:/var/lib/grafana/reports/
+      - ./reports/report.db:/var/lib/grafana/datasources/report.db
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
     networks:
