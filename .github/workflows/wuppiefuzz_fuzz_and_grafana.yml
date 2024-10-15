@@ -121,27 +121,27 @@ jobs:
   triage_reports:
     runs-on: self-hosted
     needs: build_and_fuzz
-  
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           clean: false
-  
+
       - name: Download report directory
         uses: actions/download-artifact@v4
         with:
           name: report-directory
           path: reports/
-  
+
       - name: Install Python dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
           pip3 install --upgrade pip
           pip3 install requests
-  
+
       - name: Create API Fuzz Wrapper Script
         run: |
           cat <<EOF > api_fuzz_wrapper.py
@@ -170,13 +170,13 @@ jobs:
               main()
           EOF
           chmod +x api_fuzz_wrapper.py
-  
+
       - name: Get AFLTriage commit hash
         id: afltriage_commit
         run: |
           git ls-remote https://github.com/quic/AFLTriage.git HEAD | awk '{print $1}' > afltriage_commit.txt
           echo "commit_hash=$(cat afltriage_commit.txt)" >> $GITHUB_ENV
-  
+
       - name: Cache AFLTriage Rust dependencies and build artifacts
         id: cache
         uses: actions/cache@v4
@@ -188,32 +188,35 @@ jobs:
           key: ${{ runner.os }}-afltriage-cargo-${{ hashFiles('AFLTriage/Cargo.lock') }}-${{ env.commit_hash }}
           restore-keys: |
             ${{ runner.os }}-afltriage-cargo-
-  
+
       - name: Clone AFLTriage repository
         run: git clone https://github.com/quic/AFLTriage.git
-  
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-  
+
       - name: Build AFLTriage
         run: |
           cd AFLTriage
           cargo build --release
           cd ..
-  
+
       - name: Adjust permissions for AFLTriage
         run: chmod +x AFLTriage/target/release/afltriage
-  
+
+      # **Added the step to install GDB**
+      - name: Install GDB
+        run: sudo apt-get update && sudo apt-get install -y gdb
+
       - name: Triage reports with AFLTriage
         run: |
           AFLTriage/target/release/afltriage -i reports/crashes/ -o triaged_reports/ python3 api_fuzz_wrapper.py @@
-  
+
       - name: Upload triaged reports
         uses: actions/upload-artifact@v4
         with:
           name: triaged-reports
           path: triaged_reports/
-
 
   grafana_setup:
     runs-on: self-hosted
