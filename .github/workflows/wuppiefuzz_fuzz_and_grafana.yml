@@ -137,7 +137,13 @@ jobs:
           clean: false
 
       - name: Clone WuppieFuzz-dashboard repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
+        run: |
+          git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
+          cd WuppieFuzz-dashboard
+          git checkout c1feab829687e6d1e20d83d4d4824fa8d85b2ace
+
+      - name: List contents of WuppieFuzz-dashboard/provisioning/datasources/
+        run: ls -la WuppieFuzz-dashboard/provisioning/datasources/
 
       - name: Modify datasources.yaml
         run: |
@@ -201,4 +207,3 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
