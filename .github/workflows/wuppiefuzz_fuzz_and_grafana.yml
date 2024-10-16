@@ -124,12 +124,6 @@ jobs:
     needs: build_and_fuzz
 
     steps:
-      - name: Clean up Docker networks and containers
-        if: always()
-        run: |
-          docker-compose -f docker-compose-grafana.yml down --remove-orphans
-          docker network rm wuppycicd_network || true
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -137,18 +131,7 @@ jobs:
           clean: false
 
       - name: Clone WuppieFuzz-dashboard repository
-        run: |
-          git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
-          cd WuppieFuzz-dashboard
-          git checkout c1feab829687e6d1e20d83d4d4824fa8d85b2ace
-
-      - name: List contents of WuppieFuzz-dashboard/provisioning/datasources/
-        run: ls -la WuppieFuzz-dashboard/provisioning/datasources/
-
-      - name: Modify datasources.yaml
-        run: |
-          # Replace the database path in datasources.yaml
-          sed -i 's|database:.*|database: /var/lib/grafana/datasources/report.db|' WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml
+        run: git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
 
       - name: Download report directory
         uses: actions/download-artifact@v4
@@ -156,41 +139,26 @@ jobs:
           name: report-directory
           path: reports/
 
-      - name: Prepare provisioning files
+      - name: Prepare report.db for Grafana
         run: |
-          mkdir -p provisioning/dashboards
-          mkdir -p provisioning/datasources
-          mkdir -p provisioning/plugins
-          cp WuppieFuzz-dashboard/provisioning/dashboards/* provisioning/dashboards/
-          cp WuppieFuzz-dashboard/provisioning/datasources/datasources.yaml provisioning/datasources/
-          cp WuppieFuzz-dashboard/provisioning/plugins/sqlite_plugin.yaml provisioning/plugins/
-          cp WuppieFuzz-dashboard/grafana.ini ./grafana.ini
+          mkdir -p reports/grafana
+          cp reports/report.db reports/grafana/report.db
 
-      - name: Adjust permissions for Grafana files
+      - name: Adjust permissions (if necessary)
         run: |
           sudo chown -R 472:472 reports
-          sudo chown -R 472:472 provisioning
-          sudo chown 472:472 grafana.ini
+          sudo chown -R 472:472 WuppieFuzz-dashboard
 
-      - name: Build custom Grafana image with SQLite plugin
+      - name: Start Grafana
         run: |
-          echo 'FROM grafana/grafana-enterprise
-          RUN grafana-cli plugins install frser-sqlite-datasource
-          ' > Dockerfile
-          docker build -t custom-grafana .
-
-      - name: Set up Grafana
-        env:
-          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
-        run: |
-          docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
-          docker-compose -f docker-compose-grafana.yml up -d
+          cd WuppieFuzz-dashboard
+          docker-compose up -d
           docker ps -a
 
       - name: Wait for Grafana to start
         run: |
           for i in {1..10}; do
-            if docker inspect -f '{{.State.Running}}' grafana-dashboard | grep true; then
+            if docker inspect -f '{{.State.Running}}' wuppiefuzz-dashboard_grafana-dashboard_1 | grep true; then
               echo "Grafana is running"
               break
             else
@@ -200,7 +168,7 @@ jobs:
           done
 
       - name: Output Grafana logs
-        run: docker logs grafana-dashboard
+        run: docker logs wuppiefuzz-dashboard_grafana-dashboard_1
 
       - name: Adjust permissions of workspace
         if: always()
