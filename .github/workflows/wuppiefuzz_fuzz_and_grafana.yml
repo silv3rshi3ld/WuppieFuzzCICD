@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  build_and_fuzz:
+  wuppie_build_and_fuzz:
     runs-on: self-hosted
 
     steps:
@@ -113,11 +113,11 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
+      
 
   grafana_setup:
     runs-on: self-hosted
-    needs: build_and_fuzz
+    needs: wuppie_build_and_fuzz
 
     steps:
       - name: Checkout repository
@@ -134,7 +134,11 @@ jobs:
         with:
           name: report-directory
           path: reports/
-
+      
+      - name: modify compose.yaml to use the correct report.db
+        run: |
+          sed -i 's|/var/lib/grafana/datasources/report.db|/github/workspace/reports/grafana/report.db|g' WuppieFuzz-dashboard/docker-compose-grafana.yml
+      
       - name: Install unzip
         run: |
           sudo apt-get update
