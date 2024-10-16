@@ -1,23 +1,36 @@
-name: WuppieFuzz Build and Fuzz
+name: WuppyCICD Pipeline
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  build_and_fuzz:
+  prepare_fuzz:
     runs-on: self-hosted
 
     steps:
-      - name: Clean up Docker networks and containers
-        if: always()
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false
+
+      - name: Get WuppieFuzz commit hash
         run: |
-          docker-compose down --remove-orphans
-          docker network rm wuppycicd_network || true
+          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
+          echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
+
+  build_and_fuzz:
+    runs-on: self-hosted
+    needs: prepare_fuzz
+
+    steps:
+      - name: Clean workspace
+        run: |
+          sudo rm -rf reports/
+          git clean -ffdx
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,32 +38,30 @@ jobs:
           fetch-depth: 0
           clean: false
 
-      - name: Manually clean untracked files
-        run: |
-          sudo rm -rf reports/
-          git clean -ffdx
-
       - name: Get WuppieFuzz commit hash
-        id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
       - name: Clone WuppieFuzz repository
+        env:
+          commit_hash: ${{ env.commit_hash }}
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
-      - name: Cache Rust dependencies and build artifacts
+      - name: Cache Cargo builds
         uses: actions/cache@v4
+        env:
+          commit_hash: ${{ env.commit_hash }}
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             WuppieFuzz/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('WuppieFuzz/Cargo.lock') }}-${{ env.commit_hash }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ env.commit_hash }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install Docker Compose
+      - name: Install docker-compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
@@ -58,8 +69,11 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          install: false
 
-      - name: Build and run services with Docker Compose
+      - name: Create Docker network and start services
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -69,13 +83,13 @@ jobs:
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
           docker-compose up -d --build
 
-      - name: Wait for services to start
+      - name: Wait for API to be ready
         run: sleep 15
 
-      - name: Test API Connectivity
+      - name: Test API endpoint
         run: curl -I http://localhost:3001
 
-      - name: Install Rust toolchain
+      - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies for WuppieFuzz
@@ -90,8 +104,7 @@ jobs:
           cd ..
 
       - name: Add WuppieFuzz to PATH
-        run: |
-          echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
+        run: echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
 
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
@@ -106,6 +119,11 @@ jobs:
             wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
           fi
 
+      - name: Move report.db to reports directory
+        run: |
+          mkdir -p reports
+          mv report.db reports/
+
       - name: Upload report directory
         uses: actions/upload-artifact@v4
         with:
@@ -117,7 +135,6 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
 
   grafana_setup:
     runs-on: self-hosted
@@ -143,32 +160,6 @@ jobs:
         run: |
           mkdir -p reports/grafana
           cp reports/report.db reports/grafana/report.db
-
-      - name: Adjust permissions (if necessary)
-        run: |
-          sudo chown -R 472:472 reports
-          sudo chown -R 472:472 WuppieFuzz-dashboard
-
-      - name: Start Grafana
-        run: |
-          cd WuppieFuzz-dashboard
-          docker-compose up -d
-          docker ps -a
-
-      - name: Wait for Grafana to start
-        run: |
-          for i in {1..10}; do
-            if docker inspect -f '{{.State.Running}}' wuppiefuzz-dashboard_grafana-dashboard_1 | grep true; then
-              echo "Grafana is running"
-              break
-            else
-              echo "Waiting for Grafana to start..."
-              sleep 10
-            fi
-          done
-
-      - name: Output Grafana logs
-        run: docker logs wuppiefuzz-dashboard_grafana-dashboard_1
 
       - name: Adjust permissions of workspace
         if: always()
