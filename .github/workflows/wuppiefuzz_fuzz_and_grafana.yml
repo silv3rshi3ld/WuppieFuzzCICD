@@ -113,9 +113,8 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
-      
-
-  grafana_setup:
+  
+  microsoft_restler_setup:
     runs-on: self-hosted
     needs: wuppie_build_and_fuzz
 
@@ -126,33 +125,68 @@ jobs:
           fetch-depth: 0
           clean: false
 
-      - name: Clone WuppieFuzz-dashboard repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
-
-      - name: Download report directory
-        uses: actions/download-artifact@v4
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          name: report-directory
-          path: reports/
-      
-      - name: modify compose.yaml to use the correct report.db
-        run: |
-          sed -i 's|/var/lib/grafana/datasources/report.db|/github/workspace/new_location/report.db|g' WuppieFuzz-dashboard/docker-compose-grafana.yml
-      
-      - name: Install unzip
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip
+          python-version: 3.8.2
 
-      - name: Extract report.db from artifact
-        run: |
-          mkdir -p reports/grafana
-          unzip report-directory.zip '*/report.db' -d reports/grafana
-          mv reports/grafana/*/report.db reports/grafana/report.db
-          rm -rf reports/grafana/*/
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.x
 
-      - name: Adjust permissions of workspace
-        if: always()
+      - name: Clone Microsoft/Restler repository
+        run: git clone https://github.com/microsoft/restler-fuzzer.git Restler
+
+      - name: Build RESTler
         run: |
-          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
-          sudo chmod -R u+rwX $GITHUB_WORKSPACE
+          mkdir restler_bin
+          cd Restler
+          python ./build-restler.py --dest_dir ../restler_bin
+
+      - name: Run RESTler fuzz
+        run: |
+          cd ../restler_bin/restler
+          dotnet ./Restler.dll fuzz --api_spec <path_to_your_openapi_spec>
+
+#  grafana_setup:
+#      runs-on: self-hosted
+#      needs: wuppie_build_and_fuzz
+#  
+#      steps:
+#        - name: Checkout repository
+#          uses: actions/checkout@v4
+#          with:
+#            fetch-depth: 0
+#            clean: false
+#  
+#        - name: Clone WuppieFuzz-dashboard repository
+#          run: git clone https://github.com/TNO-S3/WuppieFuzz-dashboard.git
+#  
+#        - name: Download report directory
+#          uses: actions/download-artifact@v4
+#          with:
+#            name: report-directory
+#            path: reports/
+#        
+#        - name: modify compose.yaml to use the correct report.db
+#          run: |
+#            sed -i 's|/var/lib/grafana/datasources/report.db|/github/workspace/fuzzing/reports/report.db|g' WuppieFuzz-dashboard/docker-compose-grafana.yml
+#        
+#        - name: Install unzip
+#          run: |
+#            sudo apt-get update
+#            sudo apt-get install -y unzip
+#  
+#        - name: Extract report.db from artifact
+#          run: |
+#            mkdir -p reports/grafana
+#            unzip report-directory.zip '*/report.db' -d reports/grafana
+#            mv reports/grafana/*/report.db reports/grafana/report.db
+#            rm -rf reports/grafana/*/
+#  
+#        - name: Adjust permissions of workspace
+#          if: always()
+#          run: |
+#            sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+#            sudo chmod -R u+rwX $GITHUB_WORKSPACE
