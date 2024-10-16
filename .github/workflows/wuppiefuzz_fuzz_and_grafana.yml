@@ -137,7 +137,7 @@ jobs:
       
       - name: modify compose.yaml to use the correct report.db
         run: |
-          sed -i 's|/var/lib/grafana/datasources/report.db|/github/workspace/reports/grafana/report.db|g' WuppieFuzz-dashboard/docker-compose-grafana.yml
+          sed -i 's|/var/lib/grafana/datasources/report.db|/github/workspace/new_location/report.db|g' WuppieFuzz-dashboard/docker-compose-grafana.yml
       
       - name: Install unzip
         run: |
