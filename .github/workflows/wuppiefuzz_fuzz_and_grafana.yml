@@ -129,10 +129,12 @@ jobs:
           name: report-directory
           path: reports/
 
-      - name: Prepare report.db for Grafana
+      - name: Extract report.db from artifact
         run: |
           mkdir -p reports/grafana
-          cp reports/report.db reports/grafana/report.db
+          unzip reports/report-directory.zip '*/report.db' -d reports/grafana
+          mv reports/grafana/*/report.db reports/grafana/report.db
+          rm -rf reports/grafana/*/
 
       - name: Adjust permissions of workspace
         if: always()
