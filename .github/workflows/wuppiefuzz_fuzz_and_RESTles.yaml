@@ -9,6 +9,7 @@ on:
       - main
 
 jobs:
+  
   setup_docker_wuppie:
     runs-on: self-hosted
     outputs:
@@ -42,24 +43,27 @@ jobs:
     runs-on: self-hosted
     needs: setup_docker_wuppie
     steps:
-      - name: Checkout repository
+      - name: Checkout WuppieFuzz repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          clean: false
+          repository: TNO-S3/WuppieFuzz
+          path: WuppieFuzz
 
       - name: Manually clean untracked files
         run: |
           sudo rm -rf reports/
-          git clean -ffdx
+          git -C WuppieFuzz clean -ffdx
 
       - name: Get WuppieFuzz commit hash
         run: |
-          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
-          echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
+          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > WuppieFuzz/wuppiefuzz_commit.txt
+          echo "commit_hash=$(cat WuppieFuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
-      - name: Clone WuppieFuzz repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
+      - name: Upload WuppieFuzz repository as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WuppieFuzz
+          path: WuppieFuzz
 
   cache_dependencies_wuppie:
     runs-on: self-hosted
@@ -78,8 +82,14 @@ jobs:
 
   build_and_run_wuppie:
     runs-on: self-hosted
-    needs: [setup_docker_wuppie, cache_dependencies_wuppie]
+    needs: cache_dependencies_wuppie
     steps:
+      - name: Download WuppieFuzz repository artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WuppieFuzz
+          path: .
+
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -104,6 +114,12 @@ jobs:
     runs-on: self-hosted
     needs: test_connectivity_wuppie
     steps:
+      - name: Download WuppieFuzz repository artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: WuppieFuzz
+          path: .
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -190,29 +206,38 @@ jobs:
     runs-on: self-hosted
     needs: setup_docker_restler
     steps:
-      - name: Checkout repository
+      - name: Checkout RESTler repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          clean: false
+          repository: microsoft/restler-fuzzer
+          path: restler-fuzzer
 
       - name: Manually clean untracked files
         run: |
           sudo rm -rf reports/
-          git clean -ffdx
+          git -C restler-fuzzer clean -ffdx
 
       - name: Get RESTler API commit hash
         run: |
-          git ls-remote https://github.com/microsoft/restler-fuzzer.git HEAD | awk '{print $1}' > restler_commit.txt
-          echo "commit_hash=$(cat restler_commit.txt)" >> $GITHUB_ENV
+          git ls-remote https://github.com/microsoft/restler-fuzzer.git HEAD | awk '{print $1}' > restler-fuzzer/restler_commit.txt
+          echo "commit_hash=$(cat restler-fuzzer/restler_commit.txt)" >> $GITHUB_ENV
 
-      - name: Clone RESTler API repository
-        run: git clone https://github.com/microsoft/restler-fuzzer.git
+      - name: Upload RESTler repository as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-fuzzer
+          path: restler-fuzzer
 
   build_and_run_restler:
     runs-on: self-hosted
-    needs: [setup_docker_restler, checkout_repos_restler]
+    needs: checkout_repos_restler
     steps:
+      - name: Download RESTler repository artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: restler-fuzzer
+          path: .
+
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -237,41 +262,43 @@ jobs:
     runs-on: self-hosted
     needs: test_connectivity_restler
     steps:
+      - name: Download RESTler repository artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: restler-fuzzer
+          path: .
+
       - name: Install .NET SDK and dependencies for RESTler
         run: |
           sudo apt-get update
           sudo apt-get install -y dotnet-sdk-6.0 python3.10 python3.10-venv python3-pip
-  
-      - name: Clone RESTler repository
-        run: git clone https://github.com/microsoft/restler-fuzzer.git
-  
+
       - name: Build RESTler
         run: |
           cd restler-fuzzer
           python3 ./build-restler.py --dest_dir ./restler_bin
           cd ..
-  
+
       - name: Set up RESTler in PATH
         run: echo "${{ github.workspace }}/restler-fuzzer/restler_bin/restler" >> $GITHUB_PATH
-  
+
       - name: Ensure RESTler executable has execute permissions
         run: |
           chmod +x ./restler-fuzzer/restler_bin/restler/restler
-  
+
       - name: Verify RESTler executable
         run: |
           ls -la ./restler-fuzzer/restler_bin/restler/
-  
+
       - name: Compile API specification using RESTler
         run: |
           ./restler-fuzzer/restler_bin/restler/restler compile --api_spec ./openapi.yaml
-  
+
       - name: Run RESTler Fuzzing (lean mode)
         run: |
           ./restler-fuzzer/restler_bin/restler/restler fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
         env:
           RUST_BACKTRACE: 1
-
 
   finalize_restler:
     runs-on: self-hosted
