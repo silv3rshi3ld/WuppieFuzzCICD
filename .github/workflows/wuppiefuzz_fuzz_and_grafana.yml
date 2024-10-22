@@ -114,40 +114,84 @@ jobs:
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
   
-  microsoft_restler_setup:
-    runs-on: self-hosted
-    needs: wuppie_build_and_fuzz
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          clean: false
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8.2
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v1
-        with:
-          dotnet-version: 6.0.x
-
-      - name: Clone Microsoft/Restler repository
-        run: git clone https://github.com/microsoft/restler-fuzzer.git Restler
-
-      - name: Build RESTler
-        run: |
-          mkdir restler_bin
-          cd Restler
-          python ./build-restler.py --dest_dir ../restler_bin
-
-      - name: Run RESTler fuzz
-        run: |
-          cd ../restler_bin/restler
-          dotnet ./Restler.dll fuzz --api_spec <path_to_your_openapi_spec>
+  restler_build:
+      runs-on: self-hosted
+  
+      steps:
+        # Step 1: Clean up Docker networks and containers
+        - name: Clean up Docker networks and containers
+          if: always()
+          run: |
+            docker-compose down --remove-orphans
+            docker network rm restler_network || true
+  
+        # Step 2: Checkout repository
+        - name: Checkout repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+            clean: false
+  
+        # Step 3: Manually clean untracked files
+        - name: Manually clean untracked files
+          run: |
+            sudo rm -rf reports/
+            git clean -ffdx
+  
+        # Step 4: Get RESTler API commit hash (Optional)
+        - name: Get RESTler API commit hash
+          id: restler_commit
+          run: |
+            git ls-remote https://github.com/your-org/RESTlerAPI.git HEAD | awk '{print $1}' > restler_commit.txt
+            echo "commit_hash=$(cat restler_commit.txt)" >> $GITHUB_ENV
+  
+        # Step 5: Clone RESTler API repository
+        - name: Clone RESTler API repository
+          run: git clone https://github.com/your-org/RESTlerAPI.git
+  
+        # Step 6: Install Docker Compose
+        - name: Install Docker Compose
+          run: |
+            sudo apt-get update
+            sudo apt-get install -y docker-compose
+            docker-compose --version
+  
+        # Step 7: Set up Docker Buildx
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
+  
+        # Step 8: Build and run services with Docker Compose
+        - name: Build and run services with Docker Compose
+          env:
+            SMTP_USER: ${{ secrets.SMTP_USER }}
+            SMTP_PASS: ${{ secrets.SMTP_PASS }}
+            SMTP_HOST: ${{ secrets.SMTP_HOST }}
+            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          run: |
+            docker network inspect restler_network >/dev/null 2>&1 || docker network create restler_network
+            docker-compose up -d --build
+  
+        # Step 9: Wait for services to start
+        - name: Wait for services to start
+          run: sleep 15
+  
+        # Step 10: Test API Connectivity
+        - name: Test API Connectivity
+          run: curl -I http://localhost:3001
+  
+        # Step 11: Upload report directory (Optional)
+        - name: Upload report directory
+          uses: actions/upload-artifact@v4
+          with:
+            name: report-directory
+            path: reports/
+  
+        # Step 12: Adjust permissions of workspace
+        - name: Adjust permissions of workspace
+          if: always()
+          run: |
+            sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+            sudo chmod -R u+rwX $GITHUB_WORKSPACE
 
 #  grafana_setup:
 #      runs-on: self-hosted
