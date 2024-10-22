@@ -240,11 +240,7 @@ jobs:
       - name: Install .NET SDK and dependencies for RESTler
         run: |
           sudo apt-get update
-          sudo apt-get install -y dotnet-sdk-6.0 python3.8 python3.8-venv python3-pip
-
-      - name: Set Python 3.8 as default
-        run: |
-          sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+          sudo apt-get install -y dotnet-sdk-6.0 python3.10 python3.10-venv python3-pip
 
       - name: Clone RESTler repository
         run: git clone https://github.com/microsoft/restler-fuzzer.git
