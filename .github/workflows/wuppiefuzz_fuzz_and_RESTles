@@ -17,7 +17,7 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans
+          docker-compose down --remove-orphans -p wuppie || true
           docker network rm wuppycicd_network || true
 
       - name: Install Docker Compose
@@ -26,18 +26,15 @@ jobs:
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Set Cache Key
         id: set_cache_key
-        run: echo "::set-output name=docker_cache_key::docker-cache-${{ github.sha }}"
+        run: echo "docker_cache_key=docker-cache-${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Cache Docker Layers
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-wuppie
-          key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
+          key: ${{ env.docker_cache_key }}
           restore-keys: |
             docker-cache-
 
@@ -57,7 +54,6 @@ jobs:
           git clean -ffdx
 
       - name: Get WuppieFuzz commit hash
-        id: wuppiefuzz_commit
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz_commit.txt
           echo "commit_hash=$(cat wuppiefuzz_commit.txt)" >> $GITHUB_ENV
@@ -84,14 +80,6 @@ jobs:
     runs-on: self-hosted
     needs: [setup_docker_wuppie, cache_dependencies_wuppie]
     steps:
-      - name: Restore Docker Buildx Cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache-wuppie
-          key: ${{ needs.setup_docker_wuppie.outputs.docker_cache_key }}
-          restore-keys: |
-            docker-cache-
-
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -100,12 +88,7 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
-          docker-compose up -d --build
-
-      - name: Export Docker Buildx Cache
-        if: success()
-        run: |
-          docker buildx build --cache-from=type=local,src=/tmp/.buildx-cache-wuppie --cache-to=type=local,dest=/tmp/.buildx-cache-wuppie,mode=max --pull
+          docker-compose up -d --build -p wuppie
 
   test_connectivity_wuppie:
     runs-on: self-hosted
@@ -171,7 +154,7 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans
+          docker-compose down --remove-orphans -p wuppie || true
           docker network rm wuppycicd_network || true
 
   setup_docker_restler:
@@ -182,7 +165,7 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans
+          docker-compose down --remove-orphans -p restler || true
           docker network rm restler_network || true
 
       - name: Install Docker Compose
@@ -191,18 +174,15 @@ jobs:
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Set Cache Key
         id: set_cache_key
-        run: echo "::set-output name=docker_cache_key::docker-cache-${{ github.sha }}"
+        run: echo "docker_cache_key=docker-cache-${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Cache Docker Layers
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-restler
-          key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
+          key: ${{ env.docker_cache_key }}
           restore-keys: |
             docker-cache-
 
@@ -222,7 +202,6 @@ jobs:
           git clean -ffdx
 
       - name: Get RESTler API commit hash
-        id: restler_commit
         run: |
           git ls-remote https://github.com/microsoft/restler-fuzzer.git HEAD | awk '{print $1}' > restler_commit.txt
           echo "commit_hash=$(cat restler_commit.txt)" >> $GITHUB_ENV
@@ -234,14 +213,6 @@ jobs:
     runs-on: self-hosted
     needs: [setup_docker_restler, checkout_repos_restler]
     steps:
-      - name: Restore Docker Buildx Cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache-restler
-          key: ${{ needs.setup_docker_restler.outputs.docker_cache_key }}
-          restore-keys: |
-            docker-cache-
-
       - name: Build and run services with Docker Compose
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -250,12 +221,7 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
           docker network inspect restler_network >/dev/null 2>&1 || docker network create restler_network
-          docker-compose up -d --build
-
-      - name: Export Docker Buildx Cache
-        if: success()
-        run: |
-          docker buildx build --cache-from=type=local,src=/tmp/.buildx-cache-restler --cache-to=type=local,dest=/tmp/.buildx-cache-restler,mode=max --pull
+          docker-compose up -d --build -p restler
 
   test_connectivity_restler:
     runs-on: self-hosted
@@ -294,11 +260,11 @@ jobs:
 
       - name: Compile API specification using RESTler
         run: |
-          ./restler_bin/restler compile --api_spec ./openapi.yaml
+          ./restler-fuzzer/restler_bin/restler compile --api_spec ./openapi.yaml
 
       - name: Run RESTler Fuzzing (lean mode)
         run: |
-          ./restler_bin/restler fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
+          ./restler-fuzzer/restler_bin/restler fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
 
   finalize_restler:
     runs-on: self-hosted
@@ -319,5 +285,5 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans
+          docker-compose down --remove-orphans -p restler || true
           docker network rm restler_network || true
