@@ -36,7 +36,7 @@ jobs:
       - name: Cache Docker Layers
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache
+          path: /tmp/.buildx-cache-wuppie
           key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
           restore-keys: |
             docker-cache-
@@ -87,7 +87,7 @@ jobs:
       - name: Restore Docker Buildx Cache
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache
+          path: /tmp/.buildx-cache-wuppie
           key: ${{ needs.setup_docker_wuppie.outputs.docker_cache_key }}
           restore-keys: |
             docker-cache-
@@ -105,7 +105,7 @@ jobs:
       - name: Export Docker Buildx Cache
         if: success()
         run: |
-          docker buildx build --cache-to=type=local,dest=/tmp/.buildx-cache --cache-import=type=local,src=/tmp/.buildx-cache --pull --push
+          docker buildx build --cache-from=type=local,src=/tmp/.buildx-cache-wuppie --cache-to=type=local,dest=/tmp/.buildx-cache-wuppie,mode=max --pull
 
   test_connectivity_wuppie:
     runs-on: self-hosted
@@ -173,7 +173,7 @@ jobs:
         run: |
           docker-compose down --remove-orphans
           docker network rm wuppycicd_network || true
-          
+
   setup_docker_restler:
     runs-on: self-hosted
     outputs:
@@ -201,7 +201,7 @@ jobs:
       - name: Cache Docker Layers
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache
+          path: /tmp/.buildx-cache-restler
           key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
           restore-keys: |
             docker-cache-
@@ -237,7 +237,7 @@ jobs:
       - name: Restore Docker Buildx Cache
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache
+          path: /tmp/.buildx-cache-restler
           key: ${{ needs.setup_docker_restler.outputs.docker_cache_key }}
           restore-keys: |
             docker-cache-
@@ -255,8 +255,8 @@ jobs:
       - name: Export Docker Buildx Cache
         if: success()
         run: |
-          docker buildx bake --push
-          
+          docker buildx build --cache-from=type=local,src=/tmp/.buildx-cache-restler --cache-to=type=local,dest=/tmp/.buildx-cache-restler,mode=max --pull
+
   test_connectivity_restler:
     runs-on: self-hosted
     needs: build_and_run_restler
