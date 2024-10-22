@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  
+
   setup_docker_wuppie:
     runs-on: self-hosted
     outputs:
@@ -279,24 +279,13 @@ jobs:
           python3 ./build-restler.py --dest_dir ./restler_bin
           cd ..
 
-      - name: Set up RESTler in PATH
-        run: echo "${{ github.workspace }}/restler-fuzzer/restler_bin/restler" >> $GITHUB_PATH
-
-      - name: Ensure RESTler executable has execute permissions
-        run: |
-          chmod +x ./restler-fuzzer/restler_bin/restler/restler
-
-      - name: Verify RESTler executable
-        run: |
-          ls -la ./restler-fuzzer/restler_bin/restler/
-
       - name: Compile API specification using RESTler
         run: |
-          ./restler-fuzzer/restler_bin/restler/restler compile --api_spec ./openapi.yaml
+          dotnet restler-fuzzer/restler_bin/restler/Restler.Driver.dll compile --api_spec ./openapi.yaml
 
       - name: Run RESTler Fuzzing (lean mode)
         run: |
-          ./restler-fuzzer/restler_bin/restler/restler fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
+          dotnet restler-fuzzer/restler_bin/restler/Restler.Driver.dll fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
         env:
           RUST_BACKTRACE: 1
 
