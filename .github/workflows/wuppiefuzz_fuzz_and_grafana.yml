@@ -173,7 +173,7 @@ jobs:
         run: |
           docker-compose down --remove-orphans
           docker network rm wuppycicd_network || true
-
+          
   setup_docker_restler:
     runs-on: self-hosted
     outputs:
@@ -196,7 +196,7 @@ jobs:
 
       - name: Set Cache Key
         id: set_cache_key
-        run: echo "::set-output name=docker_cache_key::$(echo "docker-cache-${{ github.sha }}" | cut -c1-32)"
+        run: echo "::set-output name=docker_cache_key::docker-cache-${{ github.sha }}"
 
       - name: Cache Docker Layers
         uses: actions/cache@v4
@@ -224,11 +224,11 @@ jobs:
       - name: Get RESTler API commit hash
         id: restler_commit
         run: |
-          git ls-remote https://github.com/your-org/RESTlerAPI.git HEAD | awk '{print $1}' > restler_commit.txt
+          git ls-remote https://github.com/microsoft/restler-fuzzer.git HEAD | awk '{print $1}' > restler_commit.txt
           echo "commit_hash=$(cat restler_commit.txt)" >> $GITHUB_ENV
 
       - name: Clone RESTler API repository
-        run: git clone https://github.com/your-org/RESTlerAPI.git
+        run: git clone https://github.com/microsoft/restler-fuzzer.git
 
   build_and_run_restler:
     runs-on: self-hosted
@@ -256,7 +256,7 @@ jobs:
         if: success()
         run: |
           docker buildx bake --push
-
+          
   test_connectivity_restler:
     runs-on: self-hosted
     needs: build_and_run_restler
@@ -308,7 +308,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-report-directory
-          path: ./restler_bin/RestlerResults/Results/
+          path: ./restler-fuzzer/restler_bin/RestlerResults/Results/
 
       - name: Adjust permissions of workspace
         if: always()
