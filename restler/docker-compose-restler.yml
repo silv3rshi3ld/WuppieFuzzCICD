@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   app_restler:
     build:
@@ -18,7 +16,7 @@ services:
 
   restler:
     build:
-      context: ./restler
+      context: .
       dockerfile: Dockerfile.restler
     container_name: restler
     volumes:
