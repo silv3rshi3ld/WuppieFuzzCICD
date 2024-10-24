@@ -1,20 +1,38 @@
-# Use an appropriate base image
-FROM node:14
+# Stage 1: Build RESTler
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS Build-env
 
-# Set the working directory
-WORKDIR /app
-
-# Copy package.json and package-lock.json
-COPY package*.json ./
+# Set working directory
+WORKDIR /workspace
 
 # Install dependencies
-RUN npm install
+RUN apt-get update && apt-get install -y git python3 python3-pip
 
-# Copy the rest of your application code
-COPY . .
+# Clone RESTler repository
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-src
 
-# Expose the port your app runs on
-EXPOSE 3001
+# Build RESTler
+RUN cd /restler-src && python3 ./build-restler.py --dest_dir /restler_bin
 
-# Start the application
-CMD ["npm", "start"]
+# Stage 2: Setup Runtime Environment
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
+
+# Install dependencies
+RUN apt-get update && apt-get install -y python3-pip curl
+
+# Install Python packages
+RUN pip3 install requests
+
+# Copy built RESTler binaries from Build-env
+COPY --from=Build-env /restler_bin /home/restler
+
+# Copy restler_config directory into the image
+COPY restler_config /restler_config
+
+# Set working directory
+WORKDIR /workspace
+
+# Ensure entrypoint script is executable
+RUN chmod +x /restler_config/entrypoint.sh
+
+# Entrypoint script
+ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
