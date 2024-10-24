@@ -1,18 +1,29 @@
-version: '3'
+version: '3.8'
 
 services:
   api:
-    build: ./server
+    build:
+      context: ../server
+      dockerfile: Dockerfile
     ports:
       - "3001:3001"
     environment:
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
+      DB_URL: mongodb://mongo/vulnerable-rest-api
+    env_file:
+      - ../server/smtp_config.list
+    command: ["sh", "docker-entrypoint.sh"]
     depends_on:
       - mongo
+    networks:
+      - wuppycicd_network
+
   mongo:
     image: mongo:latest
     ports:
       - "27017:27017"
+    networks:
+      - wuppycicd_network
+
+networks:
+  wuppycicd_network:
+    name: wuppycicd_network
