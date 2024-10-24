@@ -1,18 +1,26 @@
+version: '3'
+
 services:
-  app_restler:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    container_name: app_restler
+  api:
+    build: ./server
     ports:
       - "3001:3001"
+    environment:
+      - SMTP_USER=${SMTP_USER:-dummy_user}
+      - SMTP_PASS=${SMTP_PASS:-dummy_pass}
+      - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+    depends_on:
+      - mongo
     networks:
       - restler_network
-    environment:
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    networks:
+      - restler_network
 
   restler:
     build:
@@ -20,11 +28,11 @@ services:
       dockerfile: Dockerfile.restler
     container_name: restler
     volumes:
-      - ../restler:/restler_workdir
+      - ./restler:/restler_workdir
     networks:
       - restler_network
     depends_on:
-      - app_restler
+      - api
     entrypoint: ["sh", "/restler_config/entrypoint.sh"]
 
 networks:
