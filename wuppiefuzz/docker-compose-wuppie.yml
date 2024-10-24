@@ -6,10 +6,10 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - SMTP_USER=${SMTP_USER:-dummy_user}
-      - SMTP_PASS=${SMTP_PASS:-dummy_pass}
-      - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
-      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
     depends_on:
       - mongo
   mongo:
