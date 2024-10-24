@@ -10,6 +10,10 @@ on:
 
 jobs:
 
+  # ----------------------------
+  # WuppieFuzz Jobs
+  # ----------------------------
+
   setup_docker_wuppiefuzz:
     runs-on: self-hosted
     outputs:
@@ -172,6 +176,10 @@ jobs:
         run: |
           docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
           docker network rm wuppycicd_network || true
+
+  # ----------------------------
+  # RESTler Jobs
+  # ----------------------------
 
   setup_docker_restler:
     runs-on: self-hosted
