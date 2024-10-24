@@ -29,8 +29,6 @@ services:
       context: .
       dockerfile: Dockerfile.restler
     container_name: restler
-    volumes:
-      - ./restler:/restler_workdir
     networks:
       - restler_network
     depends_on:
