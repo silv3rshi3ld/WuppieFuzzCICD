@@ -103,11 +103,28 @@ jobs:
     runs-on: self-hosted
     needs: build_and_run_wuppiefuzz
     steps:
-      - name: Wait for services to start
-        run: sleep 15
+      - name: Wait for API to be ready with retry logic
+        run: |
+          echo "Waiting for API to become available..."
+          for i in {1..10}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "API is up!"
+              break
+            fi
+            echo "Attempt $i: API not ready yet. Retrying in 5 seconds..."
+            sleep 5
+          done
+          if ! curl -s http://localhost:3001 > /dev/null; then
+            echo "API did not start in time."
+            exit 1
+          fi
 
       - name: Test API Connectivity
         run: curl -I http://localhost:3001
+
+      - name: Output API Service Logs
+        if: failure()
+        run: docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml logs api
 
   run_fuzz_wuppiefuzz:
     runs-on: self-hosted
@@ -212,16 +229,36 @@ jobs:
           docker network inspect restler_network >/dev/null 2>&1 || docker network create restler_network
           docker-compose -f restler/docker-compose-restler.yml up -d --build -p restler
 
-      - name: Wait for services to start
-        run: sleep 15
+  test_connectivity_restler:
+    runs-on: self-hosted
+    needs: build_and_run_restler
+    steps:
+      - name: Wait for API to be ready with retry logic
+        run: |
+          echo "Waiting for API to become available..."
+          for i in {1..10}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "API is up!"
+              break
+            fi
+            echo "Attempt $i: API not ready yet. Retrying in 5 seconds..."
+            sleep 5
+          done
+          if ! curl -s http://localhost:3001 > /dev/null; then
+            echo "API did not start in time."
+            exit 1
+          fi
 
       - name: Test API Connectivity
         run: curl -I http://localhost:3001
 
+      - name: Output API Service Logs
+        if: failure()
+        run: docker-compose -f restler/docker-compose-restler.yml logs api
 
   run_fuzz_restler:
     runs-on: self-hosted
-    needs: build_and_run_restler
+    needs: test_connectivity_restler
     env:
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -230,8 +267,7 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
       - name: Run RESTler Fuzzing via Docker Compose
-        run: |
-          docker-compose -f restler/docker-compose-restler.yml run --rm restler
+        run: docker-compose -f restler/docker-compose-restler.yml run --rm restler
 
   finalize_restler:
     runs-on: self-hosted

@@ -1,40 +1,51 @@
-version: '3.8'
-
+version: "3.8"
 services:
   api:
     build:
-      context: ../server
+      context: ./server
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
     environment:
-      DB_URL: mongodb://mongo/vulnerable-rest-api
-    env_file:
-      - ../server/smtp_config.list
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      DB_URL: mongodb://db/vulnerable-rest-api
     command: ["sh", "docker-entrypoint.sh"]
     depends_on:
-      - mongo
+      - db
     networks:
       - restler_network
 
-  mongo:
-    image: mongo:latest
+  db:
+    image: mongo:6.0
     ports:
       - "27017:27017"
+    volumes:
+      - rest-api:/data/db
     networks:
       - restler_network
 
   restler:
     build:
-      context: .
+      context: ./restler
       dockerfile: Dockerfile.restler
     container_name: restler
-    networks:
-      - restler_network
+    environment:
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
     depends_on:
       - api
     entrypoint: ["sh", "/restler_config/entrypoint.sh"]
+    networks:
+      - restler_network
 
 networks:
   restler_network:
-    name: restler_network
+    external: true
+
+volumes:
+  rest-api:
