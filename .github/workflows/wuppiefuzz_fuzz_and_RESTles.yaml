@@ -10,7 +10,7 @@ on:
 
 jobs:
 
-  setup_docker_wuppie:
+  setup_docker_wuppiefuzz:
     runs-on: self-hosted
     outputs:
       docker_cache_key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
@@ -18,7 +18,7 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans -p wuppie || true
+          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
           docker network rm wuppycicd_network || true
 
       - name: Install Docker Compose
@@ -34,40 +34,40 @@ jobs:
       - name: Cache Docker Layers
         uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache-wuppie
+          path: /tmp/.buildx-cache-wuppiefuzz
           key: ${{ env.docker_cache_key }}
           restore-keys: |
             docker-cache-
 
-  checkout_repos_wuppie:
+  checkout_repos_wuppiefuzz:
     runs-on: self-hosted
-    needs: setup_docker_wuppie
+    needs: setup_docker_wuppiefuzz
     steps:
       - name: Checkout WuppieFuzz repository
         uses: actions/checkout@v4
         with:
           repository: TNO-S3/WuppieFuzz
-          path: WuppieFuzz
+          path: wuppiefuzz
 
       - name: Manually clean untracked files
         run: |
-          sudo rm -rf reports/
-          git -C WuppieFuzz clean -ffdx
+          sudo rm -rf wuppiefuzz/reports/
+          git -C wuppiefuzz clean -ffdx
 
       - name: Get WuppieFuzz commit hash
         run: |
-          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > WuppieFuzz/wuppiefuzz_commit.txt
-          echo "commit_hash=$(cat WuppieFuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
+          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz/wuppiefuzz_commit.txt
+          echo "commit_hash=$(cat wuppiefuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
       - name: Upload WuppieFuzz repository as artifact
         uses: actions/upload-artifact@v4
         with:
           name: WuppieFuzz
-          path: WuppieFuzz
+          path: wuppiefuzz
 
-  cache_dependencies_wuppie:
+  cache_dependencies_wuppiefuzz:
     runs-on: self-hosted
-    needs: checkout_repos_wuppie
+    needs: checkout_repos_wuppiefuzz
     steps:
       - name: Restore Rust and Git caches
         uses: actions/cache@v4
@@ -75,14 +75,14 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            WuppieFuzz/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('WuppieFuzz/Cargo.lock') }}-${{ env.commit_hash }}
+            wuppiefuzz/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ env.commit_hash }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-  build_and_run_wuppie:
+  build_and_run_wuppiefuzz:
     runs-on: self-hosted
-    needs: cache_dependencies_wuppie
+    needs: cache_dependencies_wuppiefuzz
     steps:
       - name: Download WuppieFuzz repository artifact
         uses: actions/download-artifact@v4
@@ -90,7 +90,7 @@ jobs:
           name: WuppieFuzz
           path: .
 
-      - name: Build and run services with Docker Compose
+      - name: Build and run services with Docker Compose (WuppieFuzz)
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -98,11 +98,11 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
           docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
-          docker-compose up -d --build -p wuppie
+          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml up -d --build -p wuppiefuzz
 
-  test_connectivity_wuppie:
+  test_connectivity_wuppiefuzz:
     runs-on: self-hosted
-    needs: build_and_run_wuppie
+    needs: build_and_run_wuppiefuzz
     steps:
       - name: Wait for services to start
         run: sleep 15
@@ -110,9 +110,9 @@ jobs:
       - name: Test API Connectivity
         run: curl -I http://localhost:3001
 
-  run_fuzz_wuppie:
+  run_fuzz_wuppiefuzz:
     runs-on: self-hosted
-    needs: test_connectivity_wuppie
+    needs: test_connectivity_wuppiefuzz
     steps:
       - name: Download WuppieFuzz repository artifact
         uses: actions/download-artifact@v4
@@ -130,13 +130,13 @@ jobs:
 
       - name: Build WuppieFuzz
         run: |
-          cd WuppieFuzz
+          cd wuppiefuzz
           cargo build --release
           cd ..
 
       - name: Add WuppieFuzz to PATH
         run: |
-          echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/wuppiefuzz/target/release" >> $GITHUB_PATH
 
       - name: Generate initial corpus
         run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
@@ -151,15 +151,15 @@ jobs:
             wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
           fi
 
-  finalize_wuppie:
+  finalize_wuppiefuzz:
     runs-on: self-hosted
-    needs: run_fuzz_wuppie
+    needs: run_fuzz_wuppiefuzz
     steps:
       - name: Upload report directory
         uses: actions/upload-artifact@v4
         with:
           name: report-directory
-          path: reports/
+          path: wuppiefuzz/reports/
 
       - name: Adjust permissions of workspace
         if: always()
@@ -170,18 +170,17 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans -p wuppie || true
+          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
           docker network rm wuppycicd_network || true
 
   setup_docker_restler:
     runs-on: self-hosted
-    outputs:
-      docker_cache_key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
+    needs: finalize_wuppiefuzz
     steps:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose down --remove-orphans -p restler || true
+          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
           docker network rm restler_network || true
 
       - name: Install Docker Compose
@@ -190,55 +189,18 @@ jobs:
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      - name: Set Cache Key
-        id: set_cache_key
-        run: echo "docker_cache_key=docker-cache-${{ github.sha }}" >> $GITHUB_ENV
-
-      - name: Cache Docker Layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache-restler
-          key: ${{ env.docker_cache_key }}
-          restore-keys: |
-            docker-cache-
-
-  checkout_repos_restler:
+  build_and_run_restler:
     runs-on: self-hosted
     needs: setup_docker_restler
     steps:
-      - name: Checkout RESTler repository
+      - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          repository: microsoft/restler-fuzzer
-          path: restler-fuzzer
 
-      - name: Manually clean untracked files
+      - name: Set execute permissions for entrypoint.sh
         run: |
-          sudo rm -rf reports/
-          git -C restler-fuzzer clean -ffdx
+          chmod +x restler/restler_config/entrypoint.sh
 
-      - name: Get RESTler API commit hash
-        run: |
-          git ls-remote https://github.com/microsoft/restler-fuzzer.git HEAD | awk '{print $1}' > restler-fuzzer/restler_commit.txt
-          echo "commit_hash=$(cat restler-fuzzer/restler_commit.txt)" >> $GITHUB_ENV
-
-      - name: Upload RESTler repository as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-fuzzer
-          path: restler-fuzzer
-
-  build_and_run_restler:
-    runs-on: self-hosted
-    needs: checkout_repos_restler
-    steps:
-      - name: Download RESTler repository artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: restler-fuzzer
-          path: .
-
-      - name: Build and run services with Docker Compose
+      - name: Build and run services with Docker Compose (RESTler)
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -246,12 +208,8 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
         run: |
           docker network inspect restler_network >/dev/null 2>&1 || docker network create restler_network
-          docker-compose up -d --build -p restler
+          docker-compose -f restler/docker-compose-restler.yml up -d --build -p restler
 
-  test_connectivity_restler:
-    runs-on: self-hosted
-    needs: build_and_run_restler
-    steps:
       - name: Wait for services to start
         run: sleep 15
 
@@ -260,53 +218,4 @@ jobs:
 
   run_fuzz_restler:
     runs-on: self-hosted
-    needs: test_connectivity_restler
-    steps:
-      - name: Download RESTler repository artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: restler-fuzzer
-          path: .
-
-      - name: Install .NET SDK and dependencies for RESTler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dotnet-sdk-6.0 python3.10 python3.10-venv python3-pip
-
-      - name: Build RESTler
-        run: |
-          cd restler-fuzzer
-          python3 ./build-restler.py --dest_dir ./restler_bin
-          cd ..
-
-      - name: Compile API specification using RESTler
-        run: |
-          dotnet restler-fuzzer/restler_bin/restler/Restler.Driver.dll compile --api_spec ./openapi.yaml
-
-      - name: Run RESTler Fuzzing (lean mode)
-        run: |
-          dotnet restler-fuzzer/restler_bin/restler/Restler.Driver.dll fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json
-        env:
-          RUST_BACKTRACE: 1
-
-  finalize_restler:
-    runs-on: self-hosted
-    needs: run_fuzz_restler
-    steps:
-      - name: Upload RESTler report directory
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-report-directory
-          path: ./restler-fuzzer/restler_bin/RestlerResults/Results/
-
-      - name: Adjust permissions of workspace
-        if: always()
-        run: |
-          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
-          sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
-      - name: Clean up Docker networks and containers
-        if: always()
-        run: |
-          docker-compose down --remove-orphans -p restler || true
-          docker network rm restler_network || true
+    needs: b

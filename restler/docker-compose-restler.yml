@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app_restler:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: app_restler
+    ports:
+      - "3001:3001"
+    networks:
+      - restler_network
+    environment:
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+
+  restler:
+    build:
+      context: ./restler
+      dockerfile: Dockerfile.restler
+    container_name: restler
+    volumes:
+      - ../restler:/restler_workdir
+    networks:
+      - restler_network
+    depends_on:
+      - app_restler
+    entrypoint: ["sh", "/restler_config/entrypoint.sh"]
+
+networks:
+  restler_network:
+    name: restler_network
