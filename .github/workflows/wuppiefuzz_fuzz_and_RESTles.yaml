@@ -218,4 +218,32 @@ jobs:
 
   run_fuzz_restler:
     runs-on: self-hosted
-    needs: b
+    needs: build_and_run_restler
+    steps:
+      - name: Run RESTler Fuzzing via Docker Compose
+        run: |
+          docker-compose -f restler/docker-compose-restler.yml run --rm restler
+        env:
+          RUST_BACKTRACE: 1
+
+  finalize_restler:
+    runs-on: self-hosted
+    needs: run_fuzz_restler
+    steps:
+      - name: Upload RESTler report directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-report-directory
+          path: restler/RestlerResults/
+
+      - name: Adjust permissions of workspace
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
+          sudo chmod -R u+rwX $GITHUB_WORKSPACE
+
+      - name: Clean up Docker networks and containers
+        if: always()
+        run: |
+          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
+          docker network rm restler_network || true
