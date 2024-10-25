@@ -62,7 +62,7 @@ jobs:
       - name: Checkout Vulnerable REST API
         uses: actions/checkout@v4
         with:
-          repository: YOUR_USERNAME/YOUR_VULNERABLE_REST_API_REPO
+          repository: silv3rshi3ld/WuppieFuzzCICD
           path: api
 
       - name: Checkout WuppieFuzz Repository
