@@ -1,51 +1,27 @@
-version: "3.8"
+version: '3.8'
+
 services:
-  api:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      DB_URL: mongodb://db/vulnerable-rest-api
-    command: ["sh", "docker-entrypoint.sh"]
-    depends_on:
-      - db
-    networks:
-      - restler_network
-
-  db:
-    image: mongo:6.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - rest-api:/data/db
-    networks:
-      - restler_network
-
   restler:
     build:
-      context: ./restler
+      context: .
       dockerfile: Dockerfile.restler
-    container_name: restler
     environment:
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
+      HOST: host.docker.internal
+      PORT: 3001
+      SWAGGER_URL: http://localhost:3001/openapi.yaml
+      RUN_FUZZ_LEAN: "true"
+      FUZZ_LEAN_TIME_BUDGET: "0.01"
+      RUN_FUZZ: "true"
+      FUZZ_TIME_BUDGET: "1"
+      RESTLER_TELEMETRY_OPTOUT: "1"
     depends_on:
-      - api
-    entrypoint: ["sh", "/restler_config/entrypoint.sh"]
+      api:
+        condition: service_healthy
     networks:
-      - restler_network
+      - cicd_network
+    volumes:
+      - ./output:/home/restler/output
 
 networks:
-  restler_network:
+  cicd_network:
     external: true
-
-volumes:
-  rest-api:

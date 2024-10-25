@@ -1,5 +1,5 @@
 # Stage 1: Build RESTler
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS Build-env
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build-env
 
 WORKDIR /workspace
 
@@ -15,15 +15,16 @@ RUN cd /restler-src && python3 ./build-restler.py --dest_dir /restler_bin
 # Stage 2: Setup Runtime Environment
 FROM mcr.microsoft.com/dotnet/aspnet:6.0
 
+WORKDIR /home/restler
+
 # Install dependencies
 RUN apt-get update && apt-get install -y python3-pip curl
 
 # Install Python packages
-COPY restler/requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
+RUN pip3 install requests
 
-# Copy built RESTler binaries from Build-env
-COPY --from=Build-env /restler_bin /home/restler
+# Copy built RESTler binaries from build-env
+COPY --from=build-env /restler_bin /home/restler
 
 # Copy restler_config directory into the image
 COPY restler_config /restler_config

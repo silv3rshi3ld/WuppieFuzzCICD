@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./server
+    ports:
+      - "3001:3001"
+    environment:
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - cicd_network
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cicd_network
+
+networks:
+  cicd_network:
+    driver: bridge

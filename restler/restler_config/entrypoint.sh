@@ -1,18 +1,17 @@
 #!/bin/sh
 set -e
 
-# Navigate to RESTler directory
-cd /home/restler
+# Define variables
+API_SPEC="${SWAGGER_URL}"
+GRAMMAR_DIR="/home/restler/output/grammar"
+FUZZ_DIR="/home/restler/output/RestlerResults"
 
-# Compile the API specification
-./Restler.Driver.dll compile --api_spec /workspace/openapi.yaml --out_dir /restler_workdir/Compile
+# Compile the API specification to generate grammar
+echo "Compiling API specification..."
+dotnet /home/restler/Restler.dll compile --api_spec=${API_SPEC}
 
-# Run RESTler fuzzing in lean mode
-./Restler.Driver.dll fuzz-lean \
-  --grammar_file /restler_workdir/Compile/grammar.py \
-  --dictionary_file /restler_workdir/Compile/dict.json \
-  --settings /restler_workdir/Compile/engine_settings.json \
-  --target_ip app_restler \
-  --target_port 3001 \
-  --no_ssl \
-  --out_dir /restler_workdir/RestlerResults
+# Start fuzzing
+echo "Starting Restler fuzzing..."
+dotnet /home/restler/Restler.dll fuzz --no_ssl --host ${HOST} --port ${PORT} --output_dir=${FUZZ_DIR} --time_budget=${FUZZ_TIME_BUDGET}
+
+echo "Restler fuzzing completed."

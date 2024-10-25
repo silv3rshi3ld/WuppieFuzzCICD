@@ -9,16 +9,18 @@ on:
       - main
 
 jobs:
-  setup_docker_wuppiefuzz:
+  setup_environment:
     runs-on: self-hosted
     outputs:
-      docker_cache_key: ${{ steps.set_cache_key.outputs.docker_cache_key }}
+      commit_hash_wuppiefuzz: ${{ steps.get_commit_hash_wuppiefuzz.outputs.commit_hash }}
     steps:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
           docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
-          docker network rm wuppycicd_network || true
+          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
+          docker-compose -f docker-compose.base.yml down --remove-orphans || true
+          docker network rm cicd_network || true
 
       - name: Install Docker Compose
         run: |
@@ -26,36 +28,43 @@ jobs:
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      - name: Set Cache Key
-        id: set_cache_key
-        run: echo "docker_cache_key=docker-cache-${{ github.sha }}" >> $GITHUB_ENV
+      - name: Set Cache Key for WuppieFuzz
+        id: set_cache_key_wuppiefuzz
+        run: echo "docker_cache_key_wuppiefuzz=docker-cache-wuppiefuzz-${{ github.sha }}" >> $GITHUB_ENV
 
-      - name: Cache Docker Layers
+      - name: Cache Docker Layers for WuppieFuzz
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-wuppiefuzz
-          key: ${{ env.docker_cache_key }}
+          key: ${{ env.docker_cache_key_wuppiefuzz }}
           restore-keys: |
-            docker-cache-
+            docker-cache-wuppiefuzz-
 
-  checkout_repos_wuppiefuzz:
-    runs-on: self-hosted
-    needs: setup_docker_wuppiefuzz
-    steps:
-      - name: Checkout WuppieFuzz repository
-        uses: actions/checkout@v4
+      - name: Set Cache Key for Restler
+        id: set_cache_key_restler
+        run: echo "docker_cache_key_restler=docker-cache-restler-${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Cache Docker Layers for Restler
+        uses: actions/cache@v4
         with:
-          repository: TNO-S3/WuppieFuzz
-          path: wuppiefuzz
+          path: /tmp/.buildx-cache-restler
+          key: ${{ env.docker_cache_key_restler }}
+          restore-keys: |
+            docker-cache-restler-
 
-      - name: Manually clean untracked files
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Manually clean untracked files (WuppieFuzz)
         run: |
           sudo rm -rf wuppiefuzz/reports/
           git -C wuppiefuzz clean -ffdx
 
       - name: Get WuppieFuzz commit hash
+        id: get_commit_hash_wuppiefuzz
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz/wuppiefuzz_commit.txt
+          echo "::set-output name=commit_hash::$(cat wuppiefuzz/wuppiefuzz_commit.txt)"
           echo "commit_hash=$(cat wuppiefuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
 
       - name: Upload WuppieFuzz repository as artifact
@@ -64,24 +73,42 @@ jobs:
           name: WuppieFuzz
           path: wuppiefuzz
 
+      - name: Upload Restler directory as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Restler
+          path: restler
+
   cache_dependencies_wuppiefuzz:
     runs-on: self-hosted
-    needs: checkout_repos_wuppiefuzz
+    needs: setup_environment
     steps:
-      - name: Restore Rust and Git caches
+      - name: Restore Rust and Git caches for WuppieFuzz
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             wuppiefuzz/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ env.commit_hash }}
+          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            cargo-${{ runner.os }}-wuppiefuzz-
 
-  build_and_run_wuppiefuzz:
+  cache_dependencies_restler:
     runs-on: self-hosted
-    needs: cache_dependencies_wuppiefuzz
+    needs: setup_environment
+    steps:
+      - name: Restore Python caches for Restler
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-cache-${{ runner.os }}-restler-${{ github.sha }}
+          restore-keys: |
+            pip-cache-${{ runner.os }}-restler-
+
+  build_and_run_services:
+    runs-on: self-hosted
+    needs: [cache_dependencies_wuppiefuzz, cache_dependencies_restler]
     env:
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -94,19 +121,21 @@ jobs:
           name: WuppieFuzz
           path: .
 
-      - name: Build and run services with Docker Compose (WuppieFuzz)
-        run: |
-          docker network inspect wuppycicd_network >/dev/null 2>&1 || docker network create wuppycicd_network
-          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml up -d --build -p wuppiefuzz
+      - name: Download Restler directory artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Restler
+          path: .
 
-  test_connectivity_wuppiefuzz:
-    runs-on: self-hosted
-    needs: build_and_run_wuppiefuzz
-    steps:
-      - name: Wait for API to be ready with retry logic
+      - name: Build and run base services (API and MongoDB)
+        run: |
+          docker network create cicd_network || true
+          docker-compose -f docker-compose.base.yml up -d --build
+
+      - name: Wait for API to be ready
         run: |
           echo "Waiting for API to become available..."
-          for i in {1..10}; do
+          for i in {1..30}; do
             if curl -s http://localhost:3001 > /dev/null; then
               echo "API is up!"
               break
@@ -119,16 +148,17 @@ jobs:
             exit 1
           fi
 
-      - name: Test API Connectivity
-        run: curl -I http://localhost:3001
+      - name: Build and run Restler service
+        run: |
+          docker-compose -f restler/docker-compose-restler.yml up -d --build -p restler
 
-      - name: Output API Service Logs
-        if: failure()
-        run: docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml logs api
+      - name: Build and run WuppieFuzz service
+        run: |
+          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml up -d --build -p wuppiefuzz
 
-  run_fuzz_wuppiefuzz:
+  run_fuzzers:
     runs-on: self-hosted
-    needs: test_connectivity_wuppiefuzz
+    needs: build_and_run_services
     env:
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASS: ${{ secrets.SMTP_PASS }}
@@ -136,14 +166,28 @@ jobs:
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       RUST_BACKTRACE: 1
     steps:
+      # WuppieFuzz Steps
       - name: Download WuppieFuzz repository artifact
         uses: actions/download-artifact@v4
         with:
           name: WuppieFuzz
           path: .
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust dependencies for WuppieFuzz
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            wuppiefuzz/target
+          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          restore-keys: |
+            cargo-${{ runner.os }}-wuppiefuzz-
+
+      - name: Install Rust toolchain for WuppieFuzz
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
 
       - name: Install dependencies for WuppieFuzz
         run: |
@@ -160,124 +204,47 @@ jobs:
         run: |
           echo "${{ github.workspace }}/wuppiefuzz/target/release" >> $GITHUB_PATH
 
-      - name: Generate initial corpus
-        run: wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
+      - name: Generate initial corpus for WuppieFuzz
+        run: |
+          wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
 
       - name: Run WuppieFuzz
         run: |
-          if [ -f "login.yaml" ]; then
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication login.yaml openapi.yaml
+          if [ -f "wuppiefuzz/login.yaml" ]; then
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication=wuppiefuzz/login.yaml api/openapi.yaml
           else
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 api/openapi.yaml
           fi
 
-  finalize_wuppiefuzz:
-    runs-on: self-hosted
-    needs: run_fuzz_wuppiefuzz
-    steps:
-      - name: Upload report directory
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-directory
-          path: wuppiefuzz/reports/
-
-      - name: Adjust permissions of workspace
-        if: always()
-        run: |
-          sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
-          sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
-      - name: Clean up Docker networks and containers
-        if: always()
-        run: |
-          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
-          docker network rm wuppycicd_network || true
-
-  setup_docker_restler:
-    runs-on: self-hosted
-    steps:
-      - name: Clean up Docker networks and containers
-        if: always()
-        run: |
-          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
-          docker network rm restler_network || true
-
-      - name: Install Docker Compose
+      # Restler Steps
+      - name: Install Restler dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y docker-compose
-          docker-compose --version
+          sudo apt-get install -y python3 python3-pip
 
-  build_and_run_restler:
-    runs-on: self-hosted
-    needs: setup_docker_restler
-    env:
-      SMTP_USER: ${{ secrets.SMTP_USER }}
-      SMTP_PASS: ${{ secrets.SMTP_PASS }}
-      SMTP_HOST: ${{ secrets.SMTP_HOST }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set execute permissions for entrypoint.sh
+      - name: Install Restler Python packages
         run: |
-          chmod +x restler/restler_config/entrypoint.sh
+          pip3 install -r restler/restler_config/requirements.txt
 
-      - name: Build and run services with Docker Compose (RESTler)
-        run: |
-          docker network inspect restler_network >/dev/null 2>&1 || docker network create restler_network
-          docker-compose -f restler/docker-compose-restler.yml up -d --build -p restler
-
-  test_connectivity_restler:
-    runs-on: self-hosted
-    needs: build_and_run_restler
-    steps:
-      - name: Wait for API to be ready with retry logic
-        run: |
-          echo "Waiting for API to become available..."
-          for i in {1..10}; do
-            if curl -s http://localhost:3001 > /dev/null; then
-              echo "API is up!"
-              break
-            fi
-            echo "Attempt $i: API not ready yet. Retrying in 5 seconds..."
-            sleep 5
-          done
-          if ! curl -s http://localhost:3001 > /dev/null; then
-            echo "API did not start in time."
-            exit 1
-          fi
-
-      - name: Test API Connectivity
-        run: curl -I http://localhost:3001
-
-      - name: Output API Service Logs
-        if: failure()
-        run: docker-compose -f restler/docker-compose-restler.yml logs api
-
-  run_fuzz_restler:
-    runs-on: self-hosted
-    needs: test_connectivity_restler
-    env:
-      SMTP_USER: ${{ secrets.SMTP_USER }}
-      SMTP_PASS: ${{ secrets.SMTP_PASS }}
-      SMTP_HOST: ${{ secrets.SMTP_HOST }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      RUST_BACKTRACE: 1
-    steps:
       - name: Run RESTler Fuzzing via Docker Compose
-        run: docker-compose -f restler/docker-compose-restler.yml run --rm restler
+        run: |
+          docker-compose -f restler/docker-compose-restler.yml run --rm restler
 
-  finalize_restler:
+  finalize:
     runs-on: self-hosted
-    needs: run_fuzz_restler
+    needs: run_fuzzers
     steps:
-      - name: Upload RESTler report directory
+      - name: Upload WuppieFuzz report directory
         uses: actions/upload-artifact@v4
         with:
-          name: restler-report-directory
-          path: restler/RestlerResults/
+          name: WuppieFuzz-Report
+          path: wuppiefuzz/reports/
+
+      - name: Upload Restler report directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: Restler-Report
+          path: restler/output/RestlerResults/
 
       - name: Adjust permissions of workspace
         if: always()
@@ -288,5 +255,7 @@ jobs:
       - name: Clean up Docker networks and containers
         if: always()
         run: |
-          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
-          docker network rm restler_network || true
+          docker-compose -f docker-compose.base.yml down --remove-orphans
+          docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans
+          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans
+          docker network rm cicd_network || true

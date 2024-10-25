@@ -1,51 +1,23 @@
-version: "3.8"
+version: '3.8'
+
 services:
-  api:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    ports:
-      - "3002:3001"  # Changed host port to 3002 to avoid conflict
-    environment:
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      DB_URL: mongodb://db/vulnerable-rest-api
-    command: ["sh", "docker-entrypoint.sh"]
-    depends_on:
-      - db
-    networks:
-      - wuppycicd_network
-
-  db:
-    image: mongo:6.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - rest-api:/data/db
-    networks:
-      - wuppycicd_network
-
   wuppiefuzz:
     build:
-      context: ./wuppiefuzz
+      context: .
       dockerfile: Dockerfile.wuppiefuzz
-    container_name: wuppiefuzz
     environment:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
     depends_on:
-      - api
-    entrypoint: ["sh", "/wuppiefuzz_config/entrypoint.sh"]
+      api:
+        condition: service_healthy
     networks:
-      - wuppycicd_network
+      - cicd_network
+    volumes:
+      - ./reports:/wuppiefuzz/reports
 
 networks:
-  wuppycicd_network:
+  cicd_network:
     external: true
-
-volumes:
-  rest-api:
