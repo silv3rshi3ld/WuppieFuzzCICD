@@ -244,7 +244,7 @@ jobs:
 
       - name: Install Restler Python packages
         run: |
-          pip3 install --user -r restler-fuzzer/restler/requirements.txt
+          pip3 install --user -r restler/requirements.txt
 
       - name: Run RESTler Fuzzing via Docker Compose
         run: |
