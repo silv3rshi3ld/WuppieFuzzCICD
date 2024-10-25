@@ -206,9 +206,11 @@ jobs:
             cargo-${{ runner.os }}-wuppiefuzz-
 
       - name: Install Rust toolchain for WuppieFuzz
-        uses: actions/setup-rust@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
-          rust-version: stable
+          toolchain: stable
+          components: clippy, rustfmt
+          override: true
 
       - name: Install dependencies for WuppieFuzz
         run: |
