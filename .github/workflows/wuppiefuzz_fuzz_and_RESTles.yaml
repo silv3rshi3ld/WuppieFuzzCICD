@@ -152,8 +152,9 @@ jobs:
           fi
 
       - name: Build and run Restler service
+        working-directory: restler
         run: |
-          docker-compose -f restler/docker-compose-restler.yml up -d --build -p restler
+          docker-compose -f docker-compose-restler.yml up -d --build -p restler
 
       - name: Build and run WuppieFuzz service
         run: |
