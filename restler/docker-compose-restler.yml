@@ -3,7 +3,7 @@ version: '3.8'
 services:
   restler:
     build:
-      context: .
+      context: ./restler
       dockerfile: Dockerfile.restler
     environment:
       HOST: host.docker.internal
@@ -15,12 +15,11 @@ services:
       FUZZ_TIME_BUDGET: "1"
       RESTLER_TELEMETRY_OPTOUT: "1"
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     networks:
       - cicd_network
     volumes:
-      - ./output:/home/restler/output
+      - ./restler/output:/home/restler/output
 
 networks:
   cicd_network:

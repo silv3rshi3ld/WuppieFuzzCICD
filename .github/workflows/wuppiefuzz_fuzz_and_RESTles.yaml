@@ -14,12 +14,16 @@ jobs:
     outputs:
       commit_hash_wuppiefuzz: ${{ steps.get_commit_hash_wuppiefuzz.outputs.commit_hash }}
     steps:
-      - name: Clean up Docker networks and containers
+      - name: Clean up Docker networks and containers (WuppieFuzz)
         if: always()
         run: |
           docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
+          docker network rm cicd_network || true
+
+      - name: Clean up Docker networks and containers (Restler)
+        if: always()
+        run: |
           docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
-          docker-compose -f docker-compose.base.yml down --remove-orphans || true
           docker network rm cicd_network || true
 
       - name: Install Docker Compose
@@ -55,27 +59,46 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Checkout Vulnerable REST API
+        uses: actions/checkout@v4
+        with:
+          repository: bnematzadeh/vulnerable-rest-api
+          path: api
+
+      - name: Checkout WuppieFuzz Repository
+        uses: actions/checkout@v4
+        with:
+          repository: TNO-S3/WuppieFuzz
+          path: wuppiefuzz
+
+      - name: Checkout Restler Repository
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/restler-fuzzer
+          path: restler_src
+
       - name: Manually clean untracked files (WuppieFuzz)
         run: |
           sudo rm -rf wuppiefuzz/reports/
           git -C wuppiefuzz clean -ffdx
+
       - name: Get WuppieFuzz commit hash
         id: get_commit_hash_wuppiefuzz
         run: |
-          git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz/wuppiefuzz_commit.txt
-          echo "::set-output name=commit_hash::$(cat wuppiefuzz/wuppiefuzz_commit.txt)"
-          echo "commit_hash=$(cat wuppiefuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
+          commit_hash=$(git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}')
+          echo "commit_hash=${commit_hash}" >> $GITHUB_OUTPUT
+
       - name: Upload WuppieFuzz repository as artifact
         uses: actions/upload-artifact@v4
         with:
           name: WuppieFuzz
           path: wuppiefuzz
 
-      - name: Upload Restler directory as artifact
+      - name: Upload Restler repository as artifact
         uses: actions/upload-artifact@v4
         with:
           name: Restler
-          path: restler
+          path: restler_src
 
   cache_dependencies_wuppiefuzz:
     runs-on: self-hosted
@@ -88,9 +111,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
           restore-keys: |
-            cargo-${{ runner.os }}-wuppiefuzz-
+            cargo-${{ runner.os }}-wuppieFuzz-
 
   cache_dependencies_restler:
     runs-on: self-hosted
@@ -119,7 +142,7 @@ jobs:
           name: WuppieFuzz
           path: .
 
-      - name: Download Restler directory artifact
+      - name: Download Restler repository artifact
         uses: actions/download-artifact@v4
         with:
           name: Restler
@@ -191,11 +214,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
+
       - name: Build WuppieFuzz
         run: |
           cd wuppiefuzz
           cargo build --release
           cd ..
+
       - name: Add WuppieFuzz to PATH
         run: |
           echo "${{ github.workspace }}/wuppiefuzz/target/release" >> $GITHUB_PATH
@@ -220,7 +245,7 @@ jobs:
 
       - name: Install Restler Python packages
         run: |
-          pip3 install -r restler/restler_config/requirements.txt
+          pip3 install -r restler_src/restler_config/requirements.txt
 
       - name: Run RESTler Fuzzing via Docker Compose
         run: |
@@ -247,6 +272,7 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
+
       - name: Clean up Docker networks and containers
         if: always()
         run: |

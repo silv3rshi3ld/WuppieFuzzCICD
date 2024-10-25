@@ -3,7 +3,7 @@ version: '3.8'
 services:
   wuppiefuzz:
     build:
-      context: .
+      context: ./wuppiefuzz
       dockerfile: Dockerfile.wuppiefuzz
     environment:
       SMTP_USER: ${SMTP_USER}
@@ -11,12 +11,11 @@ services:
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     networks:
       - cicd_network
     volumes:
-      - ./reports:/wuppiefuzz/reports
+      - ./wuppiefuzz/reports:/wuppiefuzz/reports
 
 networks:
   cicd_network:

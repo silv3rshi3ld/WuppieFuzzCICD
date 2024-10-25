@@ -12,8 +12,7 @@ services:
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
     depends_on:
-      mongo:
-        condition: service_healthy
+      - mongo
     networks:
       - cicd_network
 
@@ -21,11 +20,6 @@ services:
     image: mongo:latest
     ports:
       - "27017:27017"
-    healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - cicd_network
 
