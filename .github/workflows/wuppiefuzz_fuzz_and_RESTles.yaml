@@ -59,14 +59,12 @@ jobs:
         run: |
           sudo rm -rf wuppiefuzz/reports/
           git -C wuppiefuzz clean -ffdx
-
       - name: Get WuppieFuzz commit hash
         id: get_commit_hash_wuppiefuzz
         run: |
           git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}' > wuppiefuzz/wuppiefuzz_commit.txt
           echo "::set-output name=commit_hash::$(cat wuppiefuzz/wuppiefuzz_commit.txt)"
           echo "commit_hash=$(cat wuppiefuzz/wuppiefuzz_commit.txt)" >> $GITHUB_ENV
-
       - name: Upload WuppieFuzz repository as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -193,13 +191,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-
       - name: Build WuppieFuzz
         run: |
           cd wuppiefuzz
           cargo build --release
           cd ..
-
       - name: Add WuppieFuzz to PATH
         run: |
           echo "${{ github.workspace }}/wuppiefuzz/target/release" >> $GITHUB_PATH
@@ -251,7 +247,6 @@ jobs:
         run: |
           sudo chown -R $(id -u):$(id -g) $GITHUB_WORKSPACE
           sudo chmod -R u+rwX $GITHUB_WORKSPACE
-
       - name: Clean up Docker networks and containers
         if: always()
         run: |
