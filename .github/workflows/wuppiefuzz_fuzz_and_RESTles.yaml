@@ -62,7 +62,7 @@ jobs:
       - name: Checkout Vulnerable REST API
         uses: actions/checkout@v4
         with:
-          repository: bnematzadeh/vulnerable-rest-api
+          repository: YOUR_USERNAME/YOUR_VULNERABLE_REST_API_REPO
           path: api
 
       - name: Checkout WuppieFuzz Repository
@@ -70,12 +70,6 @@ jobs:
         with:
           repository: TNO-S3/WuppieFuzz
           path: wuppiefuzz
-
-      - name: Checkout Restler Repository
-        uses: actions/checkout@v4
-        with:
-          repository: microsoft/restler-fuzzer
-          path: restler_src
 
       - name: Manually clean untracked files (WuppieFuzz)
         run: |
@@ -93,12 +87,6 @@ jobs:
         with:
           name: WuppieFuzz
           path: wuppiefuzz
-
-      - name: Upload Restler repository as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Restler
-          path: restler_src
 
   cache_dependencies_wuppiefuzz:
     runs-on: self-hosted
@@ -140,12 +128,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: WuppieFuzz
-          path: .
-
-      - name: Download Restler repository artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Restler
           path: .
 
       - name: Build and run base services (API and MongoDB)
@@ -241,10 +223,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
-
-      - name: Install Restler Python packages
-        run: |
-          pip3 install --user -r restler/requirements.txt
 
       - name: Run RESTler Fuzzing via Docker Compose
         run: |
