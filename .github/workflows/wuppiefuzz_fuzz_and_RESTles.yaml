@@ -111,9 +111,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
           restore-keys: |
-            cargo-${{ runner.os }}-wuppieFuzz-
+            cargo-${{ runner.os }}-wuppiefuzz-
 
   cache_dependencies_restler:
     runs-on: self-hosted
@@ -187,7 +187,6 @@ jobs:
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       RUST_BACKTRACE: 1
     steps:
-      # WuppieFuzz Steps
       - name: Download WuppieFuzz repository artifact
         uses: actions/download-artifact@v4
         with:
@@ -229,17 +228,16 @@ jobs:
 
       - name: Generate initial corpus for WuppieFuzz
         run: |
-          wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
+          wuppiefuzz output-corpus --openapi-spec=openapi.yaml corpus_directory
 
       - name: Run WuppieFuzz
         run: |
           if [ -f "wuppiefuzz/login.yaml" ]; then
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication=wuppiefuzz/login.yaml api/openapi.yaml
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 --authentication=wuppiefuzz/login.yaml openapi.yaml
           else
-            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 api/openapi.yaml
+            wuppiefuzz fuzz --report=true --log-level=info --initial-corpus=corpus_directory --timeout=60 openapi.yaml
           fi
 
-      # Restler Steps
       - name: Install Restler dependencies
         run: |
           sudo apt-get update
