@@ -111,9 +111,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
           restore-keys: |
-            cargo-${{ runner.os }}-wuppiefuzz-
+            cargo-${{ runner.os }}-wuppieFuzz-
 
   cache_dependencies_restler:
     runs-on: self-hosted
@@ -200,15 +200,15 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppiefuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
           restore-keys: |
-            cargo-${{ runner.os }}-wuppiefuzz-
+            cargo-${{ runner.os }}-wuppieFuzz-
 
       - name: Install Rust toolchain for WuppieFuzz
-        uses: actions-rs/toolchain@v1.0.6
+        uses: shivammathur/setup-rust@v1
         with:
-          toolchain: stable
-          components: clippy, rustfmt
+          rust-version: stable
+          components: clippy,rustfmt
           override: true
 
       - name: Install dependencies for WuppieFuzz
@@ -245,7 +245,7 @@ jobs:
 
       - name: Install Restler Python packages
         run: |
-          pip3 install -r restler_src/restler_config/requirements.txt
+          pip3 install -r restler-fuzzer/restler/requirements.txt
 
       - name: Run RESTler Fuzzing via Docker Compose
         run: |
