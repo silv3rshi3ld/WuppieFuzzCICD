@@ -73,10 +73,14 @@ jobs:
 
       - name: Setup Restler Directory
         run: |
+          # First remove existing directory if it exists
+          rm -rf restler
+          # Then create fresh directory and config subdirectory
           mkdir -p restler/restler_config
+          # Copy files from source to destination, using source path relative to workspace
           cp -r ${{ github.workspace }}/restler/* restler/
           ls -la restler/
-
+          
       - name: Get WuppieFuzz commit hash
         id: get_commit_hash_wuppiefuzz
         run: |
