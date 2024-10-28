@@ -2,7 +2,7 @@ version: '3.8'
 services:
   restler:
     build:
-      context: .
+      context: ./
       dockerfile: Dockerfile.restler
     environment:
       SMTP_USER: ${SMTP_USER}
@@ -21,6 +21,7 @@ services:
       - cicd_network
     volumes:
       - ./output:/home/restler/output
+      - ../api/openapi.yaml:/workspace/openapi.yaml  # Mount from api directory
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

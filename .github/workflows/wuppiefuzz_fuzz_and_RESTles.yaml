@@ -242,9 +242,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
 
-      - name: Run RESTler Fuzzing via Docker Compose
+      - name: Run Restler
         run: |
-          docker-compose -f restler/docker-compose-restler.yml run --rm restler
+          cd restler_workspace
+          
+          # Ensure the OpenAPI spec is available
+          cp api/openapi.yaml ./openapi.yaml
+          
+          # Convert YAML to JSON for Restler
+          docker run --rm -v $(pwd):/data mikefarah/yq eval -j /data/openapi.yaml > openapi.json
+          
+          # Debug: Check files exist
+          ls -la openapi.*
+          
+          # Run Restler with both files mounted
+          docker-compose -f restler/docker-compose-restler.yml \
+            run --rm \
+            -v $(pwd)/openapi.yaml:/workspace/openapi.yaml:ro \
+            -v $(pwd)/openapi.json:/workspace/openapi.json:ro \
+            restler
 
   finalize:
     runs-on: self-hosted
