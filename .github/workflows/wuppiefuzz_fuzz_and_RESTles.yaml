@@ -19,42 +19,36 @@ jobs:
         run: |
           docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
           docker network rm cicd_network || true
-
       - name: Clean up Docker networks and containers (Restler)
         if: always()
         run: |
           docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
           docker network rm cicd_network || true
-
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      - name: Set Cache Key for WuppieFuzz
-        id: set_cache_key_wuppiefuzz
-        run: echo "docker_cache_key_wuppiefuzz=docker-cache-wuppiefuzz-${{ github.sha }}" >> $GITHUB_ENV
-
-      - name: Cache Docker Layers for WuppieFuzz
-        uses: actions/cache@v4
+      # Improved Docker layer caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Cache Docker layers for WuppieFuzz
+        uses: docker/build-cache-action@v3
         with:
           path: /tmp/.buildx-cache-wuppiefuzz
-          key: ${{ env.docker_cache_key_wuppiefuzz }}
+          key: buildx-wuppiefuzz-${{ github.sha }}
           restore-keys: |
-            docker-cache-wuppiefuzz-
+            buildx-wuppiefuzz-
 
-      - name: Set Cache Key for Restler
-        id: set_cache_key_restler
-        run: echo "docker_cache_key_restler=docker-cache-restler-${{ github.sha }}" >> $GITHUB_ENV
-
-      - name: Cache Docker Layers for Restler
-        uses: actions/cache@v4
+      - name: Cache Docker layers for Restler
+        uses: docker/build-cache-action@v3
         with:
           path: /tmp/.buildx-cache-restler
-          key: ${{ env.docker_cache_key_restler }}
+          key: buildx-restler-${{ github.sha }}
           restore-keys: |
-            docker-cache-restler-
+            buildx-restler-
 
       - name: Checkout Main Repository
         uses: actions/checkout@v4
@@ -93,28 +87,25 @@ jobs:
     runs-on: self-hosted
     needs: setup_environment
     steps:
-      - name: Restore Rust and Git caches for WuppieFuzz
-        uses: actions/cache@v4
+      # Improved Rust caching strategy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
-          restore-keys: |
-            cargo-${{ runner.os }}-wuppieFuzz-
+          workspaces: "wuppiefuzz -> target"
+          key: ${{ runner.os }}-cargo-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          shared-key: "wuppiefuzz-deps"
 
   cache_dependencies_restler:
     runs-on: self-hosted
     needs: setup_environment
     steps:
-      - name: Restore Python caches for Restler
+      - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-cache-${{ runner.os }}-restler-${{ github.sha }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('restler/requirements.txt') }}
           restore-keys: |
-            pip-cache-${{ runner.os }}-restler-
+            ${{ runner.os }}-pip-
 
   build_and_run_services:
     runs-on: self-hosted
@@ -188,27 +179,23 @@ jobs:
           name: Restler-Config
           path: restler
 
-      - name: Cache Rust dependencies for WuppieFuzz
-        uses: actions/cache@v4
+      # Updated Rust toolchain setup
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            wuppiefuzz/target
-          key: cargo-${{ runner.os }}-wuppieFuzz-${{ hashFiles('wuppiefuzz/Cargo.lock') }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
-          restore-keys: |
-            cargo-${{ runner.os }}-wuppieFuzz-
-
-      - name: rust-toolchain
-        uses: actions-rs/toolchain@v1.0.6
-        with:
-          toolchain: stable
           components: clippy, rustfmt
 
       - name: Install dependencies for WuppieFuzz
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
+
+      # Reuse cached dependencies
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "wuppiefuzz -> target"
+          shared-key: "wuppiefuzz-deps"
 
       - name: Build WuppieFuzz
         run: |
@@ -244,6 +231,7 @@ jobs:
   finalize:
     runs-on: self-hosted
     needs: run_fuzzers
+    if: always()
     steps:
       - name: Upload WuppieFuzz report directory
         uses: actions/upload-artifact@v4

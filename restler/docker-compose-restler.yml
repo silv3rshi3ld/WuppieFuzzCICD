@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   restler:
     build:
@@ -12,18 +11,18 @@ services:
       SMTP_PORT: ${SMTP_PORT}
       HOST: host.docker.internal
       PORT: '3001'
-      SWAGGER_URL: 'http://localhost:3001/'
+      SWAGGER_URL: 'http://host.docker.internal:3001/openapi.yaml'
       RUN_FUZZ_LEAN: 'true'
       FUZZ_LEAN_TIME_BUDGET: '0.01'
       RUN_FUZZ: 'true'
       FUZZ_TIME_BUDGET: '1'
       RESTLER_TELEMETRY_OPTOUT: '1'
-    depends_on:
-      - api
     networks:
       - cicd_network
     volumes:
       - ./restler/output:/home/restler/output
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   cicd_network:

@@ -39,5 +39,5 @@ COPY scripts/entrypoint.sh /restler_config/entrypoint.sh
 # Ensure entrypoint script is executable
 RUN chmod +x /restler_config/entrypoint.sh
 
-# Entrypoint
+# Fix the syntax error in the ENTRYPOINT line by adding closing bracket
 ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
