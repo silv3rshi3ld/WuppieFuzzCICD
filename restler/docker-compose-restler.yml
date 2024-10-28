@@ -3,7 +3,7 @@ version: '3.8'
 services:
   restler:
     build:
-      context: ./restler
+      context: ./
       dockerfile: Dockerfile.restler
     environment:
       SMTP_USER: ${SMTP_USER}
