@@ -242,12 +242,83 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip
 
+      run_restler:
+    runs-on: self-hosted
+    needs: [prepare_restler, prepare_api]
+    env:
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+    steps:
+      - name: Create Workspace
+        run: |
+          mkdir -p restler_workspace
+          cd restler_workspace
+          mkdir -p restler api
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: restler_workspace
+
+      - name: Debug Directory Structure
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          echo "Restler workspace contents:"
+          ls -la restler_workspace || true
+
+      - name: Setup Directory Structure
+        run: |
+          cd restler_workspace
+          # Move files from artifact directories to their correct locations
+          mv vulnerable-api/* api/ || true
+          mv restler-config/* restler/ || true
+          
+          # Debug: Show directory structure
+          echo "Final directory structure:"
+          ls -la
+          echo "API directory:"
+          ls -la api/
+          echo "Restler directory:"
+          ls -la restler/
+
+      - name: Start API Service
+        run: |
+          cd restler_workspace
+          docker network create restler_network || true
+          docker-compose -f api/docker-compose.base.yml up -d --build
+
+      - name: Wait for API
+        timeout-minutes: 2
+        run: |
+          cd restler_workspace
+          echo "Waiting for API to become available..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "API is up!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "API failed to start"
+              exit 1
+            fi
+            echo "Attempt $i: API not ready yet. Retrying in 5 seconds..."
+            sleep 5
+          done
+
       - name: Run Restler
         run: |
           cd restler_workspace
           
           # Ensure the OpenAPI spec is available
-          cp api/openapi.yaml ./openapi.yaml
+          cp api/openapi.yaml ./openapi.yaml || {
+            echo "Failed to copy openapi.yaml"
+            exit 1
+          }
           
           # Convert YAML to JSON for Restler
           docker run --rm -v $(pwd):/data mikefarah/yq eval -j /data/openapi.yaml > openapi.json
@@ -255,12 +326,32 @@ jobs:
           # Debug: Check files exist
           ls -la openapi.*
           
-          # Run Restler with both files mounted
+          # Fix entrypoint permissions
+          chmod +x restler/restler_config/entrypoint.sh || true
+          
+          # Run Restler
           docker-compose -f restler/docker-compose-restler.yml \
             run --rm \
             -v $(pwd)/openapi.yaml:/workspace/openapi.yaml:ro \
             -v $(pwd)/openapi.json:/workspace/openapi.json:ro \
             restler
+
+      - name: Upload Restler Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-results-${{ github.run_id }}
+          path: restler_workspace/restler/output/RestlerResults/
+
+      - name: Cleanup Restler
+        if: always()
+        run: |
+          cd restler_workspace
+          docker-compose -f api/docker-compose.base.yml down --remove-orphans || true
+          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans || true
+          docker network rm restler_network || true
+          cd ..
+          sudo rm -rf restler_workspace
 
   finalize:
     runs-on: self-hosted
