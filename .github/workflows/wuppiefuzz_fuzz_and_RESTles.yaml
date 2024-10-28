@@ -56,7 +56,7 @@ jobs:
           restore-keys: |
             docker-cache-restler-
 
-      - name: Checkout Code
+      - name: Checkout Main Repository
         uses: actions/checkout@v4
 
       - name: Checkout Vulnerable REST API
@@ -71,10 +71,11 @@ jobs:
           repository: TNO-S3/WuppieFuzz
           path: wuppiefuzz
 
-      - name: Manually clean untracked files (WuppieFuzz)
+      - name: Setup Restler Directory
         run: |
-          sudo rm -rf wuppiefuzz/reports/
-          git -C wuppiefuzz clean -ffdx
+          mkdir -p restler/restler_config
+          cp -r ${{ github.workspace }}/restler/* restler/
+          ls -la restler/
 
       - name: Get WuppieFuzz commit hash
         id: get_commit_hash_wuppiefuzz
@@ -87,6 +88,12 @@ jobs:
         with:
           name: WuppieFuzz
           path: wuppiefuzz
+
+      - name: Upload Restler configuration as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Restler-Config
+          path: restler/
 
   cache_dependencies_wuppiefuzz:
     runs-on: self-hosted
@@ -128,7 +135,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: WuppieFuzz
-          path: .
+          path: wuppiefuzz
+
+      - name: Download Restler configuration artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Restler-Config
+          path: restler
 
       - name: Build and run base services (API and MongoDB)
         run: |
@@ -174,7 +187,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: WuppieFuzz
-          path: .
+          path: wuppiefuzz
+
+      - name: Download Restler configuration artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Restler-Config
+          path: restler
 
       - name: Cache Rust dependencies for WuppieFuzz
         uses: actions/cache@v4
@@ -187,11 +206,11 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-wuppieFuzz-
 
-      - name: Install Rust toolchain for WuppieFuzz
-        uses: dtolnay/rust-toolchain@v1
+      - name: rust-toolchain
+        uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: stable
-          components: clippy,rustfmt
+          components: clippy, rustfmt
 
       - name: Install dependencies for WuppieFuzz
         run: |
