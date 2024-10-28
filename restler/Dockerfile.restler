@@ -20,7 +20,9 @@ WORKDIR /workspace
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
+    python3 \
     python3-pip \
+    python3-yaml \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,7 +39,9 @@ COPY restler_config /restler_config
 COPY restler_config/entrypoint.sh /restler_config/entrypoint.sh
 
 # Ensure entrypoint script is executable
-RUN chmod +x /restler_config/entrypoint.sh
+RUN chmod +x /restler_config/entrypoint.sh && \
+    sed -i 's/\r$//' /restler_config/entrypoint.sh
 
 # Entrypoint
+SHELL ["/bin/bash", "-c"]
 ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
