@@ -19,36 +19,35 @@ jobs:
         run: |
           docker-compose -f wuppiefuzz/docker-compose-wuppiefuzz.yml down --remove-orphans -p wuppiefuzz || true
           docker network rm cicd_network || true
+
       - name: Clean up Docker networks and containers (Restler)
         if: always()
         run: |
           docker-compose -f restler/docker-compose-restler.yml down --remove-orphans -p restler || true
           docker network rm cicd_network || true
+
       - name: Install Docker Compose
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose
           docker-compose --version
 
-      # Improved Docker layer caching
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Cache Docker layers for WuppieFuzz
-        uses: docker/build-cache-action@v3
+      # Cache Docker layers using GitHub Actions cache
+      - name: Cache WuppieFuzz Docker layers
+        uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache-wuppiefuzz
-          key: buildx-wuppiefuzz-${{ github.sha }}
+          path: /var/lib/docker
+          key: docker-wuppiefuzz-${{ github.sha }}
           restore-keys: |
-            buildx-wuppiefuzz-
+            docker-wuppiefuzz-
 
-      - name: Cache Docker layers for Restler
-        uses: docker/build-cache-action@v3
+      - name: Cache Restler Docker layers
+        uses: actions/cache@v4
         with:
-          path: /tmp/.buildx-cache-restler
-          key: buildx-restler-${{ github.sha }}
+          path: /var/lib/docker
+          key: docker-restler-${{ github.sha }}
           restore-keys: |
-            buildx-restler-
+            docker-restler-
 
       - name: Checkout Main Repository
         uses: actions/checkout@v4
@@ -87,13 +86,16 @@ jobs:
     runs-on: self-hosted
     needs: setup_environment
     steps:
-      # Improved Rust caching strategy
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: actions/cache@v4
         with:
-          workspaces: "wuppiefuzz -> target"
-          key: ${{ runner.os }}-cargo-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
-          shared-key: "wuppiefuzz-deps"
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            wuppiefuzz/target
+          key: rust-${{ runner.os }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          restore-keys: |
+            rust-${{ runner.os }}-
 
   cache_dependencies_restler:
     runs-on: self-hosted
@@ -102,10 +104,12 @@ jobs:
       - name: Cache Python dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('restler/requirements.txt') }}
+          path: |
+            ~/.cache/pip
+            ~/.local/lib/python*/site-packages
+          key: python-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            python-${{ runner.os }}-
 
   build_and_run_services:
     runs-on: self-hosted
@@ -127,6 +131,15 @@ jobs:
         with:
           name: Restler-Config
           path: restler
+
+      # Restore Docker cache
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /var/lib/docker
+          key: docker-${{ github.sha }}
+          restore-keys: |
+            docker-
 
       - name: Build and run base services (API and MongoDB)
         run: |
@@ -179,6 +192,18 @@ jobs:
           name: Restler-Config
           path: restler
 
+      # Restore Rust cache
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            wuppiefuzz/target
+          key: rust-${{ runner.os }}-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          restore-keys: |
+            rust-${{ runner.os }}-
+
       # Updated Rust toolchain setup
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -189,13 +214,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-
-      # Reuse cached dependencies
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "wuppiefuzz -> target"
-          shared-key: "wuppiefuzz-deps"
 
       - name: Build WuppieFuzz
         run: |
