@@ -33,11 +33,11 @@ COPY --from=build-env /restler_bin /home/restler
 # Copy restler_config directory into the image
 COPY restler_config /restler_config
 
-# Copy entrypoint script
-COPY scripts/entrypoint.sh /restler_config/entrypoint.sh
+# Copy entrypoint script directly from restler_config
+COPY restler_config/entrypoint.sh /restler_config/entrypoint.sh
 
 # Ensure entrypoint script is executable
 RUN chmod +x /restler_config/entrypoint.sh
 
-# Fix the syntax error in the ENTRYPOINT line by adding closing bracket
+# Entrypoint
 ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]

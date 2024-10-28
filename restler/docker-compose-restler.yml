@@ -2,7 +2,7 @@ version: '3.8'
 services:
   restler:
     build:
-      context: ./
+      context: .
       dockerfile: Dockerfile.restler
     environment:
       SMTP_USER: ${SMTP_USER}
@@ -20,7 +20,7 @@ services:
     networks:
       - cicd_network
     volumes:
-      - ./restler/output:/home/restler/output
+      - ./output:/home/restler/output
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
