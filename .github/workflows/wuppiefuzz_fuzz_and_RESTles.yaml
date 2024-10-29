@@ -11,8 +11,6 @@ on:
 jobs:
   setup_environment:
     runs-on: self-hosted
-    outputs:
-      commit_hash_wuppiefuzz: ${{ steps.get_commit_hash_wuppiefuzz.outputs.commit_hash }}
     steps:
       - name: Clean up Docker resources
         if: always()
@@ -30,15 +28,8 @@ jobs:
       - name: Checkout Main Repository
         uses: actions/checkout@v4
 
-      - name: Get WuppieFuzz commit hash
-        id: get_commit_hash_wuppiefuzz
-        run: |
-          commit_hash=$(git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | awk '{print $1}')
-          echo "commit_hash=${commit_hash}" >> $GITHUB_OUTPUT
-
   prepare_wuppiefuzz:
     runs-on: self-hosted
-    needs: setup_environment
     steps:
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
@@ -51,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: wuppiefuzz/target
-          key: wuppiefuzz-target-${{ needs.setup_environment.outputs.commit_hash_wuppiefuzz }}
+          key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
 
       - name: Setup Rust and Build WuppieFuzz
         if: steps.cache-wuppiefuzz-build.outputs.cache-hit != 'true'
@@ -67,9 +58,30 @@ jobs:
           name: wuppiefuzz-build
           path: wuppiefuzz/target
 
+  prepare_restler:
+    runs-on: self-hosted
+    steps:
+      - name: Clone RESTler Repository
+        run: |
+          git clone https://github.com/microsoft/restler-fuzzer.git restler
+
+      - name: Build RESTler Docker Image
+        run: |
+          cd restler
+          docker build -t restler:latest -f ./Dockerfile .
+
+      - name: Save RESTler Docker Image
+        run: |
+          docker save restler:latest -o restler_image.tar
+
+      - name: Upload RESTler Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-image
+          path: restler_image.tar
+
   prepare_api:
     runs-on: self-hosted
-    needs: setup_environment
     steps:
       - name: Checkout API Repository
         uses: actions/checkout@v4
@@ -99,35 +111,40 @@ jobs:
           cd wuppiefuzz_workspace
           mkdir -p wuppiefuzz api
 
-      - name: Download Artifacts
+      - name: Download WuppieFuzz Build
         uses: actions/download-artifact@v4
         with:
           name: wuppiefuzz-build
           path: wuppiefuzz_workspace/wuppiefuzz
-      - uses: actions/download-artifact@v4
+
+      - name: Download API
+        uses: actions/download-artifact@v4
         with:
           name: vulnerable-api
           path: wuppiefuzz_workspace/api
 
       - name: Start API Service
         run: |
-          cd wuppiefuzz_workspace
-          docker-compose -f api/docker-compose.base.yml up -d --build
+          cd wuppiefuzz_workspace/api
+          docker-compose -f docker-compose.base.yml up -d --build
 
       - name: Wait for API
         run: |
-          cd wuppiefuzz_workspace
           echo "Waiting for API to become available..."
-          docker-compose -f api/docker-compose.base.yml exec -T api sh -c 'until nc -z localhost 3001; do sleep 1; done'
+          until curl -s http://localhost:3001 > /dev/null; do
+            echo "API not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "API is up!"
 
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          export PATH="$PWD/wuppiefuzz/target/release:$PATH"
+          chmod +x wuppiefuzz/target/release/wuppiefuzz
           # Generate initial corpus
-          wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
+          ./wuppiefuzz/target/release/wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
           # Run fuzzing
-          wuppiefuzz fuzz \
+          ./wuppiefuzz/target/release/wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
@@ -144,14 +161,14 @@ jobs:
       - name: Cleanup WuppieFuzz
         if: always()
         run: |
-          cd wuppiefuzz_workspace
-          docker-compose -f api/docker-compose.base.yml down --remove-orphans || true
-          cd ..
+          cd wuppiefuzz_workspace/api
+          docker-compose -f docker-compose.base.yml down --remove-orphans || true
+          cd ../../
           rm -rf wuppiefuzz_workspace
 
   run_restler:
     runs-on: self-hosted
-    needs: [prepare_api]
+    needs: [prepare_restler, prepare_api]
     strategy:
       fail-fast: false
     steps:
@@ -163,9 +180,19 @@ jobs:
         run: |
           mkdir -p restler_workspace
           cd restler_workspace
-          mkdir -p restler api
+          mkdir -p api
 
-      - name: Download Artifacts
+      - name: Download RESTler Image
+        uses: actions/download-artifact@v4
+        with:
+          name: restler-image
+          path: restler_workspace
+
+      - name: Load RESTler Docker Image
+        run: |
+          docker load -i restler_workspace/restler_image.tar
+
+      - name: Download API
         uses: actions/download-artifact@v4
         with:
           name: vulnerable-api
@@ -173,43 +200,41 @@ jobs:
 
       - name: Start API Service
         run: |
-          cd restler_workspace
-          docker-compose -f api/docker-compose.base.yml up -d --build
+          cd restler_workspace/api
+          docker-compose -f docker-compose.base.yml up -d --build
 
       - name: Wait for API
         run: |
-          cd restler_workspace
           echo "Waiting for API to become available..."
-          docker-compose -f api/docker-compose.base.yml exec -T api sh -c 'until nc -z localhost 3001; do sleep 1; done'
-
-      - name: Setup RESTler
-        run: |
-          cd restler_workspace
-          cp api/openapi.yaml ./openapi.yaml
-          docker-compose -f restler/docker-compose-restler.yml build
+          until curl -s http://localhost:3001 > /dev/null; do
+            echo "API not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "API is up!"
 
       - name: Run RESTler
         run: |
           cd restler_workspace
-          docker-compose -f restler/docker-compose-restler.yml \
-            run --rm \
-            -v $(pwd)/openapi.yaml:/workspace/openapi.yaml:ro \
-            restler
+          cp api/openapi.yaml ./openapi.yaml
+          docker run --rm --network host \
+            -v "$(pwd)":/workspace \
+            restler:latest \
+            /bin/bash -c "restler compile --api_spec /workspace/openapi.yaml && \
+                          restler fuzz --time_budget 1 --output_dir /workspace/restler_output"
 
-      - name: Upload Restler Results
+      - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: restler-results-${{ github.run_id }}
-          path: restler_workspace/restler/output/RestlerResults/
+          path: restler_workspace/restler_output/
 
-      - name: Cleanup Restler
+      - name: Cleanup RESTler
         if: always()
         run: |
-          cd restler_workspace
-          docker-compose -f api/docker-compose.base.yml down --remove-orphans || true
-          docker-compose -f restler/docker-compose-restler.yml down --remove-orphans || true
-          cd ..
+          cd restler_workspace/api
+          docker-compose -f docker-compose.base.yml down --remove-orphans || true
+          cd ../../
           rm -rf restler_workspace
 
   summarize_results:
@@ -225,9 +250,7 @@ jobs:
       - name: Download Results
         uses: actions/download-artifact@v4
         with:
-          pattern: |
-            wuppiefuzz-results-${{ github.run_id }}
-            restler-results-${{ github.run_id }}
+          name: '**'
           path: all_results
 
       - name: Create Summary
@@ -237,8 +260,6 @@ jobs:
           if [ -d "all_results/wuppiefuzz-results-${{ github.run_id }}" ]; then
             issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt || echo "0")
             echo "Number of issues found: $issues_found" >> summary.md
-            
-            # Add detailed findings if they exist
             if [ -f "all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt" ]; then
               echo "### Detailed Findings" >> summary.md
               cat "all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt" >> summary.md
@@ -251,8 +272,6 @@ jobs:
           if [ -d "all_results/restler-results-${{ github.run_id }}" ]; then
             bugs_found=$(grep -c 'Bug' all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt || echo "0")
             echo "Number of bugs found: $bugs_found" >> summary.md
-            
-            # Add detailed findings if they exist
             if [ -f "all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt" ]; then
               echo "### Detailed Findings" >> summary.md
               cat "all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt" >> summary.md
