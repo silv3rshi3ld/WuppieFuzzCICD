@@ -179,12 +179,16 @@ jobs:
           cd restler_workspace
           cp api/openapi.yaml ./
           
+          # Copy RESTler configuration files from API repository
+          cp -r api/restler/restler_config .
+          cp api/restler/Dockerfile.restler .
+          cp api/restler/docker-compose-restler.yml .
+          
           # Build and run using docker-compose
           docker-compose -f docker-compose-restler.yml up --build
-
-          # Ensure output directory has correct permissions
-          sudo chown -R $USER:$USER output/
-
+    
+    # Ensure output directory has correct permissions
+    sudo chown -R $USER:$USER output/ || true
       - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
