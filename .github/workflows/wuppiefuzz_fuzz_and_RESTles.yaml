@@ -138,72 +138,72 @@ jobs:
 
   # Job to run RESTler
   run_restler:
-    runs-on: self-hosted
-    needs: [prepare_api]
-    steps:
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
+      runs-on: self-hosted
+      needs: [prepare_api]
+      steps:
+        - name: Install Docker Compose
+          run: |
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
 
-      - name: Setup Docker Network
-        run: |
-          docker network create --driver bridge cicd_network || true
+        - name: Setup Docker Network
+          run: |
+            docker network create --driver bridge cicd_network || true
 
-      - name: Create Workspace
-        run: mkdir -p restler_workspace
+        - name: Create Workspace
+          run: mkdir -p restler_workspace
 
-      - name: Download API
-        uses: actions/download-artifact@v4
-        with:
-          name: vulnerable-api
-          path: restler_workspace/api
+        - name: Download API
+          uses: actions/download-artifact@v4
+          with:
+            name: vulnerable-api
+            path: restler_workspace/api
 
-      - name: Start API Service
-        run: |
-          cd restler_workspace/api
-          docker-compose -f docker-compose.base.yml up -d --build
+        - name: Start API Service
+          env:
+            SMTP_USER: ${{ secrets.SMTP_USER }}
+            SMTP_PASS: ${{ secrets.SMTP_PASS }}
+            SMTP_HOST: ${{ secrets.SMTP_HOST }}
+            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          run: |
+            cd restler_workspace/api
+            chmod +x server/wait-for
+            chmod +x server/docker-entrypoint.sh
+            docker-compose -f docker-compose.base.yml up -d --build
 
-      - name: Wait for API
-        run: |
-          echo "Waiting for API to become available..."
-          until curl -s http://localhost:3001 > /dev/null; do
-            echo "API not ready. Retrying in 5 seconds..."
-            sleep 5
-          done
-          echo "API is up!"
+        - name: Wait for API
+          run: |
+            echo "Waiting for API to become available..."
+            until curl -s http://localhost:3001/health > /dev/null; do
+              echo "API not ready. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "API is up!"
 
-      - name: Run RESTler
-        run: |
-          cd restler_workspace
-          cp api/openapi.yaml ./
-          
-          # Copy RESTler configuration files from API repository
-          cp -r api/restler/restler_config .
-          cp api/restler/Dockerfile.restler .
-          cp api/restler/docker-compose-restler.yml .
-          
-          # Build and run using docker-compose
-          docker-compose -f docker-compose-restler.yml up --build
-          
-          # Ensure output directory has correct permissions
-          sudo chown -R $USER:$USER output/ || true
+        - name: Run RESTler
+          run: |
+            cd restler_workspace
+            cp api/openapi.yaml ./
+            cp -r api/restler/restler_config .
+            cp api/restler/Dockerfile.restler .
+            cp api/restler/docker-compose-restler.yml .
+            docker-compose -f docker-compose-restler.yml up --build
 
-      - name: Upload RESTler Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-results
-          path: restler_workspace/restler_output/
+        - name: Upload RESTler Results
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: restler-results
+            path: restler_workspace/restler_output/
 
-      - name: Cleanup
-        if: always()
-        run: |
-          cd restler_workspace/api
-          docker-compose -f docker-compose.base.yml down --remove-orphans || true
-          cd ../../
-          rm -rf restler_workspace
+        - name: Cleanup
+          if: always()
+          run: |
+            cd restler_workspace/api
+            docker-compose -f docker-compose.base.yml down --remove-orphans || true
+            cd ../../
+            rm -rf restler_workspace
 
   # Job to summarize results
   summarize_results:

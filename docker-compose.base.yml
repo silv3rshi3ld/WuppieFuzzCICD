@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   api:
     build:
@@ -28,6 +30,3 @@ services:
 networks:
   cicd_network:
     driver: bridge
-
-volumes:
-  rest-api:
