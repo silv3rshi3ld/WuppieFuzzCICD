@@ -77,7 +77,7 @@ jobs:
       - name: Setup Restler Config
         run: |
           mkdir -p restler
-          cp -r restler_config restler/
+          cp -r restler/restler_config restler/
 
       - name: Upload Restler Config
         uses: actions/upload-artifact@v4
