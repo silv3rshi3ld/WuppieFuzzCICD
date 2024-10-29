@@ -5,12 +5,6 @@ services:
       context: ./
       dockerfile: Dockerfile.restler
     environment:
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      HOST: host.docker.internal
-      PORT: '3001'
       SWAGGER_URL: 'http://host.docker.internal:3001/openapi.yaml'
       RUN_FUZZ_LEAN: 'true'
       FUZZ_LEAN_TIME_BUDGET: '0.01'
@@ -21,7 +15,7 @@ services:
       - cicd_network
     volumes:
       - ./output:/home/restler/output
-      - ../api/openapi.yaml:/workspace/openapi.yaml  # Mount from api directory
+      - ./openapi.yaml:/workspace/openapi.yaml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
