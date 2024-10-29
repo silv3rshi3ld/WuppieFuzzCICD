@@ -186,9 +186,10 @@ jobs:
           
           # Build and run using docker-compose
           docker-compose -f docker-compose-restler.yml up --build
-    
-    # Ensure output directory has correct permissions
-    sudo chown -R $USER:$USER output/ || true
+          
+          # Ensure output directory has correct permissions
+          sudo chown -R $USER:$USER output/ || true
+
       - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
