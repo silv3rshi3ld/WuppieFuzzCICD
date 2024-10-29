@@ -33,8 +33,7 @@ echo "Using API specification at: ${API_SPEC_PATH}"
 # Compile phase
 echo "Compiling API specification..."
 dotnet /home/restler/restler/Restler.dll compile \
-    --api_spec "${API_SPEC_PATH}" \
-    --restler_compiler_telemetry_optout "${RESTLER_TELEMETRY_OPTOUT:-1}"
+    --api_spec "${API_SPEC_PATH}"
 
 # Fuzz-lean phase
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
@@ -44,7 +43,9 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
         --time_budget "${FUZZ_LEAN_TIME_BUDGET:-0.01}" \
-        --restler_telemetry_optout "${RESTLER_TELEMETRY_OPTOUT:-1}"
+        --target_ip "host.docker.internal" \
+        --target_port "3001" \
+        --no_ssl
 fi
 
 # Full fuzzing phase
@@ -55,7 +56,9 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
         --time_budget "${FUZZ_TIME_BUDGET:-1}" \
-        --restler_telemetry_optout "${RESTLER_TELEMETRY_OPTOUT:-1}"
+        --target_ip "host.docker.internal" \
+        --target_port "3001" \
+        --no_ssl
 fi
 
 echo "RESTler Fuzzing completed!"
