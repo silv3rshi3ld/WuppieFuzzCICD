@@ -9,28 +9,17 @@ on:
       - main
 
 jobs:
-  setup_environment:
-    runs-on: self-hosted
-    steps:
-      - name: Clean up Docker resources
-        if: always()
-        run: |
-          docker container prune -f
-          docker network prune -f
-          docker network rm cicd_network || true
-
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
-
-      - name: Checkout Main Repository
-        uses: actions/checkout@v4
-
+  # Job to prepare WuppieFuzz
   prepare_wuppiefuzz:
     runs-on: self-hosted
     steps:
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source "$HOME/.cargo/env"
+
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
@@ -44,42 +33,19 @@ jobs:
           path: wuppiefuzz/target
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
 
-      - name: Setup Rust and Build WuppieFuzz
+      - name: Build WuppieFuzz
         if: steps.cache-wuppiefuzz-build.outputs.cache-hit != 'true'
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source "$HOME/.cargo/env"
           cd wuppiefuzz
           cargo build --release
 
-      - name: Upload WuppieFuzz Build Artifacts
+      - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
-          name: wuppiefuzz-build
-          path: wuppiefuzz/target
+          name: wuppiefuzz-binary
+          path: wuppiefuzz/target/release/wuppiefuzz
 
-  prepare_restler:
-    runs-on: self-hosted
-    steps:
-      - name: Clone RESTler Repository
-        run: |
-          git clone https://github.com/microsoft/restler-fuzzer.git restler
-
-      - name: Build RESTler Docker Image
-        run: |
-          cd restler
-          docker build -t restler:latest -f ./Dockerfile .
-
-      - name: Save RESTler Docker Image
-        run: |
-          docker save restler:latest -o restler_image.tar
-
-      - name: Upload RESTler Image
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-image
-          path: restler_image.tar
-
+  # Job to prepare the API
   prepare_api:
     runs-on: self-hosted
     steps:
@@ -95,26 +61,28 @@ jobs:
           name: vulnerable-api
           path: api/
 
+  # Job to run WuppieFuzz
   run_wuppiefuzz:
     runs-on: self-hosted
     needs: [prepare_wuppiefuzz, prepare_api]
-    strategy:
-      fail-fast: false
     steps:
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+
       - name: Setup Docker Network
         run: |
           docker network create --driver bridge cicd_network || true
 
       - name: Create Workspace
-        run: |
-          mkdir -p wuppiefuzz_workspace
-          cd wuppiefuzz_workspace
-          mkdir -p wuppiefuzz api
+        run: mkdir -p wuppiefuzz_workspace
 
-      - name: Download WuppieFuzz Build
+      - name: Download WuppieFuzz Binary
         uses: actions/download-artifact@v4
         with:
-          name: wuppiefuzz-build
+          name: wuppiefuzz-binary
           path: wuppiefuzz_workspace/wuppiefuzz
 
       - name: Download API
@@ -122,6 +90,9 @@ jobs:
         with:
           name: vulnerable-api
           path: wuppiefuzz_workspace/api
+
+      - name: Make WuppieFuzz Executable
+        run: chmod +x wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
 
       - name: Start API Service
         run: |
@@ -140,11 +111,10 @@ jobs:
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          chmod +x wuppiefuzz/target/release/wuppiefuzz
           # Generate initial corpus
-          ./wuppiefuzz/target/release/wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
+          ./wuppiefuzz/wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
           # Run fuzzing
-          ./wuppiefuzz/target/release/wuppiefuzz fuzz \
+          ./wuppiefuzz/wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
@@ -155,10 +125,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: wuppiefuzz-results-${{ github.run_id }}
+          name: wuppiefuzz-results
           path: wuppiefuzz_workspace/wuppiefuzz/reports/
 
-      - name: Cleanup WuppieFuzz
+      - name: Cleanup
         if: always()
         run: |
           cd wuppiefuzz_workspace/api
@@ -166,31 +136,23 @@ jobs:
           cd ../../
           rm -rf wuppiefuzz_workspace
 
+  # Job to run RESTler
   run_restler:
     runs-on: self-hosted
-    needs: [prepare_restler, prepare_api]
-    strategy:
-      fail-fast: false
+    needs: [prepare_api]
     steps:
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+
       - name: Setup Docker Network
         run: |
           docker network create --driver bridge cicd_network || true
 
       - name: Create Workspace
-        run: |
-          mkdir -p restler_workspace
-          cd restler_workspace
-          mkdir -p api
-
-      - name: Download RESTler Image
-        uses: actions/download-artifact@v4
-        with:
-          name: restler-image
-          path: restler_workspace
-
-      - name: Load RESTler Docker Image
-        run: |
-          docker load -i restler_workspace/restler_image.tar
+        run: mkdir -p restler_workspace
 
       - name: Download API
         uses: actions/download-artifact@v4
@@ -215,21 +177,22 @@ jobs:
       - name: Run RESTler
         run: |
           cd restler_workspace
-          cp api/openapi.yaml ./openapi.yaml
+          cp api/openapi.yaml ./
           docker run --rm --network host \
             -v "$(pwd)":/workspace \
-            restler:latest \
-            /bin/bash -c "restler compile --api_spec /workspace/openapi.yaml && \
-                          restler fuzz --time_budget 1 --output_dir /workspace/restler_output"
+            mcr.microsoft.com/restlerfuzzer/restler:latest \
+            bash -c "cd /workspace && \
+              restler compile --api_spec openapi.yaml && \
+              restler fuzz --time_budget 1 --output_dir restler_output"
 
       - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: restler-results-${{ github.run_id }}
+          name: restler-results
           path: restler_workspace/restler_output/
 
-      - name: Cleanup RESTler
+      - name: Cleanup
         if: always()
         run: |
           cd restler_workspace/api
@@ -237,10 +200,10 @@ jobs:
           cd ../../
           rm -rf restler_workspace
 
+  # Job to summarize results
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
-    if: always()
     steps:
       - name: Final Cleanup
         run: |
@@ -257,24 +220,24 @@ jobs:
         run: |
           echo "# Fuzzing Results Summary" > summary.md
           echo "## WuppieFuzz Results" >> summary.md
-          if [ -d "all_results/wuppiefuzz-results-${{ github.run_id }}" ]; then
-            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt || echo "0")
+          if [ -d "all_results/wuppiefuzz-results" ]; then
+            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results/report.txt || echo "0")
             echo "Number of issues found: $issues_found" >> summary.md
-            if [ -f "all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt" ]; then
+            if [ -f "all_results/wuppiefuzz-results/report.txt" ]; then
               echo "### Detailed Findings" >> summary.md
-              cat "all_results/wuppiefuzz-results-${{ github.run_id }}/report.txt" >> summary.md
+              cat "all_results/wuppiefuzz-results/report.txt" >> summary.md
             fi
           else
             echo "No WuppieFuzz results found" >> summary.md
           fi
-          
+
           echo "## RESTler Results" >> summary.md
-          if [ -d "all_results/restler-results-${{ github.run_id }}" ]; then
-            bugs_found=$(grep -c 'Bug' all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt || echo "0")
+          if [ -d "all_results/restler-results" ]; then
+            bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
             echo "Number of bugs found: $bugs_found" >> summary.md
-            if [ -f "all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt" ]; then
+            if [ -f "all_results/restler-results/bug_buckets/BugBuckets.txt" ]; then
               echo "### Detailed Findings" >> summary.md
-              cat "all_results/restler-results-${{ github.run_id }}/bug_buckets/BugBuckets.txt" >> summary.md
+              cat "all_results/restler-results/bug_buckets/BugBuckets.txt" >> summary.md
             fi
           else
             echo "No RESTler results found" >> summary.md
