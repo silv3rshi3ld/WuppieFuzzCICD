@@ -111,6 +111,9 @@ jobs:
           cd wuppiefuzz_workspace
           mkdir -p wuppiefuzz api
 
+      - name: Setup Docker Network
+        run: docker network create cicd_network || true
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
