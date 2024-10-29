@@ -23,10 +23,14 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - rest-api:/data/db
+      - mongodb_data:/data/db
     networks:
       - cicd_network
 
 networks:
   cicd_network:
     driver: bridge
+
+volumes:
+  mongodb_data:   
+    name: mongodb_data   
