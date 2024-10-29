@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "db:up": "migrate-mongo up",
-    "start": "nodemon --ignore './tests' index.js",
+    "db:status": "node db-check.js",
+    "start": "node index.js",
+    "start:dev": "nodemon --ignore './tests' index.js",
     "test": "jest --forceExit --detectOpenHandles  --watchAll --maxWorkers=1 --verbose"
   },
   "keywords": [],
