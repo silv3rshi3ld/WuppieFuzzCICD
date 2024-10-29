@@ -168,72 +168,9 @@ jobs:
             SMTP_PORT: ${{ secrets.SMTP_PORT }}
           run: |
             cd restler_workspace/api
-            
-            # Make scripts executable
             chmod +x server/wait-for
             chmod +x server/docker-entrypoint.sh
-            
-            # Start services and capture output
             docker-compose -f docker-compose.base.yml up -d --build
-            
-            # Debug information
-            echo "=== Docker Containers ==="
-            docker ps -a
-            
-            echo "=== Docker Networks ==="
-            docker network ls
-            
-            echo "=== API Container Logs ==="
-            docker-compose -f docker-compose.base.yml logs api
-            
-            echo "=== MongoDB Container Logs ==="
-            docker-compose -f docker-compose.base.yml logs db
-            
-            echo "=== Container Status ==="
-            docker-compose -f docker-compose.base.yml ps
-            
-            echo "=== Testing MongoDB Connection ==="
-            docker-compose -f docker-compose.base.yml exec -T db mongosh --eval "db.adminCommand('ping')" || true
-            
-            echo "=== Testing API Health Endpoint ==="
-            curl -v http://localhost:3001/health || true
-            
-            # Enhanced wait with timeout
-            timeout=300  # 5 minutes timeout
-            start_time=$(date +%s)
-            
-            while true; do
-              current_time=$(date +%s)
-              elapsed=$((current_time - start_time))
-              
-              if [ $elapsed -gt $timeout ]; then
-                echo "Timeout waiting for API to become available"
-                echo "=== Final API Container Logs ==="
-                docker-compose -f docker-compose.base.yml logs api
-                exit 1
-              fi
-              
-              if curl -s http://localhost:3001/health > /dev/null; then
-                echo "API is up!"
-                break
-              else
-                echo "API not ready. Retrying in 5 seconds... (elapsed: ${elapsed}s)"
-                echo "=== Current API Container Logs ==="
-                docker-compose -f docker-compose.base.yml logs --tail=50 api
-                sleep 5
-              fi
-            done
-
-        - name: Check API Container Status
-          if: failure()
-          run: |
-            cd restler_workspace/api
-            echo "=== Container Status ==="
-            docker-compose -f docker-compose.base.yml ps
-            echo "=== API Container Logs ==="
-            docker-compose -f docker-compose.base.yml logs api
-            echo "=== MongoDB Container Logs ==="
-            docker-compose -f docker-compose.base.yml logs db
 
         - name: Wait for API
           run: |
