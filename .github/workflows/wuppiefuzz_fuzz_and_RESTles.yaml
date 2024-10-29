@@ -45,7 +45,7 @@ jobs:
           name: wuppiefuzz-binary
           path: wuppiefuzz/target/release/wuppiefuzz
 
-  # Job to prepare and verify the API
+  # Job to prepare the API
   prepare_api:
     runs-on: self-hosted
     steps:
@@ -55,6 +55,17 @@ jobs:
           repository: silv3rshi3ld/WuppieFuzzCICD
           path: api
 
+      - name: Upload API
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerable-api
+          path: api/
+
+  # Job to run WuppieFuzz
+  run_wuppiefuzz:
+    runs-on: self-hosted
+    needs: [prepare_wuppiefuzz, prepare_api]
+    steps:
       - name: Install Docker Compose
         run: |
           sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
@@ -65,72 +76,9 @@ jobs:
         run: |
           docker network create --driver bridge cicd_network || true
 
-      - name: Start and Verify API
-        env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-        run: |
-          cd api
-          
-          # Start services
-          docker-compose -f docker-compose.base.yml up -d --build
-          
-          # Wait for MongoDB to be ready
-          echo "Waiting for MongoDB to initialize..."
-          timeout=60
-          while [ $timeout -gt 0 ]; do
-            if docker-compose -f docker-compose.base.yml exec -T db mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
-              echo "MongoDB is ready!"
-              break
-            fi
-            timeout=$((timeout-1))
-            sleep 1
-          done
-          
-          # Give the API a moment to start
-          echo "Waiting for API to initialize..."
-          sleep 10
-          
-          # Check if API is responding
-          timeout=60
-          while [ $timeout -gt 0 ]; do
-            if curl -s http://localhost:3001/health > /dev/null; then
-              echo "API is up and running!"
-              break
-            fi
-            
-            if [ $timeout -eq 1 ]; then
-              echo "API failed to start. Checking logs:"
-              docker-compose -f docker-compose.base.yml logs api
-              exit 1
-            fi
-            
-            echo "Waiting for API... ($timeout seconds remaining)"
-            timeout=$((timeout-1))
-            sleep 1
-          done
-          
-          echo "API is successfully prepared and verified!"
+      - name: Create Workspace
+        run: mkdir -p wuppiefuzz_workspace
 
-      - name: Upload API
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerable-api
-          path: api/
-
-      - name: Cleanup
-        if: always()
-        run: |
-          cd api
-          docker-compose -f docker-compose.base.yml down --remove-orphans || true
-
-  # Job to run WuppieFuzz
-  run_wuppiefuzz:
-    runs-on: self-hosted
-    needs: [prepare_wuppiefuzz, prepare_api]
-    steps:
       - name: Download WuppieFuzz Binary
         uses: actions/download-artifact@v4
         with:
@@ -145,6 +93,20 @@ jobs:
 
       - name: Make WuppieFuzz Executable
         run: chmod +x wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
+
+      - name: Start API Service
+        run: |
+          cd wuppiefuzz_workspace/api
+          docker-compose -f docker-compose.base.yml up -d --build
+
+      - name: Wait for API
+        run: |
+          echo "Waiting for API to become available..."
+          until curl -s http://localhost:3001 > /dev/null; do
+            echo "API not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "API is up!"
 
       - name: Run WuppieFuzz
         run: |
@@ -166,32 +128,145 @@ jobs:
           name: wuppiefuzz-results
           path: wuppiefuzz_workspace/wuppiefuzz/reports/
 
+      - name: Cleanup
+        if: always()
+        run: |
+          cd wuppiefuzz_workspace/api
+          docker-compose -f docker-compose.base.yml down --remove-orphans || true
+          cd ../../
+          rm -rf wuppiefuzz_workspace
+
   # Job to run RESTler
   run_restler:
-    runs-on: self-hosted
-    needs: [prepare_api]
-    steps:
-      - name: Download API
-        uses: actions/download-artifact@v4
-        with:
-          name: vulnerable-api
-          path: restler_workspace/api
+      runs-on: self-hosted
+      needs: [prepare_api]
+      steps:
+        - name: Install Docker Compose
+          run: |
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+            docker-compose --version
 
-      - name: Run RESTler
-        run: |
-          cd restler_workspace
-          cp api/openapi.yaml ./
-          cp -r api/restler/restler_config .
-          cp api/restler/Dockerfile.restler .
-          cp api/restler/docker-compose-restler.yml .
-          docker-compose -f docker-compose-restler.yml up --build
+        - name: Setup Docker Network
+          run: |
+            docker network create --driver bridge cicd_network || true
 
-      - name: Upload RESTler Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-results
-          path: restler_workspace/restler_output/
+        - name: Create Workspace
+          run: mkdir -p restler_workspace
+
+        - name: Download API
+          uses: actions/download-artifact@v4
+          with:
+            name: vulnerable-api
+            path: restler_workspace/api
+
+        - name: Start API Service
+          env:
+            SMTP_USER: ${{ secrets.SMTP_USER }}
+            SMTP_PASS: ${{ secrets.SMTP_PASS }}
+            SMTP_HOST: ${{ secrets.SMTP_HOST }}
+            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          run: |
+            cd restler_workspace/api
+            
+            # Make scripts executable
+            chmod +x server/wait-for
+            chmod +x server/docker-entrypoint.sh
+            
+            # Start services and capture output
+            docker-compose -f docker-compose.base.yml up -d --build
+            
+            # Debug information
+            echo "=== Docker Containers ==="
+            docker ps -a
+            
+            echo "=== Docker Networks ==="
+            docker network ls
+            
+            echo "=== API Container Logs ==="
+            docker-compose -f docker-compose.base.yml logs api
+            
+            echo "=== MongoDB Container Logs ==="
+            docker-compose -f docker-compose.base.yml logs db
+            
+            echo "=== Container Status ==="
+            docker-compose -f docker-compose.base.yml ps
+            
+            echo "=== Testing MongoDB Connection ==="
+            docker-compose -f docker-compose.base.yml exec -T db mongosh --eval "db.adminCommand('ping')" || true
+            
+            echo "=== Testing API Health Endpoint ==="
+            curl -v http://localhost:3001/health || true
+            
+            # Enhanced wait with timeout
+            timeout=300  # 5 minutes timeout
+            start_time=$(date +%s)
+            
+            while true; do
+              current_time=$(date +%s)
+              elapsed=$((current_time - start_time))
+              
+              if [ $elapsed -gt $timeout ]; then
+                echo "Timeout waiting for API to become available"
+                echo "=== Final API Container Logs ==="
+                docker-compose -f docker-compose.base.yml logs api
+                exit 1
+              fi
+              
+              if curl -s http://localhost:3001/health > /dev/null; then
+                echo "API is up!"
+                break
+              else
+                echo "API not ready. Retrying in 5 seconds... (elapsed: ${elapsed}s)"
+                echo "=== Current API Container Logs ==="
+                docker-compose -f docker-compose.base.yml logs --tail=50 api
+                sleep 5
+              fi
+            done
+
+        - name: Check API Container Status
+          if: failure()
+          run: |
+            cd restler_workspace/api
+            echo "=== Container Status ==="
+            docker-compose -f docker-compose.base.yml ps
+            echo "=== API Container Logs ==="
+            docker-compose -f docker-compose.base.yml logs api
+            echo "=== MongoDB Container Logs ==="
+            docker-compose -f docker-compose.base.yml logs db
+
+        - name: Wait for API
+          run: |
+            echo "Waiting for API to become available..."
+            until curl -s http://localhost:3001/health > /dev/null; do
+              echo "API not ready. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "API is up!"
+
+        - name: Run RESTler
+          run: |
+            cd restler_workspace
+            cp api/openapi.yaml ./
+            cp -r api/restler/restler_config .
+            cp api/restler/Dockerfile.restler .
+            cp api/restler/docker-compose-restler.yml .
+            docker-compose -f docker-compose-restler.yml up --build
+
+        - name: Upload RESTler Results
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: restler-results
+            path: restler_workspace/restler_output/
+
+        - name: Cleanup
+          if: always()
+          run: |
+            cd restler_workspace/api
+            docker-compose -f docker-compose.base.yml down --remove-orphans || true
+            cd ../../
+            rm -rf restler_workspace
 
   # Job to summarize results
   summarize_results:
