@@ -95,9 +95,7 @@ jobs:
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          # Generate initial corpus
           ./wuppiefuzz/wuppiefuzz output-corpus --openapi-spec=vampi/openapi_specs/openapi3.yml corpus_directory
-          # Run fuzzing
           ./wuppiefuzz/wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
@@ -123,6 +121,9 @@ jobs:
     runs-on: self-hosted
     needs: [prepare_api]
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Create Workspace
         run: mkdir -p restler_workspace
 
@@ -132,9 +133,17 @@ jobs:
           name: vampi-api
           path: restler_workspace/vampi
 
+      - name: Copy RESTler Files
+        run: |
+          cp -r restler/restler_config restler_workspace/
+          cp restler/docker-compose-restler.yml restler_workspace/
+          cp restler/Dockerfile.restler restler_workspace/
+          cp restler/entrypoint.sh restler_workspace/restler_config/
+          cp restler_workspace/vampi/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
+
       - name: Start VamPI Service
         run: |
-          cd restler_workspace/vampi
+          cd restler_workspace
           docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
 
       - name: Wait for VamPI
@@ -149,10 +158,6 @@ jobs:
       - name: Run RESTler
         run: |
           cd restler_workspace
-          cp vampi/openapi_specs/openapi3.yml ./openapi.yaml
-          cp -r vampi/restler/restler_config .
-          cp vampi/restler/Dockerfile.restler .
-          cp vampi/restler/docker-compose-restler.yml .
           docker-compose -f docker-compose-restler.yml up --build
 
       - name: Upload RESTler Results
@@ -160,7 +165,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: restler_workspace/restler_output/
+          path: restler_workspace/output/
 
       - name: Cleanup
         if: always()

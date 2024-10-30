@@ -44,7 +44,7 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --settings /workspace/Compile/engine_settings.json \
         --time_budget "${FUZZ_LEAN_TIME_BUDGET:-0.01}" \
         --target_ip "host.docker.internal" \
-        --target_port "3001" \
+        --target_port "5000" \
         --no_ssl
 fi
 
@@ -57,7 +57,7 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --settings /workspace/Compile/engine_settings.json \
         --time_budget "${FUZZ_TIME_BUDGET:-1}" \
         --target_ip "host.docker.internal" \
-        --target_port "3001" \
+        --target_port "5000" \
         --no_ssl
 fi
 
