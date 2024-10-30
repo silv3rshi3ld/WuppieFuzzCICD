@@ -138,7 +138,6 @@ jobs:
           cp -r restler/restler_config restler_workspace/
           cp restler/docker-compose-restler.yml restler_workspace/
           cp restler/Dockerfile.restler restler_workspace/
-          cp restler/entrypoint.sh restler_workspace/restler_config/
           cp restler_workspace/vampi/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
 
       - name: Start VamPI Service
@@ -173,7 +172,7 @@ jobs:
           docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
           docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
           rm -rf restler_workspace
-
+          
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
