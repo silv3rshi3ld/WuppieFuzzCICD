@@ -125,20 +125,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create Workspace
-        run: mkdir -p restler_workspace
+        run: |
+          mkdir -p restler_workspace
+          mkdir -p restler_workspace/output
 
       - name: Download VamPI
         uses: actions/download-artifact@v4
         with:
           name: vampi-api
-          path: restler_workspace/vampi
+          path: restler_workspace/VAmPI-master
 
       - name: Copy RESTler Files
         run: |
           cp -r restler/restler_config restler_workspace/
           cp restler/docker-compose-restler.yml restler_workspace/
           cp restler/Dockerfile.restler restler_workspace/
-          cp restler_workspace/vampi/openapi_specs/openapi.yml restler_workspace/openapi.yaml
+          # Copy OpenAPI spec from the correct VAmPI path
+          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
+          ls -la restler_workspace/
 
       - name: Start VamPI Service
         run: |
@@ -157,6 +161,10 @@ jobs:
       - name: Run RESTler
         run: |
           cd restler_workspace
+          # Debug: List files to verify OpenAPI spec is present
+          echo "Current directory contents:"
+          ls -la
+          echo "Running RESTler..."
           docker-compose -f docker-compose-restler.yml up --build
 
       - name: Upload RESTler Results
@@ -164,7 +172,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: restler_workspace/output/
+          path: |
+            restler_workspace/*/bug_buckets/
+            restler_workspace/*/Fuzz/coverage_failures_to_investigate.txt
+            restler_workspace/*/FuzzLean/coverage_failures_to_investigate.txt
 
       - name: Cleanup
         if: always()
