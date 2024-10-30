@@ -145,20 +145,22 @@ jobs:
           cp -r restler/restler_config restler_workspace/
           cp restler/docker-compose-restler.yml restler_workspace/
           cp restler/Dockerfile.restler restler_workspace/
-          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/swagger.json
-
-      - name: Start VamPI Service
-        run: |
-          cd restler_workspace
-          docker run -d -p 5002:5000 -e vulnerable=1 erev0s/vampi:latest
+          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
+          echo "Files in workspace:"
+          ls -la restler_workspace/
 
       - name: Create Docker Network
         run: docker network create cicd_network || true
 
+      - name: Start VamPI Service
+        run: |
+          cd restler_workspace
+          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest  # Changed to 5000
+
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI to become available..."
-          until curl -s http://localhost:5002/ > /dev/null; do
+          until curl -s http://localhost:5000/ > /dev/null; do  # Changed to 5000
             echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
@@ -167,6 +169,8 @@ jobs:
       - name: Run RESTler
         run: |
           cd restler_workspace
+          echo "Current directory contents:"
+          ls -la
           docker-compose -f docker-compose-restler.yml up --build
 
       - name: Upload RESTler Results
