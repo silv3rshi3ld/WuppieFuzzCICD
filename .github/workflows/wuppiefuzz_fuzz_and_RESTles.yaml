@@ -73,14 +73,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vampi-api
-          path: wuppiefuzz_workspace/vampi
+          path: wuppiefuzz_workspace/VAmPI-master
 
       - name: Make WuppieFuzz Executable
         run: chmod +x wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
 
       - name: Start VamPI Service
         run: |
-          cd wuppiefuzz_workspace/vampi
+          cd wuppiefuzz_workspace
           docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
 
       - name: Wait for VamPI
@@ -95,20 +95,25 @@ jobs:
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          ./wuppiefuzz/wuppiefuzz output-corpus --openapi-spec=vampi/openapi_specs/openapi.yml corpus_directory
+          echo "Current directory structure:"
+          ls -R
+          mkdir reports
+          ./wuppiefuzz/wuppiefuzz output-corpus \
+            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
+            corpus_directory
           ./wuppiefuzz/wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            vampi/openapi_specs/openapi3.yml
+            VAmPI-master/openapi_specs/openapi3.yml
 
       - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: wuppiefuzz_workspace/wuppiefuzz/reports/
+          path: wuppiefuzz_workspace/reports/
 
       - name: Cleanup
         if: always()
@@ -140,9 +145,9 @@ jobs:
           cp -r restler/restler_config restler_workspace/
           cp restler/docker-compose-restler.yml restler_workspace/
           cp restler/Dockerfile.restler restler_workspace/
-          # Copy OpenAPI spec from the correct VAmPI path
-          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
-          ls -la restler_workspace/
+          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/swagger.json
+          echo "Current directory structure:"
+          ls -R restler_workspace/
 
       - name: Start VamPI Service
         run: |
@@ -161,10 +166,6 @@ jobs:
       - name: Run RESTler
         run: |
           cd restler_workspace
-          # Debug: List files to verify OpenAPI spec is present
-          echo "Current directory contents:"
-          ls -la
-          echo "Running RESTler..."
           docker-compose -f docker-compose-restler.yml up --build
 
       - name: Upload RESTler Results
