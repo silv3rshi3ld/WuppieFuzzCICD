@@ -3,10 +3,10 @@ name: Build and Fuzz
 on:
   push:
     branches:
-      - main
+      - Vampi
   pull_request:
     branches:
-      - main
+      - Vampi
 
 jobs:
   # Job to prepare WuppieFuzz
