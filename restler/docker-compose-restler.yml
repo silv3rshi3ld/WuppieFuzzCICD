@@ -2,22 +2,21 @@ version: '3.8'
 services:
   restler:
     build:
-      context: ./
+      context: ./restler
       dockerfile: Dockerfile.restler
     environment:
-      SWAGGER_URL: 'http://host.docker.internal:5000/ui/swagger.json'
-      RUN_FUZZ_LEAN: 'true'
-      FUZZ_LEAN_TIME_BUDGET: '0.01'
-      RUN_FUZZ: 'true'
-      FUZZ_TIME_BUDGET: '1'
-      RESTLER_TELEMETRY_OPTOUT: '1'
-    networks:
-      - cicd_network
+      - RESTLER_TELEMETRY_OPTOUT=1
+      - RUN_FUZZ_LEAN=true
+      - FUZZ_LEAN_TIME_BUDGET=0.05
+      - RUN_FUZZ=true
+      - FUZZ_TIME_BUDGET=0.25
     volumes:
-      - ./output:/home/restler/output
-      - ./openapi.yaml:/workspace/openapi.yaml:ro
+      - ./VAmPI-master/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      - ./output:/workspace/output
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - cicd_network
 
 networks:
   cicd_network:

@@ -2,63 +2,65 @@
 set -e
 
 echo "Starting RESTler Fuzzer..."
+
+# Create output directory
 mkdir -p /workspace/Compile
+mkdir -p /workspace/output
 
-# Check if openapi.yaml exists and convert to JSON
-if [ -f "/workspace/openapi.yaml" ]; then
-    echo "Found OpenAPI YAML specification, converting to JSON..."
-    python3 -c '
-import yaml
-import json
-import sys
-with open("/workspace/openapi.yaml", "r") as yaml_file:
-    yaml_content = yaml.safe_load(yaml_file)
-with open("/workspace/swagger.json", "w") as json_file:
-    json.dump(yaml_content, json_file, indent=2)
-'
-    API_SPEC_PATH="/workspace/swagger.json"
-elif [ -f "/workspace/swagger.json" ]; then
-    echo "Found existing swagger.json..."
-    API_SPEC_PATH="/workspace/swagger.json"
-elif [ -f "/workspace/openapi.json" ]; then
-    echo "Found existing openapi.json..."
-    API_SPEC_PATH="/workspace/openapi.json"
-else
-    echo "Error: No OpenAPI specification file found"
-    exit 1
-fi
+# Wait for VAmPI API
+echo "Waiting for VAmPI API to be available..."
+until curl -s http://host.docker.internal:5000/ui/ > /dev/null; do
+    echo "VAmPI not ready. Retrying in 5 seconds..."
+    sleep 5
+done
+echo "VAmPI is available!"
 
-echo "Using API specification at: ${API_SPEC_PATH}"
-
-# Compile phase
+# Compile step
 echo "Compiling API specification..."
 dotnet /home/restler/restler/Restler.dll compile \
-    --api_spec "${API_SPEC_PATH}"
+    --api_spec /workspace/openapi3.yml
 
-# Fuzz-lean phase
+# Test step
+echo "Running test phase..."
+dotnet /home/restler/restler/Restler.dll test \
+    --grammar_file /workspace/Compile/grammar.py \
+    --dictionary_file /workspace/Compile/dict.json \
+    --settings /workspace/Compile/engine_settings.json \
+    --target_ip host.docker.internal \
+    --target_port 5000 \
+    --no_ssl
+
+# Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
     dotnet /home/restler/restler/Restler.dll fuzz-lean \
         --grammar_file /workspace/Compile/grammar.py \
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
-        --time_budget "${FUZZ_LEAN_TIME_BUDGET:-0.01}" \
-        --target_ip "host.docker.internal" \
-        --target_port "5000" \
+        --time_budget ${FUZZ_LEAN_TIME_BUDGET} \
+        --target_ip host.docker.internal \
+        --target_port 5000 \
         --no_ssl
 fi
 
-# Full fuzzing phase
+# Run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
     dotnet /home/restler/restler/Restler.dll fuzz \
         --grammar_file /workspace/Compile/grammar.py \
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
-        --time_budget "${FUZZ_TIME_BUDGET:-1}" \
-        --target_ip "host.docker.internal" \
-        --target_port "5000" \
+        --time_budget ${FUZZ_TIME_BUDGET} \
+        --target_ip host.docker.internal \
+        --target_port 5000 \
         --no_ssl
 fi
 
-echo "RESTler Fuzzing completed!"
+# Copy results to output directory
+for dir in Test FuzzLean Fuzz; do
+    if [ -d "/workspace/$dir/RestlerResults" ]; then
+        cp -r /workspace/$dir/RestlerResults/* /workspace/output/
+    fi
+done
+
+echo "RESTler execution completed!"
