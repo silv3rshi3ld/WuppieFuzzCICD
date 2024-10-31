@@ -2,7 +2,7 @@ version: '3.8'
 services:
   restler:
     build:
-      context: ./restler
+      context: .
       dockerfile: Dockerfile.restler
     environment:
       - RESTLER_TELEMETRY_OPTOUT=1
@@ -11,7 +11,7 @@ services:
       - RUN_FUZZ=true
       - FUZZ_TIME_BUDGET=0.25
     volumes:
-      - ./VAmPI-master/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      - ./openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
     extra_hosts:
       - "host.docker.internal:host-gateway"

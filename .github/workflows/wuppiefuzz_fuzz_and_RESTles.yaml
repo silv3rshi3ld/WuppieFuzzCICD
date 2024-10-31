@@ -131,36 +131,36 @@ jobs:
 
       - name: Create Workspace
         run: |
-          mkdir -p restler_workspace
-          mkdir -p restler_workspace/output
+          mkdir -p workspace
+          mkdir -p workspace/output
 
       - name: Download VamPI
         uses: actions/download-artifact@v4
         with:
           name: vampi-api
-          path: restler_workspace/VAmPI-master
+          path: workspace/VAmPI-master
 
       - name: Copy RESTler Files
         run: |
-          cp -r restler/restler_config restler_workspace/
-          cp restler/docker-compose-restler.yml restler_workspace/
-          cp restler/Dockerfile.restler restler_workspace/
-          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
+          cp -r restler/restler_config workspace/
+          cp restler/docker-compose-restler.yml workspace/
+          cp restler/Dockerfile.restler workspace/
+          cp workspace/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
-          ls -la restler_workspace/
+          ls -la workspace/
 
       - name: Create Docker Network
         run: docker network create cicd_network || true
 
       - name: Start VamPI Service
         run: |
-          cd restler_workspace
-          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest  # Changed to 5000
+          cd workspace
+          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
 
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI to become available..."
-          until curl -s http://localhost:5000/ > /dev/null; do  # Changed to 5000
+          until curl -s http://localhost:5000/ > /dev/null; do
             echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
@@ -168,7 +168,7 @@ jobs:
 
       - name: Run RESTler
         run: |
-          cd restler_workspace
+          cd workspace
           echo "Current directory contents:"
           ls -la
           docker-compose -f docker-compose-restler.yml up --build
@@ -179,9 +179,11 @@ jobs:
         with:
           name: restler-results
           path: |
-            restler_workspace/*/bug_buckets/
-            restler_workspace/*/Fuzz/coverage_failures_to_investigate.txt
-            restler_workspace/*/FuzzLean/coverage_failures_to_investigate.txt
+            workspace/output/bug_buckets/
+            workspace/output/Test/RestlerResults/*/logs/main.txt
+            workspace/output/FuzzLean/RestlerResults/*/logs/main.txt
+            workspace/output/Fuzz/RestlerResults/*/logs/main.txt
+            workspace/output/**/coverage_failures_to_investigate.txt
 
       - name: Cleanup
         if: always()
@@ -189,7 +191,7 @@ jobs:
           docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
           docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
           docker network rm cicd_network || true
-          rm -rf restler_workspace
+          rm -rf workspace
 
   summarize_results:
     runs-on: self-hosted
