@@ -1,17 +1,25 @@
 version: "3"
 services:
- vampi-secure:
-  build: ./
-  container_name: vampi-secure
-  ports:
-   - 5001:5001
-  environment:
-   - vulnerable=0
+  vampi-secure:
+    build: ./
+    container_name: vampi-secure
+    ports:
+      - 5001:5000
+    environment:
+      - vulnerable=0
+    networks:
+      - cicd_network
 
- vampi-vulnerable:
-  build: ./
-  container_name: vampi-vulnerable
-  ports:
-   - 5002:5002
-  environment:
-   - vulnerable=1
+  vampi-vulnerable:
+    build: ./
+    container_name: vampi-vulnerable
+    ports:
+      - 5002:5000
+    environment:
+      - vulnerable=1
+    networks:
+      - cicd_network
+
+networks:
+  cicd_network:
+    external: true

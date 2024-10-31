@@ -50,6 +50,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Create Docker Network
+        run: docker network create cicd_network || true
+
+      - name: Start VamPI Service
+        run: |
+          cd VAmPI-master
+          docker-compose up -d
+
       - name: Upload VamPI
         uses: actions/upload-artifact@v4
         with:
@@ -81,8 +89,7 @@ jobs:
       - name: Start VamPI Service
         run: |
           cd wuppiefuzz_workspace/VAmPI-master
-          docker build -t local-vampi .
-          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
+          docker-compose up -d
 
       - name: Wait for VamPI
         run: |
@@ -157,7 +164,7 @@ jobs:
         run: |
           cd workspace/VAmPI-master
           docker build -t local-vampi .
-          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
+          docker run -d --network cicd_network -p 5000:5000 -e vulnerable=1 local-vampi
 
       - name: Wait for VamPI
         run: |
@@ -224,7 +231,6 @@ jobs:
           else
             echo "No WuppieFuzz results found" >> summary.md
           fi
-
           echo "## RESTler Results" >> summary.md
           if [ -d "all_results/restler-results" ]; then
             bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
