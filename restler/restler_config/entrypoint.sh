@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+RUN apt-get update && apt-get install -y curl
 
 echo "Starting RESTler Fuzzer..."
 
