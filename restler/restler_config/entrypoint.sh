@@ -27,7 +27,7 @@ dotnet /home/restler/restler/Restler.dll test \
     --dictionary_file /workspace/Compile/dict.json \
     --settings /workspace/Compile/engine_settings.json \
     --target_ip host.docker.internal \
-    --target_port 5002 \
+    --target_port 5000 \
     --no_ssl
 
 # Run fuzz-lean if enabled
@@ -39,7 +39,7 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --settings /workspace/Compile/engine_settings.json \
         --time_budget ${FUZZ_LEAN_TIME_BUDGET} \
         --target_ip host.docker.internal \
-        --target_port 5002 \
+        --target_port 5000 \
         --no_ssl
 fi
 
@@ -52,7 +52,7 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --settings /workspace/Compile/engine_settings.json \
         --time_budget ${FUZZ_TIME_BUDGET} \
         --target_ip host.docker.internal \
-        --target_port 5002 \
+        --target_port 5000 \
         --no_ssl
 fi
 
