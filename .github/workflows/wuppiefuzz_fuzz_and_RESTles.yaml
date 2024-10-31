@@ -3,13 +3,12 @@ name: Build and Fuzz
 on:
   push:
     branches:
-      - main
+      - Vampi
   pull_request:
     branches:
-      - main
+      - Vampi
 
 jobs:
-  # Job to prepare WuppieFuzz
   prepare_wuppiefuzz:
     runs-on: self-hosted
     steps:
@@ -45,37 +44,22 @@ jobs:
           name: wuppiefuzz-binary
           path: wuppiefuzz/target/release/wuppiefuzz
 
-  # Job to prepare the API
   prepare_api:
     runs-on: self-hosted
     steps:
-      - name: Checkout API Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          repository: silv3rshi3ld/WuppieFuzzCICD
-          path: api
 
-      - name: Upload API
+      - name: Upload VamPI
         uses: actions/upload-artifact@v4
         with:
-          name: vulnerable-api
-          path: api/
+          name: vampi-api
+          path: VAmPI-master/
 
-  # Job to run WuppieFuzz
   run_wuppiefuzz:
     runs-on: self-hosted
     needs: [prepare_wuppiefuzz, prepare_api]
     steps:
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
-
-      - name: Setup Docker Network
-        run: |
-          docker network create --driver bridge cicd_network || true
-
       - name: Create Workspace
         run: mkdir -p wuppiefuzz_workspace
 
@@ -85,127 +69,128 @@ jobs:
           name: wuppiefuzz-binary
           path: wuppiefuzz_workspace/wuppiefuzz
 
-      - name: Download API
+      - name: Download VamPI
         uses: actions/download-artifact@v4
         with:
-          name: vulnerable-api
-          path: wuppiefuzz_workspace/api
+          name: vampi-api
+          path: wuppiefuzz_workspace/VAmPI-master
 
       - name: Make WuppieFuzz Executable
         run: chmod +x wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
 
-      - name: Start API Service
+      - name: Start VamPI Service
         run: |
-          cd wuppiefuzz_workspace/api
-          docker-compose -f docker-compose.base.yml up -d --build
+          cd wuppiefuzz_workspace
+          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
 
-      - name: Wait for API
+      - name: Wait for VamPI
         run: |
-          echo "Waiting for API to become available..."
-          until curl -s http://localhost:3001 > /dev/null; do
-            echo "API not ready. Retrying in 5 seconds..."
+          echo "Waiting for VamPI to become available..."
+          until curl -s http://localhost:5000/ > /dev/null; do
+            echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
-          echo "API is up!"
+          echo "VamPI is up!"
 
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          # Generate initial corpus
-          ./wuppiefuzz/wuppiefuzz output-corpus --openapi-spec=api/openapi.yaml corpus_directory
-          # Run fuzzing
+          echo "Current directory structure:"
+          ls -R
+          mkdir reports
+          ./wuppiefuzz/wuppiefuzz output-corpus \
+            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
+            corpus_directory
           ./wuppiefuzz/wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            api/openapi.yaml
+            VAmPI-master/openapi_specs/openapi3.yml
 
       - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: wuppiefuzz_workspace/wuppiefuzz/reports/
+          path: wuppiefuzz_workspace/reports/
 
       - name: Cleanup
         if: always()
         run: |
-          cd wuppiefuzz_workspace/api
-          docker-compose -f docker-compose.base.yml down --remove-orphans || true
-          cd ../../
+          docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
+          docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
           rm -rf wuppiefuzz_workspace
 
-  # Job to run RESTler
   run_restler:
-      runs-on: self-hosted
-      needs: [prepare_api]
-      steps:
-        - name: Install Docker Compose
-          run: |
-            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
-            sudo chmod +x /usr/local/bin/docker-compose
-            docker-compose --version
+    runs-on: self-hosted
+    needs: [prepare_api]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-        - name: Setup Docker Network
-          run: |
-            docker network create --driver bridge cicd_network || true
+      - name: Create Workspace
+        run: |
+          mkdir -p restler_workspace
+          mkdir -p restler_workspace/output
 
-        - name: Create Workspace
-          run: mkdir -p restler_workspace
+      - name: Download VamPI
+        uses: actions/download-artifact@v4
+        with:
+          name: vampi-api
+          path: restler_workspace/VAmPI-master
 
-        - name: Download API
-          uses: actions/download-artifact@v4
-          with:
-            name: vulnerable-api
-            path: restler_workspace/api
+      - name: Copy RESTler Files
+        run: |
+          cp -r restler/restler_config restler_workspace/
+          cp restler/docker-compose-restler.yml restler_workspace/
+          cp restler/Dockerfile.restler restler_workspace/
+          cp restler_workspace/VAmPI-master/openapi_specs/openapi3.yml restler_workspace/openapi.yaml
+          echo "Files in workspace:"
+          ls -la restler_workspace/
 
-        - name: Start API Service
-          env:
-            SMTP_USER: ${{ secrets.SMTP_USER }}
-            SMTP_PASS: ${{ secrets.SMTP_PASS }}
-            SMTP_HOST: ${{ secrets.SMTP_HOST }}
-            SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          run: |
-            cd restler_workspace/api
-            chmod +x server/wait-for
-            chmod +x server/docker-entrypoint.sh
-            docker-compose -f docker-compose.base.yml up -d --build
+      - name: Create Docker Network
+        run: docker network create cicd_network || true
 
-        - name: Wait for API
-          run: |
-            echo "Waiting for API to become available..."
-            until curl -s http://localhost:3001/health > /dev/null; do
-              echo "API not ready. Retrying in 5 seconds..."
-              sleep 5
-            done
-            echo "API is up!"
+      - name: Start VamPI Service
+        run: |
+          cd restler_workspace
+          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest  # Changed to 5000
 
-        - name: Run RESTler
-          run: |
-            cd restler_workspace
-            cp api/openapi.yaml ./
-            cp -r api/restler/restler_config .
-            cp api/restler/Dockerfile.restler .
-            cp api/restler/docker-compose-restler.yml .
-            docker-compose -f docker-compose-restler.yml up --build
+      - name: Wait for VamPI
+        run: |
+          echo "Waiting for VamPI to become available..."
+          until curl -s http://localhost:5000/ > /dev/null; do  # Changed to 5000
+            echo "VamPI not ready. Retrying in 5 seconds..."
+            sleep 5
+          done
+          echo "VamPI is up!"
 
-        - name: Upload RESTler Results
-          if: always()
-          uses: actions/upload-artifact@v4
-          with:
-            name: restler-results
-            path: restler_workspace/restler_output/
+      - name: Run RESTler
+        run: |
+          cd restler_workspace
+          echo "Current directory contents:"
+          ls -la
+          docker-compose -f docker-compose-restler.yml up --build
 
-        - name: Cleanup
-          if: always()
-          run: |
-            cd restler_workspace/api
-            docker-compose -f docker-compose.base.yml down --remove-orphans || true
-            cd ../../
-            rm -rf restler_workspace
+      - name: Upload RESTler Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-results
+          path: |
+            restler_workspace/*/bug_buckets/
+            restler_workspace/*/Fuzz/coverage_failures_to_investigate.txt
+            restler_workspace/*/FuzzLean/coverage_failures_to_investigate.txt
 
-  # Job to summarize results
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
+          docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
+          docker network rm cicd_network || true
+          rm -rf restler_workspace
+
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
