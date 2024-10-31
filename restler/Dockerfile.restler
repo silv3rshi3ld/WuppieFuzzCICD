@@ -1,40 +1,79 @@
+# Stage 1: Build RESTler
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build-env
 WORKDIR /workspace
 
-# Install dependencies
+# Install build dependencies for Python
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
+    wget \
+    build-essential \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libffi-dev \
+    liblzma-dev \
+    tk-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    uuid-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python 3.8.2
-RUN apt-get update && apt-get install -y \
-    software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.8 python3.8-dev python3.8-venv python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+# Install the latest Python from source
+ENV PYTHON_VERSION=3.11.5
+RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz && \
+    tar -xf Python-${PYTHON_VERSION}.tgz && \
+    cd Python-${PYTHON_VERSION} && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd .. && \
+    rm -rf Python-${PYTHON_VERSION}*
+
+# Ensure 'python3' points to the latest Python
+RUN ln -sf /usr/local/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.11 /usr/bin/pip3
+
+# Install pip for the latest Python
+RUN python3 -m ensurepip --upgrade
 
 # Clone RESTler repository
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-src
 
-# Build RESTler
-RUN cd /restler-src && python3.8 ./build-restler.py --dest_dir /restler_bin
+# Build RESTler using the latest Python
+RUN cd /restler-src && python3 ./build-restler.py --dest_dir /restler_bin
 
 # Stage 2: Setup Runtime Environment
 FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /workspace
 
-# Install dependencies
+# Install runtime dependencies for Python
 RUN apt-get update && apt-get install -y \
-    software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.8 python3.8-dev python3.8-venv python3-pip python3-yaml curl && \
-    rm -rf /var/lib/apt/lists/*
+    libffi-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libsqlite3-dev \
+    liblzma-dev \
+    tk-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    uuid-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
-RUN pip3 install requests
+# Copy Python installation from build-env
+COPY --from=build-env /usr/local/bin/python3.11 /usr/local/bin/python3.11
+COPY --from=build-env /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=build-env /usr/local/bin/pip3.11 /usr/local/bin/pip3.11
+
+# Ensure 'python3' points to the latest Python
+RUN ln -sf /usr/local/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.11 /usr/bin/pip3
+
+# Install Python packages using pip
+RUN pip3 install --no-cache-dir requests
 
 # Copy built RESTler binaries from build-env
 COPY --from=build-env /restler_bin /home/restler
@@ -50,5 +89,4 @@ RUN chmod +x /restler_config/entrypoint.sh && \
     sed -i 's/\r$//' /restler_config/entrypoint.sh
 
 # Entrypoint
-SHELL ["/bin/bash", "-c"]
-ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
+ENTRYPOINT ["/restler_config/entrypoint.sh"]
