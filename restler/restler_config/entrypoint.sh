@@ -9,7 +9,7 @@ mkdir -p /workspace/output
 
 # Wait for VAmPI API
 echo "Waiting for VAmPI API to be available..."
-until curl -s http://host.docker.internal:5000/ui/ > /dev/null; do
+until curl -s http://vampi-vulnerable:5000/ui/ > /dev/null; do
     echo "VAmPI not ready. Retrying in 5 seconds..."
     sleep 5
 done
@@ -26,7 +26,7 @@ dotnet /home/restler/restler/Restler.dll test \
     --grammar_file /workspace/Compile/grammar.py \
     --dictionary_file /workspace/Compile/dict.json \
     --settings /workspace/Compile/engine_settings.json \
-    --target_ip host.docker.internal \
+    --target_ip vampi-vulnerable \
     --target_port 5000 \
     --no_ssl
 
