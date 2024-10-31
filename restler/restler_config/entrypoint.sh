@@ -9,7 +9,7 @@ mkdir -p /workspace/output
 
 # Wait for VAmPI API
 echo "Waiting for VAmPI API to be available..."
-until curl -s http://vampi-vulnerable:5000/ui/ > /dev/null; do
+until curl -s http://vampi-vulnerable:5000/ > /dev/null; do
     echo "VAmPI not ready. Retrying in 5 seconds..."
     sleep 5
 done
