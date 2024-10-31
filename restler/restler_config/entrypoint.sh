@@ -59,8 +59,9 @@ fi
 # Copy results to output directory
 for dir in Test FuzzLean Fuzz; do
     if [ -d "/workspace/$dir/RestlerResults" ]; then
-        cp -r /workspace/$dir/RestlerResults/* /workspace/output/
+        cp -r "/workspace/$dir/RestlerResults" "/workspace/output/$dir/RestlerResults"
     fi
 done
-
-echo "RESTler execution completed!"
+if [ -f "/workspace/coverage_failures_to_investigate.txt" ]; then
+    cp "/workspace/coverage_failures_to_investigate.txt" "/workspace/output/"
+fi

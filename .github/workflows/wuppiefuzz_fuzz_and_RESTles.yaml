@@ -80,8 +80,9 @@ jobs:
 
       - name: Start VamPI Service
         run: |
-          cd wuppiefuzz_workspace
-          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
+          cd wuppiefuzz_workspace/VAmPI-master
+          docker build -t local-vampi .
+          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
 
       - name: Wait for VamPI
         run: |
@@ -118,8 +119,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
-          docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
+          docker stop $(docker ps -q --filter ancestor=local-vampi) || true
+          docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
           rm -rf wuppiefuzz_workspace
 
   run_restler:
@@ -154,8 +155,9 @@ jobs:
 
       - name: Start VamPI Service
         run: |
-          cd workspace
-          docker run -d -p 5000:5000 -e vulnerable=1 erev0s/vampi:latest
+          cd workspace/VAmPI-master
+          docker build -t local-vampi .
+          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
 
       - name: Wait for VamPI
         run: |
@@ -188,8 +190,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop $(docker ps -q --filter ancestor=erev0s/vampi) || true
-          docker rm $(docker ps -aq --filter ancestor=erev0s/vampi) || true
+          docker stop $(docker ps -q --filter ancestor=local-vampi) || true
+          docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
           docker network rm cicd_network || true
           rm -rf workspace
 
