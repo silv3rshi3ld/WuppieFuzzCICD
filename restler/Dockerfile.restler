@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/* && \
 
 # Install Restler
-RUN pipi install --upgrade pip && \
+RUN pip install --upgrade pip && \
     pip install restler && \
     mkdir /restler_config
 
@@ -20,11 +20,9 @@ WORKDIR /restler
 # Copy Restler configuration files and entrypoint
 COPY ./restler_config /restler_config
 COPY restler_config/entrypoint.sh /restler_config/entrypoint.sh
-restler_config/entrypoint.sh
 
 # Ensure the entrypoint is executable
-RUN chmod +x /restler_config/entrypoint.sh
-entrypoint.sh&& \
+RUN chmod +x /restler_config/entrypoint.sh && \
     sed -i 's/\r$//g' /restler_config/entrypoint.sh
 
 # Set the entrypoint
