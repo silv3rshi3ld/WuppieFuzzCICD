@@ -180,12 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: |
-            workspace/output/bug_buckets/
-            workspace/output/Test/RestlerResults/*/logs/main.txt
-            workspace/output/FuzzLean/RestlerResults/*/logs/main.txt
-            workspace/output/Fuzz/RestlerResults/*/logs/main.txt
-            workspace/output/**/coverage_failures_to_investigate.txt
+          path: workspace/output/**
 
       - name: Cleanup
         if: always()
