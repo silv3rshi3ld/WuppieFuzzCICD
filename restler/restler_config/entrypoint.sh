@@ -24,9 +24,8 @@ ls -la /workspace
 
 # Compile API specification
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll compile \
-    --api_spec "/workspace/openapi3.yml" \
-    --out_dir "/workspace/Compile"
+dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
+    --api_spec "/workspace/openapi3.yml"
 
 # List contents after compilation to verify Compile directory
 echo "Contents of /workspace after compilation:"
@@ -42,11 +41,11 @@ fi
 
 # Display compilation logs
 echo "Compilation logs:"
-cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
+cat /workspace/RestlerLogs/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."
-dotnet /restler_bin/restler/Restler.dll test \
+dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
     --settings "/workspace/Compile/engine_settings.json" \
@@ -57,7 +56,7 @@ dotnet /restler_bin/restler/Restler.dll test \
 # Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
-    dotnet /restler_bin/restler/Restler.dll fuzz-lean \
+    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
@@ -70,7 +69,7 @@ fi
 # Run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
-    dotnet /restler_bin/restler/Restler.dll fuzz \
+    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
