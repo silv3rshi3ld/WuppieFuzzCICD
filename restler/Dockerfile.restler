@@ -17,13 +17,9 @@ RUN apt-get update && apt-get install -y \
 # Clone the official Restler repository
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 
-# Install Restler dependencies
+# Build Restler using the provided Python script
 WORKDIR /restler
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
-
-# Build Restler
-RUN dotnet build Restler.csproj -c Release
+RUN python ./build-restler.py --dest_dir /restler_bin
 
 # Set the working directory
 WORKDIR /restler
