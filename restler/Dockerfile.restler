@@ -20,7 +20,7 @@ WORKDIR /restler
 # Copy Restler configuration files and entrypoint
 COPY ./restler_config /restler_config
 COPY restler_config/entrypoint.sh /restler_config/entrypoint.sh
-restler_config/entrypoint.sh /restler_config/entrypoint.sh
+restler_config/entrypoint.sh
 
 # Ensure the entrypoint is executable
 RUN chmod +x /restler_config/entrypoint.sh
