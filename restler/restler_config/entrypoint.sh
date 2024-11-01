@@ -3,8 +3,10 @@ set -e
 
 echo "Starting RESTler Fuzzer..."
 
-# Create output directory with appropriate permissions
+# Create necessary directories with appropriate permissions
+mkdir -p /workspace/Compile
 mkdir -p /workspace/output
+chmod 755 /workspace/Compile
 chmod 755 /workspace/output
 
 # Debug: Check if OpenAPI file exists
@@ -15,9 +17,17 @@ if [ ! -f "/workspace/openapi3.yml" ]; then
     exit 1
 fi
 
+# List contents of /workspace to confirm
+echo "Contents of /workspace:"
+ls -la /workspace
+
 # Compile API specification
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll compile --api_spec /workspace/openapi3.yml
+dotnet /restler_bin/restler/Restler.dll compile --api_spec "/workspace/openapi3.yml"
+
+# Display compilation logs
+echo "Compilation logs:"
+cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
