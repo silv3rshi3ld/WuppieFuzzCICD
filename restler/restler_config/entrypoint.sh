@@ -9,6 +9,9 @@ mkdir -p /workspace/output
 chmod 755 /workspace/Compile
 chmod 755 /workspace/output
 
+# Change to the workspace directory
+cd /workspace
+
 # Debug: Check if OpenAPI file exists
 echo "Checking OpenAPI file..."
 if [ ! -f "/workspace/openapi3.yml" ]; then
@@ -18,24 +21,29 @@ if [ ! -f "/workspace/openapi3.yml" ]; then
 fi
 
 # List contents of /workspace to confirm
-echo "Contents of /workspace:"
+echo "Contents of /workspace before compilation:"
 ls -la /workspace
 
 # Compile API specification
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll compile --api_spec "/workspace/openapi3.yml"
+dotnet /restler_bin/restler/Restler.dll compile \
+    --api_spec "/workspace/openapi3.yml"
 
-# Display compilation logs
-echo "Compilation logs:"
-cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
+# List contents after compilation to verify Compile directory
+echo "Contents of /workspace after compilation:"
+ls -la /workspace
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
     echo "Error: Grammar file was not generated!"
     echo "Checking Compile directory contents:"
-    find /workspace/Compile -type f
+    ls -la /workspace/Compile
     exit 1
 fi
+
+# Display compilation logs
+echo "Compilation logs:"
+cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."

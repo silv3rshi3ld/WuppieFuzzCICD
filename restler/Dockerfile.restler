@@ -22,7 +22,7 @@ WORKDIR /restler
 RUN python ./build-restler.py --dest_dir /restler_bin
 
 # Set the working directory
-WORKDIR /restler
+WORKDIR /workspace
 
 # Copy Restler configuration files and entrypoint
 COPY ./restler_config /restler_config
