@@ -1,20 +1,34 @@
 version: "3"
 services:
-  vampi-secure:
+  vampi-wuppiefuzz:
     build: ./
-    container_name: vampi-secure
+    container_name: vampi-wuppiefuzz
     ports:
-      - 5001:5000
-    environment:
-      - vulnerable=0
-
-  vampi-vulnerable:
-    build: ./
-    container_name: vampi-vulnerable
+      - "5002:5000"
     environment:
       - vulnerable=1
     networks:
       - cicd_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  vampi-restler:
+    build: ./
+    container_name: vampi-restler
+    ports:
+      - "5003:5000"
+    environment:
+      - vulnerable=1
+    networks:
+      - cicd_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 networks:
   cicd_network:
