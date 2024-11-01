@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicatio
 # Set the working directory
 WORKDIR /workspace
 
+# Create FuzzLean directory in workspace
+RUN mkdir -p /workspace/FuzzLean
+
 # Copy Restler configuration files and entrypoint
 COPY ./restler_config /restler_config
 
