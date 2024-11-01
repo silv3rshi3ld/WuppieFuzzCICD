@@ -5,11 +5,11 @@ services:
       context: .
       dockerfile: Dockerfile.restler
     environment:
-      - RESTLER_TELEMETRY_OPTOUT=1
-      - RUN_FUZZ_LEAN=true
-      - FUZZ_LEAN_TIME_BUDGET=0.05
-      - RUN_FUZZ=true
-      - FUZZ_TIME_BUDGET=0.25
+      RESTLER_TELEMETRY_OPTOUT: "1"
+      RUN_FUZZ_LEAN: "true"
+      FUZZ_LEAN_TIME_BUDGET: "0.05"
+      RUN_FUZZ: "true"
+      FUZZ_TIME_BUDGET: "0.25"
     volumes:
       - ./openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output

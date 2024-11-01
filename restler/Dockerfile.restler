@@ -3,17 +3,27 @@ FROM python:3.9-slim
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     wget \
-    apt-transport-https && \
-    wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    apt-get update && \
-    apt-get install -y dotnet-sdk-6.0 && \
-    rm -rf /var/lib/apt/lists/*
+    apt-transport-https \
+    git \
+    curl \
+    build-essential \
+    libssl-dev \
+    && wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+    && dpkg -i packages-microsoft-prod.deb \
+    && apt-get update \
+    && apt-get install -y dotnet-sdk-6.0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Restler
+# Clone the official Restler repository
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
+
+# Install Restler dependencies
+WORKDIR /restler
 RUN pip install --upgrade pip && \
-    pip install restler && \
-    mkdir /restler_config
+    pip install -r requirements.txt
+
+# Build Restler
+RUN dotnet build Restler.csproj -c Release
 
 # Set the working directory
 WORKDIR /restler
