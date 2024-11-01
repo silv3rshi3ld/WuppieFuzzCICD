@@ -22,7 +22,7 @@ WORKDIR /restler
 RUN python ./build-restler.py --dest_dir /restler_bin
 
 # Install RESTler dependencies
-RUN pip install --no-cache-dir azure-devtools
+RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
 # Set the working directory
 WORKDIR /workspace
