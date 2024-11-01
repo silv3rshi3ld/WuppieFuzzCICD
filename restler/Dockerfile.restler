@@ -21,6 +21,9 @@ RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 WORKDIR /restler
 RUN python ./build-restler.py --dest_dir /restler_bin
 
+# Install RESTler dependencies
+RUN pip install --no-cache-dir azure-devtools
+
 # Set the working directory
 WORKDIR /workspace
 

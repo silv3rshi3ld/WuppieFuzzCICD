@@ -41,7 +41,7 @@ fi
 
 # Display compilation logs
 echo "Compilation logs:"
-cat /workspace/RestlerLogs/RestlerCompile.log || echo "No compile log found."
+cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."
@@ -83,6 +83,7 @@ fi
 echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
     if [ -d "/workspace/${dir}/RestlerResults" ]; then
+        mkdir -p "/workspace/output/${dir}"
         cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
     fi
 done
