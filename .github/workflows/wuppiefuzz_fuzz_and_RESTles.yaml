@@ -169,6 +169,7 @@ jobs:
           echo "VamPI is up!"
 
       - name: Run RESTler
+        timeout-minutes: 3
         run: |
           cd workspace
           echo "Current directory contents:"
