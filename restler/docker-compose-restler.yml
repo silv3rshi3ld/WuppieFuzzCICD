@@ -11,7 +11,7 @@ services:
       RUN_FUZZ: "true"
       FUZZ_TIME_BUDGET: "0.25"
     volumes:
-      - ./openapi3.yml:/workspace/openapi3.yml:ro
+      - ./VAmPI-master/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
     extra_hosts:
       - "host.docker.internal:host-gateway"
