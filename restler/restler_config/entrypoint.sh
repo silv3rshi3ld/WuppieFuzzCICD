@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-RUN apt-get update && apt-get install -y curl
 
 echo "Starting RESTler Fuzzer..."
 
@@ -10,12 +9,12 @@ mkdir -p /workspace/output
 
 # Compile step
 echo "Compiling API specification..."
-dotnet /home/restler/restler/Restler.dll compile \
+dotnet /restler_bin/restler/Restler.dll compile \
     --api_spec /workspace/openapi3.yml
 
 # Test step
 echo "Running test phase..."
-dotnet /home/restler/restler/Restler.dll test \
+dotnet /restler_bin/restler/Restler.dll test \
     --grammar_file /workspace/Compile/grammar.py \
     --dictionary_file /workspace/Compile/dict.json \
     --settings /workspace/Compile/engine_settings.json \
@@ -26,7 +25,7 @@ dotnet /home/restler/restler/Restler.dll test \
 # Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
-    dotnet /home/restler/restler/Restler.dll fuzz-lean \
+    dotnet /restler_bin/restler/Restler.dll fuzz-lean \
         --grammar_file /workspace/Compile/grammar.py \
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
@@ -39,7 +38,7 @@ fi
 # Run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
-    dotnet /home/restler/restler/Restler.dll fuzz \
+    dotnet /restler_bin/restler/Restler.dll fuzz \
         --grammar_file /workspace/Compile/grammar.py \
         --dictionary_file /workspace/Compile/dict.json \
         --settings /workspace/Compile/engine_settings.json \
