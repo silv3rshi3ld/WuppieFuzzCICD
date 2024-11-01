@@ -4,9 +4,7 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/Compile
 mkdir -p /workspace/output
-chmod 755 /workspace/Compile
 chmod 755 /workspace/output
 
 # Change to the workspace directory
@@ -27,7 +25,8 @@ ls -la /workspace
 # Compile API specification
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll compile \
-    --api_spec "/workspace/openapi3.yml"
+    --api_spec "/workspace/openapi3.yml" \
+    --out_dir "/workspace/Compile"
 
 # List contents after compilation to verify Compile directory
 echo "Contents of /workspace after compilation:"
@@ -53,8 +52,7 @@ dotnet /restler_bin/restler/Restler.dll test \
     --settings "/workspace/Compile/engine_settings.json" \
     --target_ip host.docker.internal \
     --target_port 5000 \
-    --no_ssl \
-    --working_dir "/workspace/Compile"
+    --no_ssl
 
 # Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
@@ -66,8 +64,7 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --time_budget ${FUZZ_LEAN_TIME_BUDGET} \
         --target_ip host.docker.internal \
         --target_port 5000 \
-        --no_ssl \
-        --working_dir "/workspace/Compile"
+        --no_ssl
 fi
 
 # Run full fuzzing if enabled
@@ -80,17 +77,16 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --time_budget ${FUZZ_TIME_BUDGET} \
         --target_ip host.docker.internal \
         --target_port 5000 \
-        --no_ssl \
-        --working_dir "/workspace/Compile"
+        --no_ssl
 fi
 
 # Copy results to output directory
 echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
-    if [ -d "/workspace/Compile/${dir}/RestlerResults" ]; then
-        cp -r "/workspace/Compile/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
+    if [ -d "/workspace/${dir}/RestlerResults" ]; then
+        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
     fi
 done
-if [ -f "/workspace/Compile/coverage_failures_to_investigate.txt" ]; then
-    cp "/workspace/Compile/coverage_failures_to_investigate.txt" "/workspace/output/"
+if [ -f "/workspace/coverage_failures_to_investigate.txt" ]; then
+    cp "/workspace/coverage_failures_to_investigate.txt" "/workspace/output/"
 fi
