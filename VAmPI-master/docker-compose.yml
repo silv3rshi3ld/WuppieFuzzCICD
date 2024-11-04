@@ -1,33 +1,65 @@
-version: "3"
-services:
-  vampi-wuppiefuzz:
-    build: ./
-    container_name: vampi-wuppiefuzz
-    ports:
-      - 5001:5000
-    environment:
-      - vulnerable=0
+version: '3.8'
 
-  vampi-vulnerable-wuppiefuzz:
-    build: ./
-    container_name: vampi-vulnerable-wuppiefuzz
+services:
+  vampi-secure:
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile
+    container_name: vampi-secure
+    ports:
+      - "5001:5000"
     environment:
-      - vulnerable=1
+      - APP_ENV=production
+      - APP_DEBUG=0
+      - vulnerable=0
+    depends_on:
+      - mongo
     networks:
       - cicd_network
-    ports:
-      - 5002:5000
 
   vampi-vulnerable-restler:
-    build: ./
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile
     container_name: vampi-vulnerable-restler
     environment:
+      - APP_ENV=development
+      - APP_DEBUG=1
       - vulnerable=1
+    ports:
+      - "${VAMPI_RESTLER_PORT}:5000"
+    depends_on:
+      - mongo
     networks:
       - cicd_network
-    ports: 
-      - 5003:5000
+
+  vampi-vulnerable-wuppiefuzz:
+    build:
+      context: ./
+      dockerfile: docker/Dockerfile
+    container_name: vampi-vulnerable-wuppiefuzz
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=1
+      - vulnerable=1
+    ports:
+      - "${VAMPI_WUPPIEFUZZ_PORT}:5000"
+    depends_on:
+      - mongo
+    networks:
+      - cicd_network
+
+  mongo:
+    image: mongo:4.2
+    container_name: vampi-mongo
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - cicd_network
 
 networks:
   cicd_network:
     external: true
+
+volumes:
+  mongo_data:

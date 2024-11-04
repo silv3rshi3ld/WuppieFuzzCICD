@@ -3,20 +3,21 @@ version: '3.8'
 services:
   wuppiefuzz:
     build:
-      context: ./wuppiefuzz
+      context: .
       dockerfile: Dockerfile.wuppiefuzz
+    container_name: wuppiefuzz
     environment:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASS: ${SMTP_PASS}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
-    depends_on:
-      - vampi-vulnerable-wuppiefuzz
+    volumes:
+      - ./reports:/wuppiefuzz/reports
     networks:
       - cicd_network
-    volumes:
-      - ./wuppiefuzz/reports:/wuppiefuzz/reports
+    depends_on:
+      - vampi-vulnerable-wuppiefuzz
 
 networks:
   cicd_network:

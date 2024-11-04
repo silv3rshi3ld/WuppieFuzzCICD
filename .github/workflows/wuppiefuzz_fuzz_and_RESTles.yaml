@@ -12,8 +12,6 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
-  VAMPI_RESTLER_URL: http://vampi-vulnerable-restler:5000
-  VAMPI_WUPPIEFUZZ_URL: http://vampi-vulnerable-wuppiefuzz:5000
 
 jobs:
   prepare_docker_network:
@@ -32,9 +30,6 @@ jobs:
         if: steps.check_network.outputs.exists == 'false'
         run: docker network create ${{ env.DOCKER_NETWORK_NAME }}
 
-      - name: Confirm Docker Network Status
-        run: docker network ls
-
   prepare_vampi:
     runs-on: self-hosted
     needs: prepare_docker_network
@@ -44,36 +39,23 @@ jobs:
 
       - name: Fix File Permissions
         run: |
-          sudo chown -R $USER:$USER /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
-          sudo chmod -R u+rwX /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
+          sudo chown -R $USER:$USER $(pwd)
+          sudo chmod -R u+rwX $(pwd)
         shell: bash
 
-      - name: List Repository Contents
-        run: |
-          echo "Listing root directory after checkout:"
-          ls -la
+      - name: Remove Any Existing VAmPI Containers
+        working-directory: VAmPI-master
+        run: docker-compose down --remove-orphans || true
         shell: bash
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Build VamPI Images
+      - name: Build VAmPI Images
         working-directory: VAmPI-master
         run: docker-compose build --force-rm
         shell: bash
 
-      - name: Git Clean
-        run: git clean -ffdx
-        shell: bash
-
   prepare_wuppiefuzz:
     runs-on: self-hosted
-    needs: prepare_docker_network
+    needs: [prepare_docker_network, prepare_vampi]
     steps:
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
@@ -147,23 +129,24 @@ jobs:
 
       - name: Remove Existing RESTler and VAmPI Containers
         run: |
-          docker-compose -f workspace/docker-compose-restler.yml down --remove-orphans || true
-          docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
+          docker-compose -p vampi_restler -f workspace/docker-compose-restler.yml down --remove-orphans || true
+          docker-compose -p vampi_restler -f VAmPI-master/docker-compose.yml down --remove-orphans || true
         shell: bash
 
       - name: Start VamPI RESTler Instance
         working-directory: VAmPI-master
-        run: docker-compose up -d vampi-vulnerable-restler --remove-orphans || exit 1
+        run: docker-compose -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI RESTler
         run: |
           echo "Waiting for VamPI RESTler instance..."
-          timeout=120
+          timeout=180
           elapsed=0
-          while ! curl -s ${{ env.VAMPI_RESTLER_URL }}/ > /dev/null; do
+          while ! curl -s ${{ secrets.VAMPI_RESTLER_URL }}/ > /dev/null; do
             if [ $elapsed -ge $timeout ]; then
               echo "Timed out waiting for VAmPI RESTler instance."
+              docker logs vampi-vulnerable-restler || true
               exit 1
             fi
             echo "VamPI not ready. Retrying in 5 seconds..."
@@ -175,12 +158,16 @@ jobs:
 
       - name: Start RESTler Service
         working-directory: workspace
-        run: docker-compose -f docker-compose-restler.yml up -d restler --remove-orphans || exit 1
+        env:
+          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
+        run: docker-compose -p restler -f docker-compose-restler.yml up -d restler --remove-orphans || exit 1
         shell: bash
 
       - name: Run RESTler
         working-directory: workspace
-        run: docker-compose -f docker-compose-restler.yml up --build --remove-orphans
+        env:
+          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
+        run: docker-compose -p restler -f docker-compose-restler.yml up --build --remove-orphans
         shell: bash
 
       - name: Upload RESTler Results
@@ -188,20 +175,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: workspace/restler/output/**
+          path: workspace/output/**
           if-no-files-found: warn
 
       - name: Cleanup RESTler Environment
         if: always()
         run: |
-          docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans
-          docker-compose -f workspace/docker-compose-restler.yml down --remove-orphans
+          docker-compose -p vampi_restler -f VAmPI-master/docker-compose.yml down --remove-orphans
+          docker-compose -p restler -f workspace/docker-compose-restler.yml down --remove-orphans
           rm -rf workspace
         shell: bash
 
   run_wuppiefuzz:
     runs-on: self-hosted
-    needs: [prepare_wuppiefuzz, prepare_vampi]
+    needs: [prepare_wuppiefuzz, run_restler]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -216,23 +203,27 @@ jobs:
         run: chmod +x wuppiefuzz_workspace/wuppiefuzz
         shell: bash
 
-      - name: Remove Existing WuppieFuzz Containers
-        run: docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
+      - name: Remove Any Existing VAmPI WuppieFuzz Containers
+        run: |
+          docker stop vampi-vulnerable-wuppiefuzz || true
+          docker rm vampi-vulnerable-wuppiefuzz || true
+          docker-compose -p vampi_wuppiefuzz -f VAmPI-master/docker-compose.yml down --remove-orphans || true
         shell: bash
 
       - name: Start VamPI WuppieFuzz Instance
         working-directory: VAmPI-master
-        run: docker-compose up -d vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
+        run: docker-compose -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI WuppieFuzz
         run: |
           echo "Waiting for VamPI WuppieFuzz instance..."
-          timeout=120
+          timeout=180
           elapsed=0
-          while ! curl -s ${{ env.VAMPI_WUPPIEFUZZ_URL }}/ > /dev/null; do
+          while ! curl -s ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}/ > /dev/null; do
             if [ $elapsed -ge $timeout ]; then
-              echo "Timed out waiting for VamPI WuppieFuzz instance."
+              echo "Timed out waiting for VAmPI WuppieFuzz instance."
+              docker logs vampi-vulnerable-wuppiefuzz || true
               exit 1
             fi
             echo "VamPI not ready. Retrying in 5 seconds..."
@@ -244,6 +235,8 @@ jobs:
 
       - name: Run WuppieFuzz
         working-directory: wuppiefuzz_workspace
+        env:
+          VAMPI_WUPPIEFUZZ_URL: ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}
         run: |
           mkdir -p reports
           ./wuppiefuzz output-corpus \
@@ -254,7 +247,7 @@ jobs:
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            --base-url=${{ env.VAMPI_WUPPIEFUZZ_URL }} \
+            --base-url=${{ secrets.VAMPI_WUPPIEFUZZ_URL }} \
             ../VAmPI-master/openapi_specs/openapi3.yml
         shell: bash
 
@@ -270,13 +263,13 @@ jobs:
         if: always()
         working-directory: VAmPI-master
         run: |
-          docker-compose down --remove-orphans
+          docker-compose -p vampi_wuppiefuzz down --remove-orphans
           rm -rf ../wuppiefuzz_workspace
         shell: bash
 
   summarize_results:
     runs-on: self-hosted
-    needs: [run_wuppiefuzz, run_restler]
+    needs: [run_wuppiefuzz]
     steps:
       - name: Download All Results
         uses: actions/download-artifact@v4

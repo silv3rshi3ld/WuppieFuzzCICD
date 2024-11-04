@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.restler
+    container_name: restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
       RUN_FUZZ_LEAN: "true"
@@ -13,12 +14,12 @@ services:
       FUZZ_TIME_BUDGET: "0.25"
       VAMPI_RESTLER_URL: ${VAMPI_RESTLER_URL}
     volumes:
-      - ./VAmPI-master/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      - ../VAmPI-master/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - cicd_network
+    depends_on:
+      - vampi-vulnerable-restler
 
 networks:
   cicd_network:
