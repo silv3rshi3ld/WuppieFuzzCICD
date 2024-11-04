@@ -170,7 +170,7 @@ jobs:
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI RESTler instance..."
-          until curl -s http://localhost:5002/ > /dev/null; do
+          until curl -s http://localhost:5003/ > /dev/null; do
             echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
@@ -180,7 +180,7 @@ jobs:
         run: |
           cd workspace
           # Update RESTler configuration to use the correct VamPI URL
-          sed -i 's|http://localhost:5000|http://localhost:5002|g' restler_config/config.json
+          sed -i 's|http://localhost:5000|http://localhost:5003|g' restler_config/config.json
       - name: Run RESTler
         run: |
           cd workspace

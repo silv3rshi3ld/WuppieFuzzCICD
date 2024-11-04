@@ -26,7 +26,7 @@ services:
     networks:
       - cicd_network
     ports: 
-      - 5002:5001
+      - 5003:5000
 
 networks:
   cicd_network:
