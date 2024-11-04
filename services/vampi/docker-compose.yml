@@ -2,7 +2,7 @@ version: '3.8'
 services:
   vampi-secure:
     build:
-      context: ./
+      context: .
       dockerfile: Dockerfile
     container_name: vampi-secure
     ports:
@@ -15,9 +15,10 @@ services:
       - mongo
     networks:
       - cicd_network
+
   vampi-vulnerable-restler:
     build:
-      context: ./
+      context: .
       dockerfile: Dockerfile
     container_name: vampi-vulnerable-restler
     environment:
@@ -30,9 +31,10 @@ services:
       - mongo
     networks:
       - cicd_network
+
   vampi-vulnerable-wuppiefuzz:
     build:
-      context: ./
+      context: .
       dockerfile: Dockerfile
     container_name: vampi-vulnerable-wuppiefuzz
     environment:
@@ -45,6 +47,7 @@ services:
       - mongo
     networks:
       - cicd_network
+
   mongo:
     image: mongo:4.2
     container_name: vampi-mongo
@@ -52,8 +55,10 @@ services:
       - mongo_data:/data/db
     networks:
       - cicd_network
+
 networks:
   cicd_network:
     external: true
+
 volumes:
   mongo_data:

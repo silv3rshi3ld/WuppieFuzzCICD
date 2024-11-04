@@ -4,7 +4,7 @@ services:
   wuppiefuzz:
     build:
       context: .
-      dockerfile: Dockerfile.wuppiefuzz
+      dockerfile: Dockerfile
     container_name: wuppiefuzz
     environment:
       SMTP_USER: ${SMTP_USER}
@@ -14,10 +14,9 @@ services:
       VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
     volumes:
       - ./reports:/wuppiefuzz/reports
+      - ../../openapi/openapi3.yml:/workspace/openapi3.yml:ro
     networks:
       - cicd_network
-    depends_on:
-      - vampi-vulnerable-wuppiefuzz
 
 networks:
   cicd_network:
