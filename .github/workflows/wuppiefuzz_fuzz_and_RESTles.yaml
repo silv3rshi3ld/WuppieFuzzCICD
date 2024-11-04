@@ -20,8 +20,11 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: repo
+
+      - name: List Repository Contents
+        run: |
+          echo "Listing root directory after checkout:"
+          ls -la
 
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -33,10 +36,8 @@ jobs:
           
       - name: Build VamPI Images
         run: |
-          cd repo/VAmPI-master
+          cd VAmPI-master
           docker-compose -f docker-compose.yml build
-
-      # Removed Upload VamPI Files to prevent redundancy
 
   prepare_wuppiefuzz:
     runs-on: self-hosted
@@ -61,7 +62,7 @@ jobs:
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             wuppiefuzz-target-
-
+      
       - name: Build WuppieFuzz
         run: |
           cd wuppiefuzz
@@ -79,27 +80,28 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: repo
+
+      - name: List Repository Contents for run_restler
+        run: |
+          echo "Listing repository contents in run_restler job:"
+          ls -la
 
       - name: Set Up Workspace
         run: mkdir -p workspace
 
       - name: Copy RESTler Files
         run: |
-          cp -r repo/restler/restler_config workspace/
-          cp repo/restler/docker-compose-restler.yml workspace/
-          cp repo/restler/Dockerfile.restler workspace/
-          # Optional: If openapi3.yml is needed, ensure it's correctly referenced
-          # cp repo/VaMPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
+          cp -r VAmPI-master/restler/restler_config workspace/
+          cp VAmPI-master/restler/docker-compose-restler.yml workspace/
+          cp VAmPI-master/restler/Dockerfile.restler workspace/
           echo "Files in workspace:"
           ls -la workspace/
 
       - name: Verify openapi3.yml
         run: |
-          if [ ! -f "repo/VaMPI-master/openapi_specs/openapi3.yml" ]; then
+          if [ ! -f "VAmPI-master/openapi_specs/openapi3.yml" ]; then
             echo "openapi3.yml is missing or not a file."
-            ls -la repo/VaMPI-master/openapi_specs/
+            ls -la VAmPI-master/openapi_specs/
             exit 1
           fi
           echo "openapi3.yml exists and is a file."
@@ -143,8 +145,11 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          path: repo
+
+      - name: List Repository Contents for run_wuppiefuzz
+        run: |
+          echo "Listing repository contents in run_wuppiefuzz job:"
+          ls -la
 
       - name: Download WuppieFuzz Binary
         uses: actions/download-artifact@v4
@@ -159,7 +164,7 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd repo/VaMPI-master
+          cd VAmPI-master
           docker-compose -f docker-compose.yml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
@@ -176,7 +181,7 @@ jobs:
           cd wuppiefuzz_workspace
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=repo/VaMPI-master/openapi_specs/openapi3.yml \
+            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
             --report=true \
@@ -184,7 +189,7 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             --base-url=http://localhost:5002 \
-            repo/VaMPI-master/openapi_specs/openapi3.yml
+            VAmPI-master/openapi_specs/openapi3.yml
 
       - name: Upload WuppieFuzz Results
         if: always()
@@ -196,7 +201,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd repo/VaMPI-master
+          cd VAmPI-master
           docker-compose -f docker-compose.yml down
           rm -rf wuppiefuzz_workspace
 
