@@ -162,7 +162,7 @@ jobs:
           cp -r restler/restler_config workspace/
           cp restler/docker-compose-restler.yml workspace/
           cp restler/Dockerfile.restler workspace/
-          cp workspace/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
+          cp /VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
           ls -la workspace/
       
