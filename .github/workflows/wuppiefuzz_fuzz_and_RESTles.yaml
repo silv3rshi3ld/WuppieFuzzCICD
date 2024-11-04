@@ -47,7 +47,6 @@ jobs:
     steps:
       - name: Cleanup workspace
         run: rm -rf /home/michiel/_work/WuppieFuzz/WuppieFuzz/VAmPI-master/openapi_specs || true
-        sudo chown -R michiel:michiel /home/michiel/_work/WuppieFuzz/WuppieFuzz/
 
       - name: Checkout Repository
         uses: actions/checkout@v4
