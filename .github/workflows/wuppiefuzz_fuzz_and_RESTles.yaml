@@ -97,7 +97,7 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd vampi-api
+          cd VamPi-master
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
