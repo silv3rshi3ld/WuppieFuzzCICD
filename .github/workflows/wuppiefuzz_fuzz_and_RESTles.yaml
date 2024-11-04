@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          path: repo
 
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -28,18 +30,13 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-              
+          
       - name: Build VamPI Images
         run: |
-          cd VAmPI-master
-          docker-compose -f docker-compose.yaml build
-      - name: Upload VamPI Files
-        uses: actions/upload-artifact@v4
-        with:
-          name: VAmPI-master
-          path: |
-            VAmPI-master/
-            !VAmPI-master/node_modules/
+          cd repo/VaMPI-master
+          docker-compose -f docker-compose.yml build
+
+      # Removed Upload VamPI Files to prevent redundancy
 
   prepare_wuppiefuzz:
     runs-on: self-hosted
@@ -50,6 +47,7 @@ jobs:
           sudo apt-get install -y build-essential
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
+
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
@@ -57,17 +55,18 @@ jobs:
           path: wuppiefuzz
 
       - name: Cache WuppieFuzz Build
-        id: cache-wuppiefuzz-build
         uses: actions/cache@v4
         with:
           path: wuppiefuzz/target
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
+          restore-keys: |
+            wuppiefuzz-target-
 
       - name: Build WuppieFuzz
-        if: steps.cache-wuppiefuzz-build.outputs.cache-hit != 'true'
         run: |
           cd wuppiefuzz
           cargo build --release
+
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
@@ -78,44 +77,38 @@ jobs:
     runs-on: self-hosted
     needs: [prepare_vampi, prepare_docker_network]
     steps:
-      - name: Create Workspace
-        run: mkdir -p workspace
-
-      - name: Download VamPI Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: VAmPI-master
-          path: workspace/VAmPI-master
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          path: workspace/repo
+          path: repo
+
+      - name: Set Up Workspace
+        run: mkdir -p workspace
 
       - name: Copy RESTler Files
         run: |
-          cp -r workspace/repo/restler/restler_config workspace/
-          cp workspace/repo/restler/docker-compose-restler.yml workspace/
-          cp workspace/repo/restler/Dockerfile.restler workspace/
-          # Remove the following line to avoid conflict with Docker volume mount
-          # cp workspace/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
+          cp -r repo/restler/restler_config workspace/
+          cp repo/restler/docker-compose-restler.yml workspace/
+          cp repo/restler/Dockerfile.restler workspace/
+          # Optional: If openapi3.yml is needed, ensure it's correctly referenced
+          # cp repo/VaMPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
           ls -la workspace/
-      
+
       - name: Verify openapi3.yml
         run: |
-          if [ ! -f "workspace/VAmPI-master/openapi_specs/openapi3.yml" ]; then
+          if [ ! -f "repo/VaMPI-master/openapi_specs/openapi3.yml" ]; then
             echo "openapi3.yml is missing or not a file."
-            ls -la workspace/VAmPI-master/openapi_specs/
+            ls -la repo/VaMPI-master/openapi_specs/
             exit 1
           fi
           echo "openapi3.yml exists and is a file."
-      
+
       - name: Start VamPI RESTler Instance
         run: |
-          cd workspace/restler
+          cd workspace
           docker-compose -f docker-compose-restler.yml up -d restler
-      
+
       - name: Wait for VamPI RESTler
         run: |
           echo "Waiting for VamPI RESTler instance..."
@@ -124,22 +117,23 @@ jobs:
             sleep 5
           done
           echo "VamPI RESTler instance is up!"
-      
+
       - name: Run RESTler
         run: |
-          cd workspace/restler
+          cd workspace
           docker-compose -f docker-compose-restler.yml up --build
+
       - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
           path: workspace/restler/output/**
-  
+
       - name: Cleanup
         if: always()
         run: |
-          cd workspace/restler
+          cd workspace
           docker-compose -f docker-compose-restler.yml down
           rm -rf workspace
 
@@ -147,28 +141,27 @@ jobs:
     runs-on: self-hosted
     needs: [prepare_wuppiefuzz, prepare_vampi, prepare_docker_network]
     steps:
-      - name: Create Workspace
-        run: mkdir -p wuppiefuzz_workspace
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          name: VAmPI-master
-          path: workspace/vampi-api
+          path: repo
+
       - name: Download WuppieFuzz Binary
         uses: actions/download-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: wuppiefuzz_workspace/wuppiefuzz-binary
+          path: wuppiefuzz_workspace
 
-      - name: Setup Environment
+      - name: Setup WuppieFuzz Environment
         run: |
-          chmod +x wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz
-          mv wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz wuppiefuzz_workspace/
+          chmod +x wuppiefuzz_workspace/wuppiefuzz
+          mv wuppiefuzz_workspace/wuppiefuzz wuppiefuzz_workspace/
+
       - name: Start VamPI Instance
         run: |
-          cd workspace/vampi-api/VAmPI-master
-          docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
+          cd repo/VaMPI-master
+          docker-compose -f docker-compose.yml up -d vampi-vulnerable-wuppiefuzz
+
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI WuppieFuzz instance..."
@@ -177,12 +170,13 @@ jobs:
             sleep 5
           done
           echo "VamPI WuppieFuzz instance is up!"
+
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml \
+            --openapi-spec=repo/VaMPI-master/openapi_specs/openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
             --report=true \
@@ -190,19 +184,20 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             --base-url=http://localhost:5002 \
-            workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml
+            repo/VaMPI-master/openapi_specs/openapi3.yml
+
       - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
           path: wuppiefuzz_workspace/reports/
-  
+
       - name: Cleanup
         if: always()
         run: |
-          cd workspace/vampi-api/VAmPI-master
-          docker-compose -f docker-compose.yaml down
+          cd repo/VaMPI-master
+          docker-compose -f docker-compose.yml down
           rm -rf wuppiefuzz_workspace
 
   summarize_results:
@@ -240,6 +235,7 @@ jobs:
           else
             echo "No RESTler results found" >> summary.md
           fi
+
       - name: Upload Summary
         uses: actions/upload-artifact@v4
         with:
