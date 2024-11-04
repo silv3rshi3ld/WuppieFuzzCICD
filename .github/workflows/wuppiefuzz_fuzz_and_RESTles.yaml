@@ -9,6 +9,36 @@ on:
       - main
 
 jobs:
+  prepare_docker_network:
+    runs-on: self-hosted
+    steps:
+      - name: Create Docker Network
+        run: docker network create cicd_network || true
+
+  prepare_vampi:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Build VamPI Images
+        run: |
+          cd VAmPI-master
+          docker-compose -f docker-compose.fuzzing.yml build
+      - name: Upload VamPI Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: vampi-api
+          path: |
+            VAmPI-master/
+            !VAmPI-master/node_modules/
   prepare_wuppiefuzz:
     runs-on: self-hosted
     steps:
@@ -42,72 +72,50 @@ jobs:
           name: wuppiefuzz-binary
           path: wuppiefuzz/target/release/wuppiefuzz
 
-  prepare_api:
-    runs-on: self-hosted
-    steps:
-      - name: Cleanup workspace
-        run: rm -rf /home/michiel/_work/WuppieFuzz/WuppieFuzz/VAmPI-master/openapi_specs || true
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Upload VamPI
-        uses: actions/upload-artifact@v4
-        with:
-          name: vampi-api
-          path: VAmPI-master/
-
   run_wuppiefuzz:
     runs-on: self-hosted
-    needs: [prepare_wuppiefuzz, prepare_api]
+    needs: [prepare_wuppiefuzz, prepare_vampi, prepare_docker_network]
     steps:
       - name: Create Workspace
         run: mkdir -p wuppiefuzz_workspace
 
-      - name: Download WuppieFuzz Binary
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: wuppiefuzz-binary
-          path: wuppiefuzz_workspace/wuppiefuzz
+          pattern: vampi-api|wuppiefuzz-binary
+          path: wuppiefuzz_workspace
 
-      - name: Download VamPI
-        uses: actions/download-artifact@v4
-        with:
-          name: vampi-api
-          path: wuppiefuzz_workspace/VAmPI-master
-
-      - name: Make WuppieFuzz Executable
-        run: chmod +x wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
-
-      - name: Start VamPI Service
+      - name: Setup Environment
         run: |
-          cd wuppiefuzz_workspace/VAmPI-master
-          docker build -t local-vampi .
-          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
+          chmod +x wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz
+          mv wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz wuppiefuzz_workspace/
+      - name: Start VamPI Instance
+        run: |
+          cd wuppiefuzz_workspace/vampi-api
+          docker-compose -f docker-compose.fuzzing.yml up -d vampi-wuppiefuzz
       - name: Wait for VamPI
         run: |
-          echo "Waiting for VamPI to become available..."
-          until curl -s http://localhost:5000/ > /dev/null; do
+          echo "Waiting for VamPI WuppieFuzz instance..."
+          until curl -s http://localhost:5002/ > /dev/null; do
             echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
-          echo "VamPI is up!"
+          echo "VamPI WuppieFuzz instance is up!"
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
-          echo "Current directory structure:"
-          ls -R
-          mkdir reports
-          ./wuppiefuzz/wuppiefuzz output-corpus \
-            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
+          mkdir -p reports
+          ./wuppiefuzz output-corpus \
+            --openapi-spec=vampi-api/openapi_specs/openapi3.yml \
             corpus_directory
-          ./wuppiefuzz/wuppiefuzz fuzz \
+          ./wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            VAmPI-master/openapi_specs/openapi3.yml
-      - name: Upload WuppieFuzz Results
+            --base-url=http://localhost:5002 \
+            vampi-api/openapi_specs/openapi3.yml
+      - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -117,57 +125,58 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop $(docker ps -q --filter ancestor=local-vampi) || true
-          docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
+          cd wuppiefuzz_workspace/vampi-api
+          docker-compose -f docker-compose.fuzzing.yml stop vampi-wuppiefuzz
+          docker-compose -f docker-compose.fuzzing.yml rm -f vampi-wuppiefuzz
           rm -rf wuppiefuzz_workspace
   run_restler:
     runs-on: self-hosted
-    needs: [prepare_api]
+    needs: [prepare_vampi, prepare_docker_network]
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
       - name: Create Workspace
-        run: |
-          mkdir -p workspace
-          mkdir -p workspace/output
+        run: mkdir -p workspace
+
       - name: Download VamPI
         uses: actions/download-artifact@v4
         with:
           name: vampi-api
-          path: workspace/VAmPI-master
+          path: workspace/vampi-api
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          path: workspace/repo
 
       - name: Copy RESTler Files
         run: |
-          cp -r restler/restler_config workspace/
-          cp restler/docker-compose-restler.yml workspace/
-          cp restler/Dockerfile.restler workspace/
-          cp workspace/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
+          cp -r workspace/repo/restler/restler_config workspace/
+          cp workspace/repo/restler/docker-compose-restler.yml workspace/
+          cp workspace/repo/restler/Dockerfile.restler workspace/
+          cp workspace/vampi-api/openapi_specs/openapi3.yml workspace/
           echo "Files in workspace:"
           ls -la workspace/
-      - name: Create Docker Network
-        run: docker network create cicd_network || true
-
-      - name: Start VamPI Service
+      - name: Start VamPI Instance
         run: |
-          cd workspace/VAmPI-master
-          docker build -t local-vampi .
-          docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
+          cd workspace/vampi-api
+          docker-compose -f docker-compose.fuzzing.yml up -d vampi-restler
       - name: Wait for VamPI
         run: |
-          echo "Waiting for VamPI to become available..."
-          until curl -s http://localhost:5000/ > /dev/null; do
+          echo "Waiting for VamPI RESTler instance..."
+          until curl -s http://localhost:5003/ > /dev/null; do
             echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
           done
-          echo "VamPI is up!"
+          echo "VamPI RESTler instance is up!"
+      - name: Configure RESTler
+        run: |
+          cd workspace
+          # Update RESTler configuration to use the correct VamPI URL
+          sed -i 's|http://localhost:5000|http://localhost:5003|g' restler_config/config.json
       - name: Run RESTler
         run: |
           cd workspace
-          echo "Current directory contents:"
-          ls -la
           docker-compose -f docker-compose-restler.yml up --build
-      - name: Upload RESTler Results
+      - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -177,18 +186,14 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop $(docker ps -q --filter ancestor=local-vampi) || true
-          docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
-          docker network rm cicd_network || true
+          cd workspace/vampi-api
+          docker-compose -f docker-compose.fuzzing.yml stop vampi-restler
+          docker-compose -f docker-compose.fuzzing.yml rm -f vampi-restler
           rm -rf workspace
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
     steps:
-      - name: Final Cleanup
-        run: |
-          docker container prune -f
-          docker network prune -f
       - name: Download Results
         uses: actions/download-artifact@v4
         with:
@@ -225,3 +230,9 @@ jobs:
         with:
           name: fuzzing-summary
           path: summary.md
+
+      - name: Final Cleanup
+        if: always()
+        run: |
+          docker container prune -f
+          docker network prune -f
