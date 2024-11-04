@@ -33,7 +33,7 @@ jobs:
           
       - name: Build VamPI Images
         run: |
-          cd repo/VaMPI-master
+          cd repo/VAmPI-master
           docker-compose -f docker-compose.yml build
 
       # Removed Upload VamPI Files to prevent redundancy
