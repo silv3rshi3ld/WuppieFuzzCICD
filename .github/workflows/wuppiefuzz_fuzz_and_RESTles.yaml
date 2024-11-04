@@ -64,7 +64,7 @@ jobs:
 
       - name: Build VamPI Images
         working-directory: VAmPI-master
-        run: docker compose build --force-rm
+        run: docker-compose build --force-rm
         shell: bash
 
       - name: Git Clean
@@ -147,13 +147,13 @@ jobs:
 
       - name: Remove Existing RESTler and VAmPI Containers
         run: |
-          docker compose -f workspace/docker-compose-restler.yml down --remove-orphans || true
-          docker compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
+          docker-compose -f workspace/docker-compose-restler.yml down --remove-orphans || true
+          docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
         shell: bash
 
       - name: Start VamPI RESTler Instance
         working-directory: VAmPI-master
-        run: docker compose up -d vampi-vulnerable-restler --remove-orphans || exit 1
+        run: docker-compose up -d vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI RESTler
@@ -175,12 +175,12 @@ jobs:
 
       - name: Start RESTler Service
         working-directory: workspace
-        run: docker compose -f docker-compose-restler.yml up -d restler --remove-orphans || exit 1
+        run: docker-compose -f docker-compose-restler.yml up -d restler --remove-orphans || exit 1
         shell: bash
 
       - name: Run RESTler
         working-directory: workspace
-        run: docker compose -f docker-compose-restler.yml up --build --remove-orphans
+        run: docker-compose -f docker-compose-restler.yml up --build --remove-orphans
         shell: bash
 
       - name: Upload RESTler Results
@@ -194,8 +194,8 @@ jobs:
       - name: Cleanup RESTler Environment
         if: always()
         run: |
-          docker compose -f VAmPI-master/docker-compose.yml down --remove-orphans
-          docker compose -f workspace/docker-compose-restler.yml down --remove-orphans
+          docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans
+          docker-compose -f workspace/docker-compose-restler.yml down --remove-orphans
           rm -rf workspace
         shell: bash
 
@@ -217,12 +217,12 @@ jobs:
         shell: bash
 
       - name: Remove Existing WuppieFuzz Containers
-        run: docker compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
+        run: docker-compose -f VAmPI-master/docker-compose.yml down --remove-orphans || true
         shell: bash
 
       - name: Start VamPI WuppieFuzz Instance
         working-directory: VAmPI-master
-        run: docker compose up -d vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
+        run: docker-compose up -d vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI WuppieFuzz
@@ -270,7 +270,7 @@ jobs:
         if: always()
         working-directory: VAmPI-master
         run: |
-          docker compose down --remove-orphans
+          docker-compose down --remove-orphans
           rm -rf ../wuppiefuzz_workspace
         shell: bash
 
