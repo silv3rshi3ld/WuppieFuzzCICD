@@ -21,6 +21,7 @@ jobs:
           else
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
+        shell: bash
 
       - name: Create Docker Network if Not Exists
         if: steps.check_network.outputs.exists == 'false'
@@ -39,12 +40,18 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        # Using default checkout path
+
+      - name: Fix File Permissions
+        run: |
+          sudo chown -R $USER:$USER /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
+          sudo chmod -R u+rwX /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
+        shell: bash
 
       - name: List Repository Contents
         run: |
           echo "Listing root directory after checkout:"
           ls -la
+        shell: bash
 
       - name: Cache Docker layers
         uses: actions/cache@v4
@@ -58,6 +65,11 @@ jobs:
         run: |
           cd VAmPI-master
           docker-compose -f docker-compose.yml build --force-rm
+        shell: bash
+
+      - name: Git Clean
+        run: |
+          sudo git clean -ffdx
         shell: bash
 
   prepare_wuppiefuzz:
@@ -110,7 +122,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        # Using default checkout path
 
       - name: List Repository Contents for run_restler
         run: |
@@ -174,7 +185,6 @@ jobs:
         with:
           name: restler-results
           path: workspace/restler/output/**
-          # If RESTler outputs to a different directory, adjust the path accordingly
 
       - name: Cleanup RESTler Environment
         if: always()
@@ -190,7 +200,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        # Using default checkout path
 
       - name: List Repository Contents for run_wuppiefuzz
         run: |
@@ -260,7 +269,6 @@ jobs:
         with:
           name: wuppiefuzz-results
           path: wuppiefuzz_workspace/reports/
-          # Ensure that WuppieFuzz outputs reports to this directory
 
       - name: Cleanup WuppieFuzz Environment
         if: always()
