@@ -96,9 +96,9 @@ jobs:
 
       - name: Copy RESTler Files
         run: |
-          cp -r VAmPI-master/restler/restler_config workspace/
-          cp VAmPI-master/restler/docker-compose-restler.yml workspace/
-          cp VAmPI-master/restler/Dockerfile.restler workspace/
+          cp -r restler/restler_config workspace/
+          cp restler/docker-compose-restler.yml workspace/
+          cp restler/Dockerfile.restler workspace/
           echo "Files in workspace:"
           ls -la workspace/
 
@@ -170,7 +170,7 @@ jobs:
       - name: Setup WuppieFuzz Environment
         run: |
           chmod +x wuppiefuzz_workspace/wuppiefuzz
-          mv wuppiefuzz_workspace/wuppiefuzz wuppiefuzz_workspace/
+          # Removed the redundant mv command
           ls -la wuppiefuzz_workspace
 
       - name: Start VamPI Instance
