@@ -51,6 +51,7 @@ jobs:
           sudo apt-get install -y build-essential
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
+
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
@@ -96,7 +97,7 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd cd WuppieFuzzCICD/workspace/vampi-api
+          cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
@@ -107,6 +108,7 @@ jobs:
             sleep 5
           done
           echo "VamPI WuppieFuzz instance is up!"
+
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
@@ -118,9 +120,10 @@ jobs:
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
-            --timeout=60 \
-            --base-url=http://localhost:5002 \
-            vampi-api/openapi_specs/openapi3.yml
+          --timeout=60 \
+          --base-url=http://localhost:5002 \
+          vampi-api/openapi_specs/openapi3.yml
+      
       - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -131,7 +134,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd cd WuppieFuzzCICD/workspace/vampi-api
+          cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yml stop vampi-wuppiefuzz
           docker-compose -f docker-compose.yml rm -f vampi-wuppiefuzz
           rm -rf wuppiefuzz_workspace
@@ -161,7 +164,7 @@ jobs:
       
       - name: Start VamPI Instance
         run: |
-          cd cd WuppieFuzzCICD/workspace/vampi-api
+          cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-restler
 
       - name: Wait for VamPI
@@ -172,6 +175,7 @@ jobs:
             sleep 5
           done
           echo "VamPI RESTler instance is up!"
+
       - name: Configure RESTler
         run: |
           cd workspace
@@ -232,6 +236,7 @@ jobs:
           else
             echo "No RESTler results found" >> summary.md
           fi
+
       - name: Upload Summary
         uses: actions/upload-artifact@v4
         with:
