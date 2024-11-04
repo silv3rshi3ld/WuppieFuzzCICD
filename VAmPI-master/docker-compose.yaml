@@ -10,7 +10,7 @@ services:
 
   vampi-vulnerable-wuppiefuzz:
     build: ./
-    container_name: vampi-vulnerable
+    container_name: vampi-vulnerable-wuppiefuzz
     environment:
       - vulnerable=1
     networks:
@@ -20,7 +20,7 @@ services:
 
   vampi-vulnerable-restler:
     build: ./
-    container_name: vampi-vulnerable
+    container_name: vampi-vulnerable-restler
     environment:
       - vulnerable=1
     networks:
