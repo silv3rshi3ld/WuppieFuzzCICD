@@ -18,7 +18,7 @@ services:
     ports:
       - 5002:5000
 
-  vampi-vulnerable-rester:
+  vampi-vulnerable-restler:
     build: ./
     container_name: vampi-vulnerable
     environment:
