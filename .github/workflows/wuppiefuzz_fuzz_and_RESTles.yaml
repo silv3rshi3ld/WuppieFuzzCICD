@@ -87,8 +87,13 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: vampi-api|wuppiefuzz-binary
-          path: wuppiefuzz_workspace
+          name: vampi-api
+          path: workspace/vampi-api
+      - name: Download WuppieFuzz Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: wuppiefuzz_workspace/wuppiefuzz-binary
 
       - name: Setup Environment
         run: |
@@ -97,7 +102,7 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd VamPi-master
+          cd workspace/vampi-api/VAmPI-master
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
@@ -114,16 +119,16 @@ jobs:
           cd wuppiefuzz_workspace
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=vampi-api/openapi_specs/openapi3.yml \
+            --openapi-spec=workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
-          --timeout=60 \
-          --base-url=http://localhost:5002 \
-          vampi-api/openapi_specs/openapi3.yml
-      
+            --timeout=60 \
+            --base-url=http://localhost:5002 \
+            workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml
+
       - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,9 +139,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd workspace/vampi-api
-          docker-compose -f docker-compose.yml stop vampi-wuppiefuzz
-          docker-compose -f docker-compose.yml rm -f vampi-wuppiefuzz
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yml stop vampi-vulnerable-wuppiefuzz
+          docker-compose -f docker-compose.yml rm -f vampi-vulnerable-wuppiefuzz
           rm -rf wuppiefuzz_workspace
 
   run_restler:
@@ -159,16 +164,16 @@ jobs:
 
       - name: Copy RESTler Files
         run: |
-          cp -r restler/restler_config workspace/
-          cp restler/docker-compose-restler.yml workspace/
-          cp restler/Dockerfile.restler workspace/
-          cp /VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
+          cp -r workspace/repo/restler/restler_config workspace/
+          cp workspace/repo/restler/docker-compose-restler.yml workspace/
+          cp workspace/repo/restler/Dockerfile.restler workspace/
+          cp workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
           ls -la workspace/
       
       - name: Start VamPI Instance
         run: |
-          cd workspace/vampi-api
+          cd workspace/vampi-api/VAmPI-master
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-restler
 
       - name: Wait for VamPI
@@ -195,9 +200,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd workspace/vampi-api
-          docker-compose -f docker-compose.yml stop vampi-restler
-          docker-compose -f docker-compose.yml rm -f vampi-restler
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yml stop vampi-vulnerable-restler
+          docker-compose -f docker-compose.yml rm -f vampi-vulnerable-restler
           rm -rf workspace
           
   summarize_results:
