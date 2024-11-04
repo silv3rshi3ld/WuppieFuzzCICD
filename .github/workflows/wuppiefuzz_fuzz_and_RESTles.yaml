@@ -18,7 +18,6 @@ jobs:
           sudo apt-get install -y build-essential
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
-
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
@@ -37,7 +36,6 @@ jobs:
         run: |
           cd wuppiefuzz
           cargo build --release
-
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
@@ -49,11 +47,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io docker-compose
 
       - name: Upload VamPI
         uses: actions/upload-artifact@v4
@@ -88,7 +81,6 @@ jobs:
           cd wuppiefuzz_workspace/VAmPI-master
           docker build -t local-vampi .
           docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
-
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI to become available..."
@@ -97,7 +89,6 @@ jobs:
             sleep 5
           done
           echo "VamPI is up!"
-
       - name: Run WuppieFuzz
         run: |
           cd wuppiefuzz_workspace
@@ -113,7 +104,6 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             VAmPI-master/openapi_specs/openapi3.yml
-
       - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,7 +117,6 @@ jobs:
           docker stop $(docker ps -q --filter ancestor=local-vampi) || true
           docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
           rm -rf wuppiefuzz_workspace
-
   run_restler:
     runs-on: self-hosted
     needs: [prepare_api]
@@ -139,7 +128,6 @@ jobs:
         run: |
           mkdir -p workspace
           mkdir -p workspace/output
-
       - name: Download VamPI
         uses: actions/download-artifact@v4
         with:
@@ -154,7 +142,6 @@ jobs:
           cp workspace/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
           ls -la workspace/
-
       - name: Create Docker Network
         run: docker network create cicd_network || true
 
@@ -163,7 +150,6 @@ jobs:
           cd workspace/VAmPI-master
           docker build -t local-vampi .
           docker run -d -p 5000:5000 -e vulnerable=1 local-vampi
-
       - name: Wait for VamPI
         run: |
           echo "Waiting for VamPI to become available..."
@@ -172,14 +158,12 @@ jobs:
             sleep 5
           done
           echo "VamPI is up!"
-
       - name: Run RESTler
         run: |
           cd workspace
           echo "Current directory contents:"
           ls -la
           docker-compose -f docker-compose-restler.yml up --build
-
       - name: Upload RESTler Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -194,7 +178,6 @@ jobs:
           docker rm $(docker ps -aq --filter ancestor=local-vampi) || true
           docker network rm cicd_network || true
           rm -rf workspace
-
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
@@ -203,7 +186,6 @@ jobs:
         run: |
           docker container prune -f
           docker network prune -f
-
       - name: Download Results
         uses: actions/download-artifact@v4
         with:
@@ -224,7 +206,6 @@ jobs:
           else
             echo "No WuppieFuzz results found" >> summary.md
           fi
-
           echo "## RESTler Results" >> summary.md
           if [ -d "all_results/restler-results" ]; then
             bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
@@ -236,7 +217,6 @@ jobs:
           else
             echo "No RESTler results found" >> summary.md
           fi
-
       - name: Upload Summary
         uses: actions/upload-artifact@v4
         with:
