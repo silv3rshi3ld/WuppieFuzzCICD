@@ -33,7 +33,7 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-          
+        
       - name: Build VamPI Images
         run: |
           cd VAmPI-master
@@ -54,6 +54,11 @@ jobs:
         with:
           repository: TNO-S3/WuppieFuzz
           path: wuppiefuzz
+
+      - name: List WuppieFuzz Repository Contents
+        run: |
+          echo "Listing WuppieFuzz repository contents:"
+          ls -la wuppiefuzz
 
       - name: Cache WuppieFuzz Build
         uses: actions/cache@v4
@@ -157,10 +162,16 @@ jobs:
           name: wuppiefuzz-binary
           path: wuppiefuzz_workspace
 
+      - name: List WuppieFuzz Workspace Contents
+        run: |
+          echo "Listing wuppiefuzz_workspace contents:"
+          ls -la wuppiefuzz_workspace
+
       - name: Setup WuppieFuzz Environment
         run: |
           chmod +x wuppiefuzz_workspace/wuppiefuzz
           mv wuppiefuzz_workspace/wuppiefuzz wuppiefuzz_workspace/
+          ls -la wuppiefuzz_workspace
 
       - name: Start VamPI Instance
         run: |
