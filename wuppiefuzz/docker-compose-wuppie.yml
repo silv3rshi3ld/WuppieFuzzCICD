@@ -10,8 +10,9 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
+      VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
     depends_on:
-      - api
+      - vampi-vulnerable-wuppiefuzz
     networks:
       - cicd_network
     volumes:
