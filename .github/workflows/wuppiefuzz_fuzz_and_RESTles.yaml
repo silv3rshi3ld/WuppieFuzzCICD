@@ -28,7 +28,7 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-
+              
       - name: Build VamPI Images
         run: |
           cd VAmPI-master
@@ -87,8 +87,13 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: vampi-api|wuppiefuzz-binary
-          path: wuppiefuzz_workspace
+          name: vampi-api
+          path: workspace/vampi-api
+      - name: Download WuppieFuzz Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: wuppiefuzz_workspace/wuppiefuzz-binary
 
       - name: Setup Environment
         run: |
@@ -97,8 +102,8 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd wuppiefuzz_workspace/vampi-api
-          docker-compose -f docker-compose.yaml up -d vampi-wuppiefuzz
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
         run: |
@@ -114,7 +119,7 @@ jobs:
           cd wuppiefuzz_workspace
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=vampi-api/openapi_specs/openapi3.yml \
+            --openapi-spec=workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
             --report=true \
@@ -122,7 +127,7 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             --base-url=http://localhost:5002 \
-            vampi-api/openapi_specs/openapi3.yml
+            workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml
 
       - name: Upload Results
         if: always()
@@ -134,9 +139,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd wuppiefuzz_workspace/vampi-api
-          docker-compose -f docker-compose.yaml stop vampi-wuppiefuzz
-          docker-compose -f docker-compose.yaml rm -f vampi-wuppiefuzz
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yml stop vampi-vulnerable-wuppiefuzz
+          docker-compose -f docker-compose.yml rm -f vampi-vulnerable-wuppiefuzz
           rm -rf wuppiefuzz_workspace
 
   run_restler:
@@ -162,14 +167,14 @@ jobs:
           cp -r workspace/repo/restler/restler_config workspace/
           cp workspace/repo/restler/docker-compose-restler.yml workspace/
           cp workspace/repo/restler/Dockerfile.restler workspace/
-          cp workspace/vampi-api/openapi_specs/openapi3.yml workspace/
+          cp workspace/vampi-api/VAmPI-master/openapi_specs/openapi3.yml workspace/openapi3.yml
           echo "Files in workspace:"
           ls -la workspace/
-
+      
       - name: Start VamPI Instance
         run: |
-          cd workspace/vampi-api
-          docker-compose -f docker-compose.yaml up -d vampi-restler
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yaml up -d vampi-vulnerable-restler
 
       - name: Wait for VamPI
         run: |
@@ -179,13 +184,7 @@ jobs:
             sleep 5
           done
           echo "VamPI RESTler instance is up!"
-
-      - name: Configure RESTler
-        run: |
-          cd workspace
-          # Update RESTler configuration to use the correct VamPI URL
-          sed -i 's|http://localhost:5000|http://localhost:5003|g' restler_config/config.json
-
+      
       - name: Run RESTler
         run: |
           cd workspace
@@ -201,11 +200,11 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd workspace/vampi-api
-          docker-compose -f docker-compose.yaml stop vampi-restler
-          docker-compose -f docker-compose.yaml rm -f vampi-restler
+          cd workspace/vampi-api/VAmPI-master
+          docker-compose -f docker-compose.yml stop vampi-vulnerable-restler
+          docker-compose -f docker-compose.yml rm -f vampi-vulnerable-restler
           rm -rf workspace
-
+          
   summarize_results:
     runs-on: self-hosted
     needs: [run_wuppiefuzz, run_restler]
@@ -230,7 +229,6 @@ jobs:
           else
             echo "No WuppieFuzz results found" >> summary.md
           fi
-
           echo "## RESTler Results" >> summary.md
           if [ -d "all_results/restler-results" ]; then
             bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
