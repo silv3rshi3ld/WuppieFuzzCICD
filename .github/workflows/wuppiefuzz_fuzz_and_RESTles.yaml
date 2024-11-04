@@ -96,7 +96,7 @@ jobs:
 
       - name: Start VamPI Instance
         run: |
-          cd wuppiefuzz_workspace/vampi-api
+          cd cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
@@ -131,7 +131,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd wuppiefuzz_workspace/vampi-api
+          cd cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yml stop vampi-wuppiefuzz
           docker-compose -f docker-compose.yml rm -f vampi-wuppiefuzz
           rm -rf wuppiefuzz_workspace
@@ -161,7 +161,7 @@ jobs:
       
       - name: Start VamPI Instance
         run: |
-          cd wuppiefuzz_workspace/vampi-api
+          cd cd WuppieFuzzCICD/workspace/vampi-api
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-restler
 
       - name: Wait for VamPI
