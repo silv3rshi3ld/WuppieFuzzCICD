@@ -90,9 +90,14 @@ jobs:
           pattern: vampi-api|wuppiefuzz-binary
           path: wuppiefuzz_workspace
 
+      #- name: Setup Environment
+        #run: |
+         # chmod +x wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz
+         # mv wuppiefuzz_workspace/wuppiefuzz-binary/wuppiefuzz wuppiefuzz_workspace/
+
       - name: Start VamPI Instance
         run: |
-          cd workspace/vampi-api
+          cd vampi-api
           docker-compose -f docker-compose.yaml up -d vampi-vulnerable-wuppiefuzz
 
       - name: Wait for VamPI
