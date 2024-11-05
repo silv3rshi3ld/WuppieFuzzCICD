@@ -54,7 +54,10 @@ jobs:
     steps:
       - name: Set CARGO_HOME
         run: echo "CARGO_HOME=${{ runner.temp }}/cargo" >> $GITHUB_ENV
-
+  
+      - name: Set RUSTUP_INIT_SKIP_PATH_CHECK
+        run: echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
+  
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         
@@ -63,7 +66,7 @@ jobs:
         with:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
-
+  
       - name: Cache Cargo Registry and Git
         uses: actions/cache@v4
         with:
@@ -73,7 +76,7 @@ jobs:
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
-
+  
       - name: Cache WuppieFuzz Build
         uses: actions/cache@v4
         with:
@@ -81,12 +84,12 @@ jobs:
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             wuppiefuzz-target-
-
+  
       - name: Build WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
         run: cargo build --release
         shell: bash
-
+  
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
