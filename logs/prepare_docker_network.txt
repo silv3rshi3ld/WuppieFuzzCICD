@@ -1,0 +1,142 @@
+﻿2024-11-05T13:19:23.6086792Z Current runner version: '2.320.0'
+2024-11-05T13:19:23.6093885Z Runner name: 'TNO'
+2024-11-05T13:19:23.6094423Z Runner group name: 'Default'
+2024-11-05T13:19:23.6095193Z Machine name: 'michiel-wf-runner'
+2024-11-05T13:19:23.6112229Z Testing runner upgrade compatibility
+2024-11-05T13:19:23.6925264Z ##[group]GITHUB_TOKEN Permissions
+2024-11-05T13:19:23.6927204Z Contents: read
+2024-11-05T13:19:23.6927576Z Metadata: read
+2024-11-05T13:19:23.6927925Z Packages: read
+2024-11-05T13:19:23.6928276Z ##[endgroup]
+2024-11-05T13:19:23.6932491Z Secret source: Actions
+2024-11-05T13:19:23.6933348Z Prepare workflow directory
+2024-11-05T13:19:23.8079187Z Prepare all required actions
+2024-11-05T13:19:23.8254459Z Getting action download info
+2024-11-05T13:19:24.0409390Z Download action repository 'actions/checkout@v4' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+2024-11-05T13:19:24.6053948Z Complete job name: prepare_docker_network
+2024-11-05T13:19:24.7112884Z ##[group]Run actions/checkout@v4
+2024-11-05T13:19:24.7113682Z with:
+2024-11-05T13:19:24.7114514Z   fetch-depth: 0
+2024-11-05T13:19:24.7115173Z   repository: silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:19:24.7116210Z   token: ***
+2024-11-05T13:19:24.7116783Z   ssh-strict: true
+2024-11-05T13:19:24.7117386Z   ssh-user: git
+2024-11-05T13:19:24.7117934Z   persist-credentials: true
+2024-11-05T13:19:24.7118652Z   clean: true
+2024-11-05T13:19:24.7119487Z   sparse-checkout-cone-mode: true
+2024-11-05T13:19:24.7120146Z   fetch-tags: false
+2024-11-05T13:19:24.7121003Z   show-progress: true
+2024-11-05T13:19:24.7121667Z   lfs: false
+2024-11-05T13:19:24.7122188Z   submodules: false
+2024-11-05T13:19:24.7122923Z   set-safe-directory: true
+2024-11-05T13:19:24.7123609Z env:
+2024-11-05T13:19:24.7124142Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:19:24.7124903Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:19:24.7125632Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:19:24.7126724Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:24.7127748Z ##[endgroup]
+2024-11-05T13:19:24.8611528Z Syncing repository: silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:19:24.8613579Z ##[group]Getting Git version info
+2024-11-05T13:19:24.8614499Z Working directory is '/home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD'
+2024-11-05T13:19:24.8615480Z [command]/usr/bin/git version
+2024-11-05T13:19:24.8615974Z git version 2.34.1
+2024-11-05T13:19:24.8617251Z ##[endgroup]
+2024-11-05T13:19:24.8633980Z Temporarily overriding HOME='/home/michiel/actions-runner/_work/_temp/81196f18-3e1f-47fd-8e54-d04919f24da7' before making global git config changes
+2024-11-05T13:19:24.8635764Z Adding repository directory to the temporary git global config as a safe directory
+2024-11-05T13:19:24.8643534Z [command]/usr/bin/git config --global --add safe.directory /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:24.8649594Z [command]/usr/bin/git config --local --get remote.origin.url
+2024-11-05T13:19:24.8671163Z https://github.com/silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:19:24.8714088Z ##[group]Removing previously created refs, to avoid conflicts
+2024-11-05T13:19:24.8715048Z [command]/usr/bin/git rev-parse --symbolic-full-name --verify --quiet HEAD
+2024-11-05T13:19:24.8738483Z refs/heads/main
+2024-11-05T13:19:24.8751550Z [command]/usr/bin/git checkout --detach
+2024-11-05T13:19:24.8794983Z HEAD is now at ce382cd Refactor WuppieFuzz and VAmPI workflows to improve Docker health check and remove unnecessary waiting for VamPI instances
+2024-11-05T13:19:24.8839256Z [command]/usr/bin/git branch --delete --force main
+2024-11-05T13:19:24.8867371Z Deleted branch main (was ce382cd).
+2024-11-05T13:19:24.8903412Z ##[endgroup]
+2024-11-05T13:19:24.8910047Z [command]/usr/bin/git submodule status
+2024-11-05T13:19:24.9098148Z ##[group]Cleaning the repository
+2024-11-05T13:19:24.9101423Z [command]/usr/bin/git clean -ffdx
+2024-11-05T13:19:24.9135764Z [command]/usr/bin/git reset --hard HEAD
+2024-11-05T13:19:24.9183820Z HEAD is now at ce382cd Refactor WuppieFuzz and VAmPI workflows to improve Docker health check and remove unnecessary waiting for VamPI instances
+2024-11-05T13:19:24.9186684Z ##[endgroup]
+2024-11-05T13:19:24.9187253Z ##[group]Disabling automatic garbage collection
+2024-11-05T13:19:24.9187897Z [command]/usr/bin/git config --local gc.auto 0
+2024-11-05T13:19:24.9225833Z ##[endgroup]
+2024-11-05T13:19:24.9230040Z ##[group]Setting up auth
+2024-11-05T13:19:24.9239516Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2024-11-05T13:19:24.9278714Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2024-11-05T13:19:24.9470304Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2024-11-05T13:19:24.9502483Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2024-11-05T13:19:24.9723075Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2024-11-05T13:19:24.9755890Z ##[endgroup]
+2024-11-05T13:19:24.9757090Z ##[group]Fetching the repository
+2024-11-05T13:19:24.9766535Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules --unshallow origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2024-11-05T13:19:25.7457270Z From https://github.com/silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:19:25.7458488Z    ce382cd..e75828f  main       -> origin/main
+2024-11-05T13:19:25.7488630Z [command]/usr/bin/git branch --list --remote origin/main
+2024-11-05T13:19:25.7511597Z   origin/main
+2024-11-05T13:19:25.7526500Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+2024-11-05T13:19:25.7549783Z e75828fe5f7b5d6ce61752c7983d441042bb3ef0
+2024-11-05T13:19:25.7559342Z ##[endgroup]
+2024-11-05T13:19:25.7560719Z ##[group]Determining the checkout info
+2024-11-05T13:19:25.7565443Z ##[endgroup]
+2024-11-05T13:19:25.7574654Z [command]/usr/bin/git sparse-checkout disable
+2024-11-05T13:19:25.7836787Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2024-11-05T13:19:25.7838497Z ##[group]Checking out the ref
+2024-11-05T13:19:25.7839190Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2024-11-05T13:19:25.7840759Z Previous HEAD position was ce382cd Refactor WuppieFuzz and VAmPI workflows to improve Docker health check and remove unnecessary waiting for VamPI instances
+2024-11-05T13:19:25.7842089Z Switched to a new branch 'main'
+2024-11-05T13:19:25.7843337Z Branch 'main' set up to track remote branch 'main' from 'origin'.
+2024-11-05T13:19:25.7845685Z ##[endgroup]
+2024-11-05T13:19:25.7847434Z [command]/usr/bin/git log -1 --format=%H
+2024-11-05T13:19:25.7848728Z e75828fe5f7b5d6ce61752c7983d441042bb3ef0
+2024-11-05T13:19:25.8108246Z ##[group]Run mkdir -p $BASE_DIR/services/vampi
+2024-11-05T13:19:25.8108811Z [36;1mmkdir -p $BASE_DIR/services/vampi[0m
+2024-11-05T13:19:25.8109274Z [36;1mmkdir -p $BASE_DIR/workspace[0m
+2024-11-05T13:19:25.8109704Z [36;1mmkdir -p $BASE_DIR/wuppiefuzz_workspace[0m
+2024-11-05T13:19:25.8110177Z [36;1mmkdir -p $HOME/.cargo $HOME/.rustup[0m
+2024-11-05T13:19:25.8146187Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:19:25.8146681Z env:
+2024-11-05T13:19:25.8146929Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:19:25.8147318Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:19:25.8147641Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:19:25.8148172Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:25.8148734Z ##[endgroup]
+2024-11-05T13:19:25.8347953Z ##[group]Run docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
+2024-11-05T13:19:25.8349033Z [36;1mdocker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q[0m
+2024-11-05T13:19:25.8349944Z [36;1mdocker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q[0m
+2024-11-05T13:19:25.8381278Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:19:25.8381995Z env:
+2024-11-05T13:19:25.8382382Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:19:25.8383042Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:19:25.8383749Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:19:25.8384556Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:25.8385639Z ##[endgroup]
+2024-11-05T13:19:25.9086692Z time="2024-11-05T13:19:25Z" level=warning msg="The \"VAMPI_RESTLER_URL\" variable is not set. Defaulting to a blank string."
+2024-11-05T13:19:25.9164924Z ##[group]Run if docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
+2024-11-05T13:19:25.9166279Z [36;1mif docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then[0m
+2024-11-05T13:19:25.9167139Z [36;1m  echo "exists=true" >> $GITHUB_OUTPUT[0m
+2024-11-05T13:19:25.9167804Z [36;1melse[0m
+2024-11-05T13:19:25.9168295Z [36;1m  echo "exists=false" >> $GITHUB_OUTPUT[0m
+2024-11-05T13:19:25.9168927Z [36;1mfi[0m
+2024-11-05T13:19:25.9198894Z shell: /usr/bin/bash -e {0}
+2024-11-05T13:19:25.9199361Z env:
+2024-11-05T13:19:25.9199873Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:19:25.9200426Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:19:25.9200873Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:19:25.9201632Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:25.9202469Z ##[endgroup]
+2024-11-05T13:19:25.9594719Z Post job cleanup.
+2024-11-05T13:19:26.0696127Z [command]/usr/bin/git version
+2024-11-05T13:19:26.0817692Z git version 2.34.1
+2024-11-05T13:19:26.0860403Z Temporarily overriding HOME='/home/michiel/actions-runner/_work/_temp/f47c9d43-84ae-432f-ad29-a70fbae15c7e' before making global git config changes
+2024-11-05T13:19:26.0863885Z Adding repository directory to the temporary git global config as a safe directory
+2024-11-05T13:19:26.0873172Z [command]/usr/bin/git config --global --add safe.directory /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:19:26.0925620Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2024-11-05T13:19:26.0981331Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2024-11-05T13:19:26.1203034Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2024-11-05T13:19:26.1223124Z http.https://github.com/.extraheader
+2024-11-05T13:19:26.1245384Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2024-11-05T13:19:26.1283576Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2024-11-05T13:19:26.1730543Z Cleaning up orphan processes

@@ -1,0 +1,270 @@
+﻿2024-11-05T13:26:52.2121847Z Current runner version: '2.320.0'
+2024-11-05T13:26:52.2128358Z Runner name: 'TNO'
+2024-11-05T13:26:52.2128899Z Runner group name: 'Default'
+2024-11-05T13:26:52.2129867Z Machine name: 'michiel-wf-runner'
+2024-11-05T13:26:52.2147921Z Testing runner upgrade compatibility
+2024-11-05T13:26:52.3328651Z ##[group]GITHUB_TOKEN Permissions
+2024-11-05T13:26:52.3331184Z Contents: read
+2024-11-05T13:26:52.3331580Z Metadata: read
+2024-11-05T13:26:52.3331937Z Packages: read
+2024-11-05T13:26:52.3332294Z ##[endgroup]
+2024-11-05T13:26:52.3336138Z Secret source: Actions
+2024-11-05T13:26:52.3336959Z Prepare workflow directory
+2024-11-05T13:26:52.4561634Z Prepare all required actions
+2024-11-05T13:26:52.4738610Z Getting action download info
+2024-11-05T13:26:52.7148463Z Download action repository 'actions/checkout@v4' (SHA:11bd71901bbe5b1630ceea73d27597364c9af683)
+2024-11-05T13:26:53.2252069Z Download action repository 'actions/upload-artifact@v4' (SHA:b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882)
+2024-11-05T13:26:53.8437956Z Complete job name: run_restler
+2024-11-05T13:26:53.9461140Z ##[group]Run actions/checkout@v4
+2024-11-05T13:26:53.9461616Z with:
+2024-11-05T13:26:53.9461918Z   repository: silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:26:53.9462611Z   token: ***
+2024-11-05T13:26:53.9462901Z   ssh-strict: true
+2024-11-05T13:26:53.9463189Z   ssh-user: git
+2024-11-05T13:26:53.9463484Z   persist-credentials: true
+2024-11-05T13:26:53.9463829Z   clean: true
+2024-11-05T13:26:53.9464141Z   sparse-checkout-cone-mode: true
+2024-11-05T13:26:53.9464514Z   fetch-depth: 1
+2024-11-05T13:26:53.9464796Z   fetch-tags: false
+2024-11-05T13:26:53.9465108Z   show-progress: true
+2024-11-05T13:26:53.9465418Z   lfs: false
+2024-11-05T13:26:53.9465686Z   submodules: false
+2024-11-05T13:26:53.9465984Z   set-safe-directory: true
+2024-11-05T13:26:53.9466306Z env:
+2024-11-05T13:26:53.9466573Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:53.9466955Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:53.9467287Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:53.9467907Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:53.9468497Z ##[endgroup]
+2024-11-05T13:26:54.0911819Z Syncing repository: silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:26:54.0915203Z ##[group]Getting Git version info
+2024-11-05T13:26:54.0916106Z Working directory is '/home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD'
+2024-11-05T13:26:54.0917036Z [command]/usr/bin/git version
+2024-11-05T13:26:54.0917387Z git version 2.34.1
+2024-11-05T13:26:54.0918577Z ##[endgroup]
+2024-11-05T13:26:54.0931898Z Temporarily overriding HOME='/home/michiel/actions-runner/_work/_temp/20f44cf4-0e61-436c-aae3-e7b69a674cd1' before making global git config changes
+2024-11-05T13:26:54.0933236Z Adding repository directory to the temporary git global config as a safe directory
+2024-11-05T13:26:54.0934564Z [command]/usr/bin/git config --global --add safe.directory /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:54.0974963Z [command]/usr/bin/git config --local --get remote.origin.url
+2024-11-05T13:26:54.0987481Z https://github.com/silv3rshi3ld/WuppieFuzzCICD
+2024-11-05T13:26:54.1017678Z ##[group]Removing previously created refs, to avoid conflicts
+2024-11-05T13:26:54.1018681Z [command]/usr/bin/git rev-parse --symbolic-full-name --verify --quiet HEAD
+2024-11-05T13:26:54.1061723Z refs/heads/main
+2024-11-05T13:26:54.1078983Z [command]/usr/bin/git checkout --detach
+2024-11-05T13:26:54.1172181Z HEAD is now at e75828f Refactor WuppieFuzz and VAmPI workflows to update Rust installation process
+2024-11-05T13:26:54.1236921Z [command]/usr/bin/git branch --delete --force main
+2024-11-05T13:26:54.1273672Z Deleted branch main (was e75828f).
+2024-11-05T13:26:54.1338425Z ##[endgroup]
+2024-11-05T13:26:54.1347490Z [command]/usr/bin/git submodule status
+2024-11-05T13:26:54.1663208Z ##[group]Cleaning the repository
+2024-11-05T13:26:54.1663935Z [command]/usr/bin/git clean -ffdx
+2024-11-05T13:26:54.3371017Z Removing wuppiefuzz/
+2024-11-05T13:26:54.3492037Z [command]/usr/bin/git reset --hard HEAD
+2024-11-05T13:26:54.3493693Z HEAD is now at e75828f Refactor WuppieFuzz and VAmPI workflows to update Rust installation process
+2024-11-05T13:26:54.3496666Z ##[endgroup]
+2024-11-05T13:26:54.3497205Z ##[group]Disabling automatic garbage collection
+2024-11-05T13:26:54.3497819Z [command]/usr/bin/git config --local gc.auto 0
+2024-11-05T13:26:54.3498806Z ##[endgroup]
+2024-11-05T13:26:54.3499282Z ##[group]Setting up auth
+2024-11-05T13:26:54.3500159Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2024-11-05T13:26:54.3502119Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2024-11-05T13:26:54.3685139Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2024-11-05T13:26:54.3713210Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2024-11-05T13:26:54.3922838Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2024-11-05T13:26:54.3975035Z ##[endgroup]
+2024-11-05T13:26:54.3975616Z ##[group]Fetching the repository
+2024-11-05T13:26:54.3977040Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e75828fe5f7b5d6ce61752c7983d441042bb3ef0:refs/remotes/origin/main
+2024-11-05T13:26:54.8393491Z ##[endgroup]
+2024-11-05T13:26:54.8394229Z ##[group]Determining the checkout info
+2024-11-05T13:26:54.8395279Z ##[endgroup]
+2024-11-05T13:26:54.8401183Z [command]/usr/bin/git sparse-checkout disable
+2024-11-05T13:26:54.8447007Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2024-11-05T13:26:54.8484045Z ##[group]Checking out the ref
+2024-11-05T13:26:54.8491880Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2024-11-05T13:26:54.8544834Z Switched to a new branch 'main'
+2024-11-05T13:26:54.8546322Z Branch 'main' set up to track remote branch 'main' from 'origin'.
+2024-11-05T13:26:54.8559418Z ##[endgroup]
+2024-11-05T13:26:54.8615311Z [command]/usr/bin/git log -1 --format=%H
+2024-11-05T13:26:54.8642823Z e75828fe5f7b5d6ce61752c7983d441042bb3ef0
+2024-11-05T13:26:54.9113280Z ##[group]Run cp -r /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/config /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/
+2024-11-05T13:26:54.9116079Z [36;1mcp -r /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/config /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/[0m
+2024-11-05T13:26:54.9119299Z [36;1mcp /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/docker-compose.restler.yml /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/[0m
+2024-11-05T13:26:54.9122207Z [36;1mcp /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/Dockerfile.restler /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/[0m
+2024-11-05T13:26:54.9282804Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:26:54.9283403Z env:
+2024-11-05T13:26:54.9283768Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:54.9284206Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:54.9284591Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:54.9285226Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:54.9285895Z ##[endgroup]
+2024-11-05T13:26:54.9570827Z ##[group]Run docker-compose -f /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/docker-compose.restler.yml config -q
+2024-11-05T13:26:54.9572661Z [36;1mdocker-compose -f /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/docker-compose.restler.yml config -q[0m
+2024-11-05T13:26:54.9607068Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:26:54.9607645Z env:
+2024-11-05T13:26:54.9607944Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:54.9608379Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:54.9608757Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:54.9609395Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:54.9610250Z ##[endgroup]
+2024-11-05T13:26:55.0811039Z time="2024-11-05T13:26:55Z" level=warning msg="The \"VAMPI_RESTLER_URL\" variable is not set. Defaulting to a blank string."
+2024-11-05T13:26:55.0948655Z ##[group]Run docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
+2024-11-05T13:26:55.0949643Z [36;1mdocker rm -f vampi-vulnerable-restler vampi-mongo restler || true[0m
+2024-11-05T13:26:55.0981371Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:26:55.0981933Z env:
+2024-11-05T13:26:55.0982219Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:55.0982682Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:55.0983071Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:55.0983704Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:55.0984354Z ##[endgroup]
+2024-11-05T13:26:55.4564693Z Error response from daemon: No such container: vampi-vulnerable-restler
+2024-11-05T13:26:55.4598689Z Error response from daemon: No such container: vampi-mongo
+2024-11-05T13:26:55.4599331Z Error response from daemon: No such container: restler
+2024-11-05T13:26:55.4646547Z ##[group]Run docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
+2024-11-05T13:26:55.4647991Z [36;1mdocker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1[0m
+2024-11-05T13:26:55.4678784Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:26:55.4679272Z env:
+2024-11-05T13:26:55.4679532Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:55.4679932Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:55.4680264Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:55.4680812Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:55.4681372Z ##[endgroup]
+2024-11-05T13:26:55.8467456Z  Container vampi-mongo  Creating
+2024-11-05T13:26:55.9595802Z  Container vampi-mongo  Created
+2024-11-05T13:26:55.9596937Z  Container vampi-vulnerable-restler  Creating
+2024-11-05T13:26:55.9818289Z  Container vampi-vulnerable-restler  Created
+2024-11-05T13:26:55.9838539Z  Container vampi-mongo  Starting
+2024-11-05T13:26:58.6711288Z  Container vampi-mongo  Started
+2024-11-05T13:26:58.6711895Z  Container vampi-vulnerable-restler  Starting
+2024-11-05T13:26:59.1211813Z  Container vampi-vulnerable-restler  Started
+2024-11-05T13:26:59.1365553Z ##[group]Run echo "Waiting for RESTler services to become healthy..."
+2024-11-05T13:26:59.1366305Z [36;1mecho "Waiting for RESTler services to become healthy..."[0m
+2024-11-05T13:26:59.1366843Z [36;1mfor i in {1..60}; do[0m
+2024-11-05T13:26:59.1367605Z [36;1m  status=$(docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-restler 2>/dev/null || echo "unhealthy")[0m
+2024-11-05T13:26:59.1368439Z [36;1m  if [ "$status" == "healthy" ]; then[0m
+2024-11-05T13:26:59.1368897Z [36;1m    echo "RESTler service is healthy."[0m
+2024-11-05T13:26:59.1369310Z [36;1m    exit 0[0m
+2024-11-05T13:26:59.1369737Z [36;1m  fi[0m
+2024-11-05T13:26:59.1373082Z [36;1m  echo "RESTler service not ready yet. Waiting..."[0m
+2024-11-05T13:26:59.1373557Z [36;1m  sleep 5[0m
+2024-11-05T13:26:59.1373840Z [36;1mdone[0m
+2024-11-05T13:26:59.1374421Z [36;1mecho "RESTler service failed to become healthy in time."[0m
+2024-11-05T13:26:59.1374952Z [36;1mexit 1[0m
+2024-11-05T13:26:59.1404813Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:26:59.1405287Z env:
+2024-11-05T13:26:59.1405540Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:26:59.1405917Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:26:59.1406502Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:26:59.1407041Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:26:59.1407588Z ##[endgroup]
+2024-11-05T13:26:59.1522611Z Waiting for RESTler services to become healthy...
+2024-11-05T13:26:59.1976960Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:04.2289380Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:09.2524055Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:14.2765789Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:19.2970795Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:24.3204730Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:29.3472772Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:34.3689145Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:39.3931140Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:44.4136589Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:49.4382321Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:54.4676002Z RESTler service not ready yet. Waiting...
+2024-11-05T13:27:59.4892770Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:04.5119268Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:09.5368111Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:14.5576158Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:19.5765990Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:24.5978069Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:29.6184810Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:34.6396575Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:39.6613520Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:44.6828008Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:49.7025144Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:54.7254657Z RESTler service not ready yet. Waiting...
+2024-11-05T13:28:59.7479635Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:04.7680524Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:09.7890396Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:14.8140132Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:19.8344250Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:24.8553754Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:29.8762033Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:34.8970916Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:39.9166634Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:44.9420347Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:49.9608375Z RESTler service not ready yet. Waiting...
+2024-11-05T13:29:54.9807287Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:00.0055680Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:05.0262673Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:10.0472488Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:15.0676396Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:20.0869456Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:25.1069056Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:30.1334131Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:35.1541879Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:40.1802495Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:45.2010851Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:50.2260168Z RESTler service not ready yet. Waiting...
+2024-11-05T13:30:55.2473933Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:00.2713955Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:05.2905525Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:10.3115654Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:15.3333090Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:20.3532121Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:25.3764275Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:30.3966317Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:35.4195146Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:40.4430443Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:45.4656847Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:50.4869862Z RESTler service not ready yet. Waiting...
+2024-11-05T13:31:55.5085344Z RESTler service not ready yet. Waiting...
+2024-11-05T13:32:00.5105668Z RESTler service failed to become healthy in time.
+2024-11-05T13:32:00.5142724Z ##[error]Process completed with exit code 1.
+2024-11-05T13:32:00.5296419Z ##[group]Run actions/upload-artifact@v4
+2024-11-05T13:32:00.5296944Z with:
+2024-11-05T13:32:00.5297299Z   name: restler-results
+2024-11-05T13:32:00.5298011Z   path: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/output/**
+2024-11-05T13:32:00.5298739Z   if-no-files-found: warn
+2024-11-05T13:32:00.5299150Z   compression-level: 6
+2024-11-05T13:32:00.5299551Z   overwrite: false
+2024-11-05T13:32:00.5299954Z   include-hidden-files: false
+2024-11-05T13:32:00.5300301Z env:
+2024-11-05T13:32:00.5300652Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:32:00.5301115Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:32:00.5301478Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:32:00.5302059Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:32:00.5302691Z ##[endgroup]
+2024-11-05T13:32:00.8395577Z ##[warning]No files were found with the provided path: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/output/**. No artifacts will be uploaded.
+2024-11-05T13:32:00.8478361Z ##[group]Run docker-compose -f /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
+2024-11-05T13:32:00.8480338Z [36;1mdocker-compose -f /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans[0m
+2024-11-05T13:32:00.8482093Z [36;1mdocker-compose -f /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace/docker-compose.restler.yml down --remove-orphans[0m
+2024-11-05T13:32:00.8483425Z [36;1mrm -rf /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD/workspace[0m
+2024-11-05T13:32:00.8536166Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2024-11-05T13:32:00.8537055Z env:
+2024-11-05T13:32:00.8537585Z   DOCKER_NETWORK_NAME: cicd_network
+2024-11-05T13:32:00.8538313Z   VAMPI_RESTLER_PORT: 5003
+2024-11-05T13:32:00.8539191Z   VAMPI_WUPPIEFUZZ_PORT: 5002
+2024-11-05T13:32:00.8540309Z   BASE_DIR: /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:32:00.8541317Z ##[endgroup]
+2024-11-05T13:32:00.9072789Z  Container vampi-vulnerable-restler  Stopping
+2024-11-05T13:32:01.2943747Z  Container vampi-vulnerable-restler  Stopped
+2024-11-05T13:32:01.2945118Z  Container vampi-vulnerable-restler  Removing
+2024-11-05T13:32:01.3078627Z  Container vampi-vulnerable-restler  Removed
+2024-11-05T13:32:01.3079803Z  Container vampi-mongo  Stopping
+2024-11-05T13:32:01.5640048Z  Container vampi-mongo  Stopped
+2024-11-05T13:32:01.5640622Z  Container vampi-mongo  Removing
+2024-11-05T13:32:01.5771024Z  Container vampi-mongo  Removed
+2024-11-05T13:32:01.6119705Z time="2024-11-05T13:32:01Z" level=warning msg="The \"VAMPI_RESTLER_URL\" variable is not set. Defaulting to a blank string."
+2024-11-05T13:32:01.6166372Z Warning: No resource found to remove for project "workspace".
+2024-11-05T13:32:01.6340831Z Post job cleanup.
+2024-11-05T13:32:01.7498929Z [command]/usr/bin/git version
+2024-11-05T13:32:01.7544304Z git version 2.34.1
+2024-11-05T13:32:01.7597987Z Temporarily overriding HOME='/home/michiel/actions-runner/_work/_temp/e846c4fc-1f69-4df8-8675-85c6d03d10e4' before making global git config changes
+2024-11-05T13:32:01.7599585Z Adding repository directory to the temporary git global config as a safe directory
+2024-11-05T13:32:01.7604965Z [command]/usr/bin/git config --global --add safe.directory /home/michiel/actions-runner/_work/WuppieFuzzCICD/WuppieFuzzCICD
+2024-11-05T13:32:01.7645830Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2024-11-05T13:32:01.7697370Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2024-11-05T13:32:01.7917041Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2024-11-05T13:32:01.7938333Z http.https://github.com/.extraheader
+2024-11-05T13:32:01.7953781Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2024-11-05T13:32:01.7985127Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2024-11-05T13:32:01.8432725Z Cleaning up orphan processes
