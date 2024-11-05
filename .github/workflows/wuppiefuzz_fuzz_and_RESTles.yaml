@@ -95,7 +95,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.BASE_DIR }}/wuppiefuzz/target
-          key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }
+          key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             wuppiefuzz-target-
 
@@ -140,7 +140,8 @@ jobs:
         run: |
           echo "Waiting for RESTler services to become healthy..."
           for i in {1..60}; do
-            if sudo docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-restler | grep -q "healthy"; then
+            status=$(sudo docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-restler 2>/dev/null || echo "unhealthy")
+            if [ "$status" == "healthy" ]; then
               echo "RESTler service is healthy."
               exit 0
             fi
@@ -206,7 +207,7 @@ jobs:
           sudo docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo wuppiefuzz || true
         shell: bash
 
-      - name: Start VAmPI WuppieFuzz Instance
+      - name: Start VamPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
@@ -215,7 +216,8 @@ jobs:
         run: |
           echo "Waiting for WuppieFuzz services to become healthy..."
           for i in {1..60}; do
-            if sudo docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-wuppiefuzz | grep -q "healthy"; then
+            status=$(sudo docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-wuppiefuzz 2>/dev/null || echo "unhealthy")
+            if [ "$status" == "healthy" ]; then
               echo "WuppieFuzz service is healthy."
               exit 0
             fi
