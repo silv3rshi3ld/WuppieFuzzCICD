@@ -75,20 +75,13 @@ jobs:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
-      - name: Setup temporary HOME
-        run: mkdir -p $RUNNER_TEMP/home
-
-      - name: Set HOME environment variable
-        run: echo "HOME=$RUNNER_TEMP/home" >> $GITHUB_ENV
+      - name: Setup directories
+        run: mkdir -p ~/.cargo ~/.rustup
 
       - name: Install Rust Toolchain
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Verify Rust Installation
-        run: rustc --version
         shell: bash
 
       - name: Checkout WuppieFuzz Repository
@@ -117,6 +110,29 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-wuppiefuzz-
 
+      - name: Build WuppieFuzz
+        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
+        run: cargo build --release
+        shell: bash
+
+      - name: Verify Binary
+        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
+        run: |
+          if [ ! -f "target/release/wuppiefuzz" ]; then
+            echo "Binary was not built successfully"
+            exit 1
+          fi
+          file target/release/wuppiefuzz
+          ls -l target/release/wuppiefuzz
+        shell: bash
+
+      - name: Upload WuppieFuzz Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          if-no-files-found: error
+
   run_restler:
     runs-on: self-hosted
     needs: prepare_vampi
@@ -131,11 +147,6 @@ jobs:
           cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
         shell: bash
 
-      - name: Validate RESTler Docker Compose
-        run: |
-          docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml config -q
-        shell: bash
-
       - name: Cleanup existing containers
         run: |
           docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
@@ -146,11 +157,19 @@ jobs:
         run: |
           # Start MongoDB first
           docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo
-          # Wait for MongoDB to be healthy
+          
+          # Wait for MongoDB to be ready
           echo "Waiting for MongoDB to initialize..."
-          until docker-compose -f docker-compose.vampi.yml -p vampi_restler exec -T mongo mongo --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
-            sleep 2
+          for i in {1..30}; do
+            if docker exec vampi-mongo mongo --eval 'db.runCommand("ping").ok' >/dev/null 2>&1; then
+              echo "MongoDB is healthy!"
+              break
+            fi
+            echo "Attempt $i of 30: MongoDB not ready yet..."
+            docker logs vampi-mongo
+            sleep 5
           done
+
           # Start VAmPI service
           docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
         shell: bash
@@ -163,7 +182,8 @@ jobs:
               echo "RESTler service is healthy."
               exit 0
             fi
-            echo "RESTler service not ready yet. Waiting..."
+            echo "Attempt $i of 30: RESTler service not ready yet..."
+            docker logs vampi-vulnerable-restler
             sleep 5
           done
           echo "RESTler service failed to become healthy in time."
@@ -182,8 +202,7 @@ jobs:
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
           VAMPI_RESTLER_URL: "http://localhost:${VAMPI_RESTLER_PORT}"
-        run: |
-          docker-compose -f docker-compose.restler.yml up --build --remove-orphans
+        run: docker-compose -f docker-compose.restler.yml up --build --remove-orphans
 
       - name: Upload RESTler Results
         if: always()
@@ -220,14 +239,9 @@ jobs:
           chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
         shell: bash
 
-      - name: Validate WuppieFuzz Docker Compose
-        run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml config -q
-        shell: bash
-
       - name: Cleanup existing containers
         run: |
-          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo wuppiefuzz || true
+          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo || true
         shell: bash
 
       - name: Start VAmPI WuppieFuzz Instance
@@ -235,43 +249,50 @@ jobs:
         run: |
           # Start MongoDB first
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
-          # Wait for MongoDB to be healthy
+          
+          # Wait for MongoDB to be ready
           echo "Waiting for MongoDB to initialize..."
-          until docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz exec -T mongo mongo --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
-            sleep 2
+          for i in {1..30}; do
+            if docker exec vampi-mongo mongo --eval 'db.runCommand("ping").ok' >/dev/null 2>&1; then
+              echo "MongoDB is healthy!"
+              break
+            fi
+            echo "Attempt $i of 30: MongoDB not ready yet..."
+            docker logs vampi-mongo
+            sleep 5
           done
+
           # Start VAmPI service
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
-      - name: Wait for WuppieFuzz Services to Initialize
+      - name: Wait for WuppieFuzz Instance to Initialize
         run: |
-          echo "Waiting for WuppieFuzz services to become healthy..."
+          echo "Waiting for WuppieFuzz instance to become healthy..."
           for i in {1..30}; do
             if curl -s http://localhost:${VAMPI_WUPPIEFUZZ_PORT}/health >/dev/null; then
-              echo "WuppieFuzz service is healthy."
+              echo "WuppieFuzz instance is healthy."
               exit 0
             fi
-            echo "WuppieFuzz service not ready yet. Waiting..."
+            echo "Attempt $i of 30: WuppieFuzz instance not ready yet..."
+            docker logs vampi-vulnerable-wuppiefuzz
             sleep 5
           done
-          echo "WuppieFuzz service failed to become healthy in time."
+          echo "WuppieFuzz instance failed to become healthy in time."
           docker logs vampi-vulnerable-wuppiefuzz
           exit 1
         shell: bash
 
       - name: Run WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        env:
-          VAMPI_WUPPIEFUZZ_URL: "http://localhost:5002"
         run: |
           mkdir -p reports
-          # First generate the corpus
+          # Generate the corpus
           ./wuppiefuzz output-corpus \
             --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
             corpus_directory
 
-          # Then run the fuzzer with the fuzz subcommand
+          # Run the fuzzer
           ./wuppiefuzz fuzz \
             --report \
             --log-level=info \
@@ -329,7 +350,6 @@ jobs:
           else
             echo "No RESTler results found" >> summary.md
           fi
-        shell: bash
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4
