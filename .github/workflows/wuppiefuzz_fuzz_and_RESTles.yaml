@@ -18,6 +18,15 @@ jobs:
   prepare_docker_network:
     runs-on: self-hosted
     steps:
+      - name : Setup directories and permissions
+        run: |
+          sudo mkdir -p ${{ env.BASE_DIR }}/services/vampi
+          sudo mkdir -p ${{ env.BASE_DIR }}/workspace
+          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo mkdir -p ~/.cargo ~/.rustup
+          sudo chown -R $USER:$USER ~/.cargo ~/.rustup
+        shell: bash
+      
       - name: Check if Docker Network Exists
         id: check_network
         run: |
