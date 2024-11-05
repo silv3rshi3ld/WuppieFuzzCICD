@@ -52,17 +52,12 @@ jobs:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
-      - name: Set CARGO_HOME
-        run: echo "CARGO_HOME=${{ runner.temp }}/cargo" >> $GITHUB_ENV
-  
-      - name: Set RUSTUP_HOME
-        run: echo "RUSTUP_HOME=${{ runner.temp }}/rustup" >> $GITHUB_ENV
-  
-      - name: Set RUSTUP_INIT_SKIP_PATH_CHECK
-        run: echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
-  
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
         
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
