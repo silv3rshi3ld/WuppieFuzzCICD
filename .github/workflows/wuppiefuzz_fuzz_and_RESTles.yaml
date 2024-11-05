@@ -61,19 +61,26 @@ jobs:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
+      - name: Setup temporary HOME
+        run: mkdir -p $RUNNER_TEMP/home
+
+      - name: Set HOME environment variable
+        run: echo "HOME=$RUNNER_TEMP/home" >> $GITHUB_ENV
+
       - name: Install Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
+        env:
+          HOME: ${{ runner.temp }}/home
 
-        
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
-  
+
       - name: Cache Cargo Registry and Git
         uses: actions/cache@v4
         with:
@@ -83,7 +90,7 @@ jobs:
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
-  
+
       - name: Cache WuppieFuzz Build
         uses: actions/cache@v4
         with:
@@ -91,12 +98,12 @@ jobs:
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             wuppiefuzz-target-
-  
+
       - name: Build WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
         run: cargo build --release
         shell: bash
-  
+
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
@@ -104,16 +111,13 @@ jobs:
           path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
           if-no-files-found: error
 
+
   run_restler:
     runs-on: self-hosted
     needs: prepare_vampi
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Set Up Workspace
-        run: sudo mkdir -p ${{ env.BASE_DIR }}/workspace && sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/workspace
-        shell: bash
 
       - name: Copy RESTler Files
         run: |
