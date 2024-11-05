@@ -212,7 +212,6 @@ jobs:
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            --base-url=${{ secrets.VAMPI_WUPPIEFUZZ_URL }} \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
         shell: bash
 
