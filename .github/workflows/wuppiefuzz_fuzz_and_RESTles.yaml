@@ -137,24 +137,6 @@ jobs:
         run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
 
-      - name: Wait for VamPI RESTler
-        run: |
-          echo "Waiting for VamPI RESTler instance..."
-          timeout=180
-          elapsed=0
-          while ! curl -s ${{ secrets.VAMPI_RESTLER_URL }}/ > /dev/null; do
-            if [ $elapsed -ge $timeout ]; then
-              echo "Timed out waiting for VAmPI RESTler instance."
-              sudo docker logs vampi-vulnerable-restler || true
-              exit 1
-            fi
-            echo "VamPI not ready. Retrying in 5 seconds..."
-            sleep 5
-            elapsed=$((elapsed + 5))
-          done
-          echo "VamPI RESTler instance is up!"
-        shell: bash
-
       - name: Start RESTler Service
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
@@ -213,24 +195,6 @@ jobs:
       - name: Start VamPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
-        shell: bash
-
-      - name: Wait for VamPI WuppieFuzz
-        run: |
-          echo "Waiting for VamPI WuppieFuzz instance..."
-          timeout=180
-          elapsed=0
-          while ! curl -s ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}/ > /dev/null; do
-            if [ $elapsed -ge $timeout ]; then
-              echo "Timed out waiting for VamPI WuppieFuzz instance."
-              sudo docker logs vampi-vulnerable-wuppiefuzz || true
-              exit 1
-            fi
-            echo "VamPI not ready. Retrying in 5 seconds..."
-            sleep 5
-            elapsed=$((elapsed + 5))
-          done
-          echo "VamPI WuppieFuzz instance is up!"
         shell: bash
 
       - name: Run WuppieFuzz
