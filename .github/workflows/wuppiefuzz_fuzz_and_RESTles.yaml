@@ -38,12 +38,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fix File Permissions
-        run: |
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}
-          sudo chmod -R u+rwX ${{ env.BASE_DIR }}
-        shell: bash
-
       - name: Remove Any Existing VAmPI Containers
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
