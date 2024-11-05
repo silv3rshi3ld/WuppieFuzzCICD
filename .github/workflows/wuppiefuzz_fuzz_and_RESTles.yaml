@@ -12,7 +12,7 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
-  BASE_DIR: /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
+  BASE_DIR: /home/michiel/actions-runners/_work/WuppieFuzzCICD/WuppieFuzzCICD
 
 jobs:
   prepare_docker_network:
