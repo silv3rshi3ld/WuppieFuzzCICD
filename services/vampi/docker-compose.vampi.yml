@@ -77,7 +77,7 @@ services:
     networks:
       - cicd_network
     healthcheck:
-      test: mongosh --eval 'db.runCommand("ping").ok' --quiet
+      test: mongo --eval 'db.runCommand("ping").ok' || exit 1
       interval: 10s
       timeout: 5s
       retries: 3
