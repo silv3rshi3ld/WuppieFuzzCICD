@@ -55,6 +55,9 @@ jobs:
       - name: Set CARGO_HOME
         run: echo "CARGO_HOME=${{ runner.temp }}/cargo" >> $GITHUB_ENV
   
+      - name: Set RUSTUP_HOME
+        run: echo "RUSTUP_HOME=${{ runner.temp }}/rustup" >> $GITHUB_ENV
+  
       - name: Set RUSTUP_INIT_SKIP_PATH_CHECK
         run: echo "RUSTUP_INIT_SKIP_PATH_CHECK=yes" >> $GITHUB_ENV
   
