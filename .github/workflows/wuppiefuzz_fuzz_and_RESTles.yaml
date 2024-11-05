@@ -52,12 +52,6 @@ jobs:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
-      - name: Set Directory Permissions
-        run: |
-          sudo chown -R $USER:$USER ~/.cargo || true
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz
-        shell: bash
-
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         
