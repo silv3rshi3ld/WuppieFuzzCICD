@@ -66,11 +66,11 @@ jobs:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
 
-      - name: Set Directory Permissions
-        run: |
-          sudo chown -R $USER:$USER ~/.cargo || true
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz
-        shell: bash
+      #- name: Set Directory Permissions
+      #  run: |
+      #    sudo chown -R $USER:$USER ~/.cargo || true
+      #    sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz
+      #  shell: bash
 
       - name: Cache Cargo Registry and Git
         uses: actions/cache@v4
