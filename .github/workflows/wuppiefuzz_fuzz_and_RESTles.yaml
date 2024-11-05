@@ -273,19 +273,21 @@ jobs:
       - name: Run WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         env:
-          VAMPI_WUPPIEFUZZ_URL: "http://localhost:${VAMPI_WUPPIEFUZZ_PORT}"
+          VAMPI_WUPPIEFUZZ_URL: "http://localhost:5002"
         run: |
           mkdir -p reports
+          # First generate the corpus
           ./wuppiefuzz output-corpus \
             --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
             corpus_directory
+
+          # Then run the fuzzer with the fuzz subcommand
           ./wuppiefuzz fuzz \
-            --report=true \
+            --report \
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
-        shell: bash
 
       - name: Upload WuppieFuzz Results
         if: always()
