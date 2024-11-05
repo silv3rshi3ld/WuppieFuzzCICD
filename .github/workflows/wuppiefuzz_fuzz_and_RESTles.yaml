@@ -21,7 +21,7 @@ jobs:
       - name: Check if Docker Network Exists
         id: check_network
         run: |
-          if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
+          if sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -29,7 +29,7 @@ jobs:
 
       - name: Create Docker Network if Not Exists
         if: steps.check_network.outputs.exists == 'false'
-        run: docker network create ${{ env.DOCKER_NETWORK_NAME }}
+        run: sudo docker network create ${{ env.DOCKER_NETWORK_NAME }}
 
   prepare_vampi:
     runs-on: self-hosted
@@ -40,12 +40,12 @@ jobs:
 
       - name: Remove Any Existing VAmPI Containers
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
+        run: sudo docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
         shell: bash
 
       - name: Build VAmPI Images
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml build --force-rm
+        run: sudo docker-compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
   prepare_wuppiefuzz:
@@ -65,6 +65,12 @@ jobs:
         with:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
+
+      - name: Set Directory Permissions
+        run: |
+          sudo chown -R $USER:$USER ~/.cargo || true
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz
+        shell: bash
 
       - name: Cache Cargo Registry and Git
         uses: actions/cache@v4
@@ -103,24 +109,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set Up Workspace
-        run: mkdir -p ${{ env.BASE_DIR }}/workspace
+        run: sudo mkdir -p ${{ env.BASE_DIR }}/workspace && sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/workspace
         shell: bash
 
       - name: Copy RESTler Files
         run: |
-          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/
-          cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/
-          cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
+          sudo cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/
+          sudo cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/
+          sudo cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/workspace
         shell: bash
 
       - name: Cleanup existing containers
         run: |
-          docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
+          sudo docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
         shell: bash
 
       - name: Start VamPI RESTler Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
+        run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI RESTler
@@ -131,7 +138,7 @@ jobs:
           while ! curl -s ${{ secrets.VAMPI_RESTLER_URL }}/ > /dev/null; do
             if [ $elapsed -ge $timeout ]; then
               echo "Timed out waiting for VAmPI RESTler instance."
-              docker logs vampi-vulnerable-restler || true
+              sudo docker logs vampi-vulnerable-restler || true
               exit 1
             fi
             echo "VamPI not ready. Retrying in 5 seconds..."
@@ -145,14 +152,14 @@ jobs:
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
           VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
-        run: docker-compose -f docker-compose.restler.yml up -d restler --remove-orphans || exit 1
+        run: sudo docker-compose -f docker-compose.restler.yml up -d restler --remove-orphans || exit 1
         shell: bash
 
       - name: Run RESTler
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
           VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
-        run: docker-compose -f docker-compose.restler.yml up --build --remove-orphans
+        run: sudo docker-compose -f docker-compose.restler.yml up --build --remove-orphans
         shell: bash
 
       - name: Upload RESTler Results
@@ -166,9 +173,9 @@ jobs:
       - name: Cleanup RESTler Environment
         if: always()
         run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
-          docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml down --remove-orphans
-          rm -rf ${{ env.BASE_DIR }}/workspace
+          sudo docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
+          sudo docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml down --remove-orphans
+          sudo rm -rf ${{ env.BASE_DIR }}/workspace
         shell: bash
 
   run_wuppiefuzz:
@@ -185,17 +192,20 @@ jobs:
           path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
 
       - name: Setup WuppieFuzz Environment
-        run: chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
+        run: |
+          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         shell: bash
 
       - name: Cleanup existing containers
         run: |
-          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo wuppiefuzz || true
+          sudo docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo wuppiefuzz || true
         shell: bash
 
       - name: Start VamPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
+        run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
 
       - name: Wait for VamPI WuppieFuzz
@@ -206,7 +216,7 @@ jobs:
           while ! curl -s ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}/ > /dev/null; do
             if [ $elapsed -ge $timeout ]; then
               echo "Timed out waiting for VamPI WuppieFuzz instance."
-              docker logs vampi-vulnerable-wuppiefuzz || true
+              sudo docker logs vampi-vulnerable-wuppiefuzz || true
               exit 1
             fi
             echo "VamPI not ready. Retrying in 5 seconds..."
@@ -221,7 +231,8 @@ jobs:
         env:
           VAMPI_WUPPIEFUZZ_URL: ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}
         run: |
-          mkdir -p reports
+          sudo mkdir -p reports
+          sudo chown -R $USER:$USER .
           ./wuppiefuzz output-corpus \
             --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
             corpus_directory
@@ -245,8 +256,8 @@ jobs:
       - name: Cleanup WuppieFuzz Environment
         if: always()
         run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
+          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         shell: bash
 
   summarize_results:
@@ -261,6 +272,7 @@ jobs:
 
       - name: Create Summary
         run: |
+          sudo mkdir -p $(dirname summary.md)
           echo "# Fuzzing Results Summary" > summary.md
           echo "Generated on $(date)" >> summary.md
           echo "## WuppieFuzz Results" >> summary.md
@@ -297,6 +309,6 @@ jobs:
       - name: Final Cleanup
         if: always()
         run: |
-          docker container prune -f
-          docker network prune -f
+          sudo docker container prune -f
+          sudo docker network prune -f
         shell: bash
