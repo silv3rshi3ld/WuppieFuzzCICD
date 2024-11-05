@@ -53,13 +53,8 @@ jobs:
     needs: prepare_docker_network
     steps:
       - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
-          components: rustfmt, clippy
-
+        uses: dtolnay/rust-toolchain@stable
+        
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
