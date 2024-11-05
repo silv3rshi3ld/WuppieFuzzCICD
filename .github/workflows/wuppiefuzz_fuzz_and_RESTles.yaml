@@ -85,7 +85,7 @@ jobs:
       - name: Install Rust Toolchain
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source $HOME/.cargo/env
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
         shell: bash
 
       - name: Verify Rust Installation
