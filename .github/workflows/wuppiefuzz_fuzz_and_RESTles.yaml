@@ -12,7 +12,6 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
-  # Use GITHUB_WORKSPACE to avoid hardcoding paths
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -22,7 +21,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for accurate hash calculations
+          fetch-depth: 0  
 
       - name: Setup directories
         run: |
@@ -51,7 +50,7 @@ jobs:
         if: steps.check_network.outputs.exists == 'false'
         run: |
           docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
-        # Specifying subnet for better network isolation
+        
         shell: bash
 
   prepare_vampi:
@@ -126,7 +125,7 @@ jobs:
           name: wuppiefuzz-binary
           path: $BASE_DIR/wuppiefuzz/target/release/wuppiefuzz
           if-no-files-found: error
-        # Ensure only the binary is uploaded to avoid sensitive data
+        
 
   run_restler:
     runs-on: self-hosted
@@ -197,7 +196,7 @@ jobs:
           name: restler-results
           path: $BASE_DIR/workspace/output/**
           if-no-files-found: warn
-        # Ensure only necessary result files are uploaded
+        
 
       - name: Cleanup RESTler Environment
         if: always()
@@ -282,7 +281,7 @@ jobs:
           name: wuppiefuzz-results
           path: $BASE_DIR/wuppiefuzz_workspace/reports/
           if-no-files-found: warn
-        # Ensure only report files are uploaded
+        
 
       - name: Cleanup WuppieFuzz Environment
         if: always()
@@ -328,7 +327,7 @@ jobs:
             echo "No RESTler results found" >> summary.md
           fi
         shell: bash
-        # Detailed logging and summary creation
+        
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4
@@ -336,13 +335,12 @@ jobs:
           name: fuzzing-summary
           path: summary.md
           if-no-files-found: warn
-        # Ensure only the summary file is uploaded
-
+      
       - name: Final Cleanup
         if: always()
         run: |
           docker container prune -f
           docker network prune -f
         shell: bash
-        # Prune unused Docker resources to maintain security and cleanliness
+       
 
