@@ -101,31 +101,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            $RUNNER_TEMP/cargo/registry
-            $RUNNER_TEMP/cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+            ${{ runner.os }}-cargo-
 
       - name: Cache WuppieFuzz Dependencies
         uses: actions/cache@v4
         with:
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target
-          key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
+          path: |
+            ${{ env.BASE_DIR }}/wuppiefuzz/target
+            ${{ env.BASE_DIR }}/wuppiefuzz/Cargo.lock
+          key: ${{ runner.os }}-wuppiefuzz-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            wuppiefuzz-target-
-
-      - name: Build WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: cargo build --release
-        shell: bash
-
-      - name: Upload WuppieFuzz Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
-          if-no-files-found: error
+            ${{ runner.os }}-wuppiefuzz-
 
   run_restler:
     runs-on: self-hosted
