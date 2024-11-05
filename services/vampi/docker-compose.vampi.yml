@@ -12,9 +12,16 @@ services:
       - APP_DEBUG=0
       - vulnerable=0
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     networks:
       - cicd_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health" || exit 1]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   vampi-vulnerable-restler:
     build:
@@ -28,9 +35,16 @@ services:
     ports:
       - "${VAMPI_RESTLER_PORT}:5000"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     networks:
       - cicd_network
+    healthcheck:
+      test: curl -f http://localhost:5000/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   vampi-vulnerable-wuppiefuzz:
     build:
@@ -44,9 +58,16 @@ services:
     ports:
       - "${VAMPI_WUPPIEFUZZ_PORT}:5000"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     networks:
       - cicd_network
+    healthcheck:
+      test: curl -f http://localhost:5000/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   mongo:
     image: mongo:4.2
@@ -55,6 +76,12 @@ services:
       - mongo_data:/data/db
     networks:
       - cicd_network
+    healthcheck:
+      test: mongosh --eval 'db.runCommand("ping").ok' --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 networks:
   cicd_network:

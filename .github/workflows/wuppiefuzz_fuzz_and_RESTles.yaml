@@ -12,7 +12,6 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
-  # Utilize GitHub's built-in workspace variable for portability
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -22,7 +21,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for accurate hash calculations
+          fetch-depth: 0
 
       - name: Setup directories
         run: |
@@ -155,15 +154,22 @@ jobs:
       - name: Start VAmPI RESTler Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
+          # Start MongoDB first
+          docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo
+          # Wait for MongoDB to be healthy
+          echo "Waiting for MongoDB to initialize..."
+          until docker-compose -f docker-compose.vampi.yml -p vampi_restler exec -T mongo mongo --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+            sleep 2
+          done
+          # Start VAmPI service
+          docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
         shell: bash
 
       - name: Wait for RESTler Services to Initialize
         run: |
           echo "Waiting for RESTler services to become healthy..."
-          for i in {1..60}; do
-            status=$(docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-restler 2>/dev/null || echo "unhealthy")
-            if [ "$status" == "healthy" ]; then
+          for i in {1..30}; do
+            if curl -s http://localhost:${VAMPI_RESTLER_PORT}/health >/dev/null; then
               echo "RESTler service is healthy."
               exit 0
             fi
@@ -171,24 +177,23 @@ jobs:
             sleep 5
           done
           echo "RESTler service failed to become healthy in time."
+          docker logs vampi-vulnerable-restler
           exit 1
         shell: bash
 
       - name: Start RESTler Service
         working-directory: ${{ env.BASE_DIR }}/workspace
-        env:
-          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
         run: |
+          export VAMPI_RESTLER_URL="http://localhost:${VAMPI_RESTLER_PORT}"
           docker-compose -f docker-compose.restler.yml up -d restler --remove-orphans || exit 1
         shell: bash
 
       - name: Run RESTler
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
-          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
+          VAMPI_RESTLER_URL: "http://localhost:${VAMPI_RESTLER_PORT}"
         run: |
           docker-compose -f docker-compose.restler.yml up --build --remove-orphans
-        shell: bash
 
       - name: Upload RESTler Results
         if: always()
@@ -238,15 +243,22 @@ jobs:
       - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
+          # Start MongoDB first
+          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
+          # Wait for MongoDB to be healthy
+          echo "Waiting for MongoDB to initialize..."
+          until docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz exec -T mongo mongo --eval "db.adminCommand('ping')" >/dev/null 2>&1; do
+            sleep 2
+          done
+          # Start VAmPI service
+          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
       - name: Wait for WuppieFuzz Services to Initialize
         run: |
           echo "Waiting for WuppieFuzz services to become healthy..."
-          for i in {1..60}; do
-            status=$(docker inspect -f '{{.State.Health.Status}}' vampi-vulnerable-wuppiefuzz 2>/dev/null || echo "unhealthy")
-            if [ "$status" == "healthy" ]; then
+          for i in {1..30}; do
+            if curl -s http://localhost:${VAMPI_WUPPIEFUZZ_PORT}/health >/dev/null; then
               echo "WuppieFuzz service is healthy."
               exit 0
             fi
@@ -254,89 +266,6 @@ jobs:
             sleep 5
           done
           echo "WuppieFuzz service failed to become healthy in time."
+          docker logs vampi-vulnerable-wuppiefuzz
           exit 1
-        shell: bash
-
-      - name: Run WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        env:
-          VAMPI_WUPPIEFUZZ_URL: ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}
-        run: |
-          mkdir -p reports
-          ./wuppiefuzz output-corpus \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
-            corpus_directory
-          ./wuppiefuzz fuzz \
-            --report=true \
-            --log-level=info \
-            --initial-corpus=corpus_directory \
-            --timeout=60 \
-            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
-        shell: bash
-
-      - name: Upload WuppieFuzz Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
-          if-no-files-found: warn
-
-      - name: Cleanup WuppieFuzz Environment
-        if: always()
-        run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        shell: bash
-
-  summarize_results:
-    runs-on: self-hosted
-    needs: [run_restler, run_wuppiefuzz]
-    steps:
-      - name: Download All Results
-        uses: actions/download-artifact@v4
-        with:
-          name: '**'
-          path: all_results
-
-      - name: Create Summary
-        run: |
-          echo "# Fuzzing Results Summary" > summary.md
-          echo "Generated on $(date)" >> summary.md
-          echo "## WuppieFuzz Results" >> summary.md
-          if [ -d "all_results/wuppiefuzz-results" ]; then
-            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results/report.txt || echo "0")
-            echo "Number of issues found: $issues_found" >> summary.md
-            if [ -f "all_results/wuppiefuzz-results/report.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/wuppiefuzz-results/report.txt" >> summary.md
-            fi
-          else
-            echo "No WuppieFuzz results found" >> summary.md
-          fi
-          echo "## RESTler Results" >> summary.md
-          if [ -d "all_results/restler-results" ]; then
-            bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
-            echo "Number of bugs found: $bugs_found" >> summary.md
-            if [ -f "all_results/restler-results/bug_buckets/BugBuckets.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/restler-results/bug_buckets/BugBuckets.txt" >> summary.md
-            fi
-          else
-            echo "No RESTler results found" >> summary.md
-          fi
-        shell: bash
-
-      - name: Upload Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-summary
-          path: summary.md
-          if-no-files-found: warn
-
-      - name: Final Cleanup
-        if: always()
-        run: |
-          docker container prune -f
-          docker network prune -f
         shell: bash
