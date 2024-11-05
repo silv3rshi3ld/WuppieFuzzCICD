@@ -12,6 +12,7 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
+  # Utilize GitHub's built-in workspace variable for portability
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -21,7 +22,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  
+          fetch-depth: 0  # Fetch all history for accurate hash calculations
 
       - name: Setup directories
         run: |
@@ -50,7 +51,6 @@ jobs:
         if: steps.check_network.outputs.exists == 'false'
         run: |
           docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
-        
         shell: bash
 
   prepare_vampi:
@@ -61,13 +61,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Remove Any Existing VAmPI Containers
-        working-directory: $BASE_DIR/services/vampi
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
         shell: bash
 
       - name: Build VAmPI Images
-        working-directory: $BASE_DIR/services/vampi
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
@@ -83,18 +83,20 @@ jobs:
         run: echo "HOME=$RUNNER_TEMP/home" >> $GITHUB_ENV
 
       - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-        env:
-          HOME: ${{ runner.temp }}/home
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+        shell: bash
+
+      - name: Verify Rust Installation
+        run: rustc --version
+        shell: bash
 
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
         with:
           repository: TNO-S3/WuppieFuzz
-          path: $BASE_DIR/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/wuppiefuzz
 
       - name: Cache Cargo Registry and Git
         uses: actions/cache@v4
@@ -109,13 +111,13 @@ jobs:
       - name: Cache WuppieFuzz Dependencies
         uses: actions/cache@v4
         with:
-          path: $BASE_DIR/wuppiefuzz/target
+          path: ${{ env.BASE_DIR }}/wuppiefuzz/target
           key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
           restore-keys: |
             wuppiefuzz-target-
 
       - name: Build WuppieFuzz
-        working-directory: $BASE_DIR/wuppiefuzz
+        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
         run: cargo build --release
         shell: bash
 
@@ -123,9 +125,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: $BASE_DIR/wuppiefuzz/target/release/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
           if-no-files-found: error
-        
 
   run_restler:
     runs-on: self-hosted
@@ -136,14 +137,14 @@ jobs:
 
       - name: Copy RESTler Files
         run: |
-          cp -r $BASE_DIR/services/restler/config $BASE_DIR/workspace/
-          cp $BASE_DIR/services/restler/docker-compose.restler.yml $BASE_DIR/workspace/
-          cp $BASE_DIR/services/restler/Dockerfile.restler $BASE_DIR/workspace/
+          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/
+          cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/
+          cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
         shell: bash
 
       - name: Validate RESTler Docker Compose
         run: |
-          docker-compose -f $BASE_DIR/workspace/docker-compose.restler.yml config -q
+          docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml config -q
         shell: bash
 
       - name: Cleanup existing containers
@@ -152,7 +153,7 @@ jobs:
         shell: bash
 
       - name: Start VAmPI RESTler Instance
-        working-directory: $BASE_DIR/services/vampi
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
@@ -174,7 +175,7 @@ jobs:
         shell: bash
 
       - name: Start RESTler Service
-        working-directory: $BASE_DIR/workspace
+        working-directory: ${{ env.BASE_DIR }}/workspace
         env:
           VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
         run: |
@@ -182,7 +183,7 @@ jobs:
         shell: bash
 
       - name: Run RESTler
-        working-directory: $BASE_DIR/workspace
+        working-directory: ${{ env.BASE_DIR }}/workspace
         env:
           VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
         run: |
@@ -194,16 +195,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: $BASE_DIR/workspace/output/**
+          path: ${{ env.BASE_DIR }}/workspace/output/**
           if-no-files-found: warn
-        
 
       - name: Cleanup RESTler Environment
         if: always()
         run: |
-          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
-          docker-compose -f $BASE_DIR/workspace/docker-compose.restler.yml down --remove-orphans
-          rm -rf $BASE_DIR/workspace
+          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
+          docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml down --remove-orphans
+          rm -rf ${{ env.BASE_DIR }}/workspace
         shell: bash
 
   run_wuppiefuzz:
@@ -217,17 +217,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: $BASE_DIR/wuppiefuzz_workspace
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
 
       - name: Setup WuppieFuzz Environment
         run: |
-          mkdir -p $BASE_DIR/wuppiefuzz_workspace
-          chmod +x $BASE_DIR/wuppiefuzz_workspace/wuppiefuzz
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
         shell: bash
 
       - name: Validate WuppieFuzz Docker Compose
         run: |
-          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
+          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml config -q
         shell: bash
 
       - name: Cleanup existing containers
@@ -236,7 +236,7 @@ jobs:
         shell: bash
 
       - name: Start VAmPI WuppieFuzz Instance
-        working-directory: $BASE_DIR/services/vampi
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
@@ -258,20 +258,20 @@ jobs:
         shell: bash
 
       - name: Run WuppieFuzz
-        working-directory: $BASE_DIR/wuppiefuzz_workspace
+        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         env:
           VAMPI_WUPPIEFUZZ_URL: ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}
         run: |
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=$BASE_DIR/services/vampi/openapi_specs/openapi3.yml \
+            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
             --report=true \
             --log-level=info \
             --initial-corpus=corpus_directory \
             --timeout=60 \
-            $BASE_DIR/services/vampi/openapi_specs/openapi3.yml
+            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
         shell: bash
 
       - name: Upload WuppieFuzz Results
@@ -279,15 +279,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: $BASE_DIR/wuppiefuzz_workspace/reports/
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
           if-no-files-found: warn
-        
 
       - name: Cleanup WuppieFuzz Environment
         if: always()
         run: |
-          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          rm -rf $BASE_DIR/wuppiefuzz_workspace
+          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
+          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         shell: bash
 
   summarize_results:
@@ -327,7 +326,6 @@ jobs:
             echo "No RESTler results found" >> summary.md
           fi
         shell: bash
-        
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4
@@ -335,12 +333,10 @@ jobs:
           name: fuzzing-summary
           path: summary.md
           if-no-files-found: warn
-      
+
       - name: Final Cleanup
         if: always()
         run: |
           docker container prune -f
           docker network prune -f
         shell: bash
-       
-
