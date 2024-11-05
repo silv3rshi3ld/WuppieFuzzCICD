@@ -111,7 +111,6 @@ jobs:
           path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
           if-no-files-found: error
 
-
   run_restler:
     runs-on: self-hosted
     needs: prepare_vampi
@@ -137,6 +136,9 @@ jobs:
         run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
         shell: bash
 
+      - name: Wait for RESTler Services to Initialize
+        run: sleep 30  # Adjust the time as necessary
+
       - name: Start RESTler Service
         working-directory: ${{ env.BASE_DIR }}/workspace
         env:
@@ -149,22 +151,6 @@ jobs:
         env:
           VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
         run: sudo docker-compose -f docker-compose.restler.yml up --build --remove-orphans
-        shell: bash
-
-      - name: Upload RESTler Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-results
-          path: ${{ env.BASE_DIR }}/workspace/output/**
-          if-no-files-found: warn
-
-      - name: Cleanup RESTler Environment
-        if: always()
-        run: |
-          sudo docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
-          sudo docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml down --remove-orphans
-          sudo rm -rf ${{ env.BASE_DIR }}/workspace
         shell: bash
 
   run_wuppiefuzz:
@@ -197,6 +183,9 @@ jobs:
         run: sudo docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
         shell: bash
 
+      - name: Wait for WuppieFuzz Services to Initialize
+        run: sleep 30  # Adjust the time as necessary
+
       - name: Run WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         env:
@@ -213,72 +202,4 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
-        shell: bash
-
-      - name: Upload WuppieFuzz Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
-          if-no-files-found: warn
-
-      - name: Cleanup WuppieFuzz Environment
-        if: always()
-        run: |
-          sudo docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        shell: bash
-
-  summarize_results:
-    runs-on: self-hosted
-    needs: [run_restler, run_wuppiefuzz]
-    steps:
-      - name: Download All Results
-        uses: actions/download-artifact@v4
-        with:
-          name: '**'
-          path: all_results
-
-      - name: Create Summary
-        run: |
-          sudo mkdir -p $(dirname summary.md)
-          echo "# Fuzzing Results Summary" > summary.md
-          echo "Generated on $(date)" >> summary.md
-          echo "## WuppieFuzz Results" >> summary.md
-          if [ -d "all_results/wuppiefuzz-results" ]; then
-            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results/report.txt || echo "0")
-            echo "Number of issues found: $issues_found" >> summary.md
-            if [ -f "all_results/wuppiefuzz-results/report.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/wuppiefuzz-results/report.txt" >> summary.md
-            fi
-          else
-            echo "No WuppieFuzz results found" >> summary.md
-          fi
-          echo "## RESTler Results" >> summary.md
-          if [ -d "all_results/restler-results" ]; then
-            bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
-            echo "Number of bugs found: $bugs_found" >> summary.md
-            if [ -f "all_results/restler-results/bug_buckets/BugBuckets.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/restler-results/bug_buckets/BugBuckets.txt" >> summary.md
-            fi
-          else
-            echo "No RESTler results found" >> summary.md
-          fi
-        shell: bash
-
-      - name: Upload Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-summary
-          path: summary.md
-          if-no-files-found: warn
-
-      - name: Final Cleanup
-        if: always()
-        run: |
-          sudo docker container prune -f
-          sudo docker network prune -f
         shell: bash
