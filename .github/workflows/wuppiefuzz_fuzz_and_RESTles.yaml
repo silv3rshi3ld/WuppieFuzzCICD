@@ -71,6 +71,60 @@ jobs:
           docker-compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
+  name: Build and Fuzz
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  DOCKER_NETWORK_NAME: cicd_network
+  VAMPI_RESTLER_PORT: 5003
+  VAMPI_WUPPIEFUZZ_PORT: 5002
+  BASE_DIR: ${{ github.workspace }}
+
+jobs:
+  prepare_docker_network:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup directories
+        run: |
+          mkdir -p $BASE_DIR/services/vampi
+          mkdir -p $BASE_DIR/workspace
+          mkdir -p $BASE_DIR/wuppiefuzz_workspace
+          mkdir -p $HOME/.cargo $HOME/.rustup
+        shell: bash
+
+      - name: Validate Docker Compose Files
+        run: |
+          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
+          docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
+        shell: bash
+
+      - name: Check if Docker Network Exists
+        id: check_network
+        run: |
+          if docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Docker Network if Not Exists
+        if: steps.check_network.outputs.exists == 'false'
+        run: |
+          docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
+        shell: bash
+
   prepare_wuppiefuzz:
     runs-on: self-hosted
     needs: prepare_docker_network
@@ -81,16 +135,22 @@ jobs:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
 
-      - name: rustup toolchain install
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
 
-      - name: Cache Cargo Registry and Git
+      - name: Cache Rust Dependencies
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ${{ env.BASE_DIR }}/wuppiefuzz/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -100,15 +160,6 @@ jobs:
           cd ${{ env.BASE_DIR }}/wuppiefuzz
           hash=$(find . -type f -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' | sort | xargs sha1sum | sha1sum | awk '{ print $1 }')
           echo "hash=$hash" >> $GITHUB_OUTPUT
-
-      - name: Cache WuppieFuzz Build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.BASE_DIR }}/wuppiefuzz/target
-          key: ${{ runner.os }}-wuppiefuzz-build-${{ steps.wuppiefuzz-hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-wuppiefuzz-build-
 
       - name: Build WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
