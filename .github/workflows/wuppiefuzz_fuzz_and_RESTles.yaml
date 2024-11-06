@@ -289,7 +289,7 @@ jobs:
           mkdir -p reports
           # Generate the corpus
           ./wuppiefuzz output-corpus \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
+            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml \
             corpus_directory
 
           # Run the fuzzer
@@ -297,9 +297,10 @@ jobs:
             --report \
             --log-level=info \
             --initial-corpus=corpus_directory \
+            --coverage-host=localhost:${VAMPI_WUPPIEFUZZ_PORT} \
             --timeout=60 \
-            ${{ env.BASE_DIR }}/services/wuppiefuzz/openapi_specs/openapi3.yml
-          
+            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml
+
       - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
