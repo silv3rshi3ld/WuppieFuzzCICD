@@ -138,7 +138,7 @@ jobs:
 
       - name: Copy RESTler Files
         run: |
-          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/restler_config
+          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/config
           cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/
           cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
         shell: bash

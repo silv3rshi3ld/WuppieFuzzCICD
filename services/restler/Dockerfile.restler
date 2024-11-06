@@ -34,8 +34,8 @@ RUN mkdir -p /workspace/FuzzLean
 COPY ./config /config
 
 # Ensure the entrypoint is executable
-RUN chmod +x /restler_config/entrypoint.sh && \
-    sed -i 's/\r$//g' /restler_config/entrypoint.sh
+RUN chmod +x /config/entrypoint.sh && \
+    sed -i 's/\r$//g' /config/entrypoint.sh
 
 # Set the entrypoint
 ENTRYPOINT ["/service/config/entrypoint.sh"]
