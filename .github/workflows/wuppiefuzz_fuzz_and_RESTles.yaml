@@ -75,59 +75,53 @@ jobs:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
-      - name: Checkout WuppieFuzz Repository
-        uses: actions/checkout@v4
+      - name: Calculate cache key date
+        id: cache-key
+        run: echo "date=$(date '+%Y-%m-%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Check WuppieFuzz Binary Cache
+        id: cache-binary
+        uses: actions/cache@v4
         with:
-          repository: TNO-S3/WuppieFuzz
-          path: ${{ env.BASE_DIR }}/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          key: wuppiefuzz-binary-${{ steps.cache-key.outputs.date }}
+          restore-keys: |
+            wuppiefuzz-binary-
 
       - name: Setup Rust
+        if: steps.cache-binary.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
-      - name: Cache Rust Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            ${{ env.BASE_DIR }}/wuppiefuzz/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Calculate WuppieFuzz Source Hash
-        id: wuppiefuzz-hash
+      - name: Build WuppieFuzz if needed
+        if: steps.cache-binary.outputs.cache-hit != 'true'
         run: |
-          cd ${{ env.BASE_DIR }}/wuppiefuzz
-          hash=$(find . -type f -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' | sort | xargs sha1sum | sha1sum | awk '{ print $1 }')
-          echo "hash=$hash" >> $GITHUB_OUTPUT
+          # Create directory for binary
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
 
-      - name: Build WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: cargo build --release
-        shell: bash
+          # Checkout and build only if needed
+          git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
+          cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
 
-      - name: Verify Binary
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: |
-          if [ ! -f "target/release/wuppiefuzz" ]; then
-            echo "Binary was not built successfully"
-            exit 1
-          fi
-          file target/release/wuppiefuzz
-          ls -l target/release/wuppiefuzz
+          # Build using installed Rust
+          cargo build --release
+
+          # Copy binary to cache location
+          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          
+          # Cleanup build directory
+          cd ${{ env.BASE_DIR }}
+          rm -rf wuppiefuzz_temp
         shell: bash
 
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz
           if-no-files-found: error
 
   run_restler:
