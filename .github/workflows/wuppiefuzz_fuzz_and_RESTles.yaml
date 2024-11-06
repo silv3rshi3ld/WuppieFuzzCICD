@@ -137,6 +137,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Create Workspace
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/workspace
+        shell: bash
+
       - name: Copy RESTler Files
         run: |
           cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/restler_config
