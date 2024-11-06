@@ -297,6 +297,7 @@ jobs:
             --report \
             --log-level=info \
             --initial-corpus=corpus_directory \
+            --coverage-host=localhost:${VAMPI_WUPPIEFUZZ_PORT} \
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
 
