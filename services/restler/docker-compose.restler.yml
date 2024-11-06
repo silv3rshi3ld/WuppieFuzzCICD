@@ -4,7 +4,7 @@ services:
   restler:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.restler
     container_name: restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
