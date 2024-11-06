@@ -4,7 +4,7 @@ services:
   wuppiefuzz:
     build:
       context: .
-      dockerfile: Dockerfile.wuppiefuzz
+      dockerfile: ./Dockerfile.wuppiefuzz
     container_name: wuppiefuzz
     environment:
       SMTP_USER: ${SMTP_USER}

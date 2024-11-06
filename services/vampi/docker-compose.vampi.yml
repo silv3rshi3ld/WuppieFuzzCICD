@@ -3,7 +3,7 @@ services:
   vampi-secure:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
     container_name: vampi-secure
     ports:
       - "5001:5000"
@@ -26,7 +26,7 @@ services:
   vampi-vulnerable-restler:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
     container_name: vampi-vulnerable-restler
     environment:
       - APP_ENV=development
@@ -49,7 +49,7 @@ services:
   vampi-vulnerable-wuppiefuzz:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile
     container_name: vampi-vulnerable-wuppiefuzz
     environment:
       - APP_ENV=development
