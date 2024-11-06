@@ -38,4 +38,4 @@ RUN chmod +x /restler_config/entrypoint.sh && \
     sed -i 's/\r$//g' /restler_config/entrypoint.sh
 
 # Set the entrypoint
-ENTRYPOINT ["/restler_config/entrypoint.sh"]
+ENTRYPOINT ["/service/restler_config/entrypoint.sh"]
