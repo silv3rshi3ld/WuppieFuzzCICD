@@ -12,16 +12,35 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
-  BASE_DIR: /home/michiel/_work/WuppieFuzzCICD/WuppieFuzzCICD
+  BASE_DIR: ${{ github.workspace }}
 
 jobs:
   prepare_docker_network:
     runs-on: self-hosted
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup directories
+        run: |
+          mkdir -p $BASE_DIR/services/vampi
+          mkdir -p $BASE_DIR/workspace
+          mkdir -p $BASE_DIR/wuppiefuzz_workspace
+          mkdir -p $HOME/.cargo $HOME/.rustup
+        shell: bash
+
+      - name: Validate Docker Compose Files
+        run: |
+          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
+          docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
+        shell: bash
+
       - name: Check if Docker Network Exists
         id: check_network
         run: |
-          if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
+          if docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
@@ -29,7 +48,9 @@ jobs:
 
       - name: Create Docker Network if Not Exists
         if: steps.check_network.outputs.exists == 'false'
-        run: docker network create ${{ env.DOCKER_NETWORK_NAME }}
+        run: |
+          docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
+        shell: bash
 
   prepare_vampi:
     runs-on: self-hosted
@@ -38,68 +59,70 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fix File Permissions
-        run: |
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}
-          sudo chmod -R u+rwX ${{ env.BASE_DIR }}
-        shell: bash
-
       - name: Remove Any Existing VAmPI Containers
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
+        run: |
+          docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
         shell: bash
 
       - name: Build VAmPI Images
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml build --force-rm
+        run: |
+          docker-compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
   prepare_wuppiefuzz:
     runs-on: self-hosted
     needs: prepare_docker_network
     steps:
-      - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Calculate cache key date
+        id: cache-key
+        run: echo "date=$(date '+%Y-%m-%d')" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Check WuppieFuzz Binary Cache
+        id: cache-binary
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          key: wuppiefuzz-binary-${{ steps.cache-key.outputs.date }}
+          restore-keys: |
+            wuppiefuzz-binary-
+
+      - name: Setup Rust
+        if: steps.cache-binary.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-          override: true
           profile: minimal
-          components: rustfmt, clippy
 
-      - name: Checkout WuppieFuzz Repository
-        uses: actions/checkout@v4
-        with:
-          repository: TNO-S3/WuppieFuzz
-          path: ${{ env.BASE_DIR }}/wuppiefuzz
+      - name: Build WuppieFuzz if needed
+        if: steps.cache-binary.outputs.cache-hit != 'true'
+        run: |
+          # Create directory for binary
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
 
-      - name: Cache Cargo Registry and Git
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          # Checkout and build only if needed
+          git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
+          cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
 
-      - name: Cache WuppieFuzz Build
-        uses: actions/cache@v4
-        with:
-          path: wuppiefuzz/target
-          key: wuppiefuzz-target-${{ hashFiles('wuppiefuzz/Cargo.lock') }}
-          restore-keys: |
-            wuppiefuzz-target-
+          # Build using installed Rust
+          cargo build --release
 
-      - name: Build WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: cargo build --release
+          # Copy binary to cache location
+          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          
+          # Cleanup build directory
+          cd ${{ env.BASE_DIR }}
+          rm -rf wuppiefuzz_temp
         shell: bash
 
       - name: Upload WuppieFuzz Binary
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz
+          if-no-files-found: error
 
   run_restler:
     runs-on: self-hosted
@@ -108,8 +131,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set Up Workspace
+      - name: Create Workspace
         run: |
+          |
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
         shell: bash
@@ -121,14 +145,19 @@ jobs:
           cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
         shell: bash
 
-      - name: Start VamPI RESTler Instance
+      - name: Cleanup existing containers
+        run: |
+          docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
+        shell: bash
+
+      - name: Start VAmPI RESTler Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler
           sleep 10  # Give MongoDB time to initialize
         shell: bash
 
-      - name: Wait for VamPI RESTler with Health Check
+      - name: Wait for RESTler Services to Initialize with Health Check
         run: |
           echo "Waiting for VamPI RESTler instance..."
           VAMPI_URL="http://localhost:${{ env.VAMPI_RESTLER_PORT }}"
@@ -140,11 +169,13 @@ jobs:
               docker logs vampi-vulnerable-restler
               exit 1
             fi
-            echo "VamPI not ready. Retrying in 5 seconds..."
+            echo "Attempt $i of 30: RESTler service not ready yet..."
+            docker logs vampi-vulnerable-restler
             sleep 5
-            elapsed=$((elapsed + 5))
           done
-          echo "VamPI RESTler instance is up!"
+          echo "RESTler service failed to become healthy in time."
+          docker logs vampi-vulnerable-restler
+          exit 1
         shell: bash
 
       - name: Run RESTler
@@ -155,6 +186,8 @@ jobs:
         run: |
           docker-compose -f docker-compose.restler.yml up --build --exit-code-from restler
         shell: bash
+          VAMPI_RESTLER_URL: "http://localhost:${VAMPI_RESTLER_PORT}"
+        run: docker-compose -f docker-compose.restler.yml up --build --remove-orphans
 
       - name: Upload RESTler Results
         if: always()
@@ -185,54 +218,64 @@ jobs:
           path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
 
       - name: Setup WuppieFuzz Environment
-        run: chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
         shell: bash
 
       - name: Cleanup existing containers
         run: |
-          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo wuppiefuzz || true
+          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo || true
         shell: bash
 
-      - name: Start VamPI WuppieFuzz Instance
+      - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo vampi-vulnerable-wuppiefuzz --remove-orphans || exit 1
+        run: |
+          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
+          echo "Waiting for MongoDB to initialize..."
+          for i in {1..30}; do
+            if docker exec vampi-mongo mongo --eval 'db.runCommand("ping").ok' >/dev/null 2>&1; then
+              echo "MongoDB is healthy!"
+              break
+            fi
+            echo "Attempt $i of 30: MongoDB not ready yet..."
+            docker logs vampi-mongo
+            sleep 5
+          done
+          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
-      - name: Wait for VamPI WuppieFuzz
+      - name: Wait for WuppieFuzz Instance to Initialize
         run: |
-          echo "Waiting for VamPI WuppieFuzz instance..."
-          timeout=180
-          elapsed=0
-          while ! curl -s ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}/ > /dev/null; do
-            if [ $elapsed -ge $timeout ]; then
-              echo "Timed out waiting for VamPI WuppieFuzz instance."
-              docker logs vampi-vulnerable-wuppiefuzz || true
-              exit 1
+          echo "Waiting for WuppieFuzz instance to become healthy..."
+          for i in {1..30}; do
+            if curl -s http://localhost:${VAMPI_WUPPIEFUZZ_PORT}/health >/dev/null; then
+              echo "WuppieFuzz instance is healthy."
+              exit 0
             fi
-            echo "VamPI not ready. Retrying in 5 seconds..."
+            echo "Attempt $i of 30: WuppieFuzz instance not ready yet..."
+            docker logs vampi-vulnerable-wuppiefuzz
             sleep 5
-            elapsed=$((elapsed + 5))
           done
-          echo "VamPI WuppieFuzz instance is up!"
+          echo "WuppieFuzz instance failed to become healthy in time."
+          docker logs vampi-vulnerable-wuppiefuzz
+          exit 1
         shell: bash
 
       - name: Run WuppieFuzz
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        env:
-          VAMPI_WUPPIEFUZZ_URL: ${{ secrets.VAMPI_WUPPIEFUZZ_URL }}
         run: |
           mkdir -p reports
           ./wuppiefuzz output-corpus \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
+            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml \
             corpus_directory
           ./wuppiefuzz fuzz \
-            --report=true \
+            --report \
             --log-level=info \
             --initial-corpus=corpus_directory \
+            --coverage-host=localhost:${VAMPI_WUPPIEFUZZ_PORT} \
             --timeout=60 \
-            --base-url=${{ secrets.VAMPI_WUPPIEFUZZ_URL }} \
-            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
-        shell: bash
+            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml
 
       - name: Upload WuppieFuzz Results
         if: always()
@@ -256,7 +299,6 @@ jobs:
       - name: Download All Results
         uses: actions/download-artifact@v4
         with:
-          name: '**'
           path: all_results
 
       - name: Create Summary
@@ -285,7 +327,6 @@ jobs:
           else
             echo "No RESTler results found" >> summary.md
           fi
-        shell: bash
 
       - name: Upload Summary
         uses: actions/upload-artifact@v4
