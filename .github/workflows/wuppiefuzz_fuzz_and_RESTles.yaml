@@ -61,14 +61,12 @@ jobs:
 
       - name: Remove Any Existing VAmPI Containers
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
+        run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
         shell: bash
 
       - name: Build VAmPI Images
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml build --force-rm
+        run: docker-compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
   prepare_wuppiefuzz:
@@ -91,28 +89,21 @@ jobs:
 
       - name: Setup Rust
         if: steps.cache-binary.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@v1
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          override: true
           profile: minimal
+          components: rustfmt, clippy
 
       - name: Build WuppieFuzz if needed
         if: steps.cache-binary.outputs.cache-hit != 'true'
         run: |
-          # Create directory for binary
           mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-
-          # Checkout and build only if needed
           git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
           cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
-
-          # Build using installed Rust
           cargo build --release
-
-          # Copy binary to cache location
           cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
-          
-          # Cleanup build directory
           cd ${{ env.BASE_DIR }}
           rm -rf wuppiefuzz_temp
         shell: bash
@@ -139,14 +130,11 @@ jobs:
 
       - name: Copy RESTler Files
         run: |
-          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/restler/
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
+          cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
           cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
           cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-        shell: bash
-
-      - name: Cleanup existing containers
-        run: |
-          docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
+          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
         shell: bash
 
       - name: Start VAmPI RESTler Instance
@@ -195,6 +183,7 @@ jobs:
         run: |
           docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
           docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
+          rm -rf ${{ env.BASE_DIR }}/workspace/restler
         shell: bash
 
   run_wuppiefuzz:
@@ -216,25 +205,10 @@ jobs:
           chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
         shell: bash
 
-      - name: Cleanup existing containers
-        run: |
-          docker rm -f vampi-vulnerable-wuppiefuzz vampi-mongo || true
-        shell: bash
-
       - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
-          echo "Waiting for MongoDB to initialize..."
-          for i in {1..30}; do
-            if docker exec vampi-mongo mongo --eval 'db.runCommand("ping").ok' >/dev/null 2>&1; then
-              echo "MongoDB is healthy!"
-              break
-            fi
-            echo "Attempt $i of 30: MongoDB not ready yet..."
-            docker logs vampi-mongo
-            sleep 5
-          done
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
