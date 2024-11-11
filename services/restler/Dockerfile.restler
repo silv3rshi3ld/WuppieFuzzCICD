@@ -1,5 +1,9 @@
 FROM python:3.9-slim
 
+# Add a non-root user that matches the GitHub Actions runner
+RUN groupadd -g 1001 restlergroup && \
+    useradd -u 1001 -g restlergroup -m restler
+
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     wget \
@@ -24,18 +28,20 @@ RUN python ./build-restler.py --dest_dir /restler_bin
 # Install RESTler dependencies
 RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Set the working directory
+# Set up workspace and permissions
 WORKDIR /workspace
+RUN mkdir -p /workspace/output && \
+    chown -R restler:restlergroup /workspace /restler_bin /restler_config
 
-# Create FuzzLean directory in workspace
-RUN mkdir -p /workspace/FuzzLean
+# Switch to non-root user
+USER restler
 
 # Copy Restler configuration files and entrypoint
-COPY ./config /service/config
+COPY --chown=restler:restlergroup ./restler_config /restler_config
 
 # Ensure the entrypoint is executable
-RUN chmod +x /service/config/entrypoint.sh && \
-    sed -i 's/\r$//g' /service/config/entrypoint.sh
+RUN chmod +x /restler_config/entrypoint.sh && \
+    sed -i 's/\r$//g' /restler_config/entrypoint.sh
 
 # Set the entrypoint
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+ENTRYPOINT ["/restler_config/entrypoint.sh"]

@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.restler
     container_name: restler
+    user: "1001:1001"
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
       RUN_FUZZ_LEAN: "true"
