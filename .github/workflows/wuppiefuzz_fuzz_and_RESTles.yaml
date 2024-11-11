@@ -133,7 +133,6 @@ jobs:
 
       - name: Create Workspace
         run: |
-          |
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
         shell: bash
@@ -169,13 +168,11 @@ jobs:
               docker logs vampi-vulnerable-restler
               exit 1
             fi
-            echo "Attempt $i of 30: RESTler service not ready yet..."
-            docker logs vampi-vulnerable-restler
+            echo "VamPI not ready. Retrying in 5 seconds..."
             sleep 5
+            elapsed=$((elapsed + 5))
           done
-          echo "RESTler service failed to become healthy in time."
-          docker logs vampi-vulnerable-restler
-          exit 1
+          echo "VamPI RESTler instance is up!"
         shell: bash
 
       - name: Run RESTler
@@ -186,8 +183,6 @@ jobs:
         run: |
           docker-compose -f docker-compose.restler.yml up --build --exit-code-from restler
         shell: bash
-          VAMPI_RESTLER_URL: "http://localhost:${VAMPI_RESTLER_PORT}"
-        run: docker-compose -f docker-compose.restler.yml up --build --remove-orphans
 
       - name: Upload RESTler Results
         if: always()
