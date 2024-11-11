@@ -126,7 +126,6 @@ jobs:
         run: |
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler
         shell: bash
 
       - name: Copy RESTler Files
@@ -168,11 +167,7 @@ jobs:
         env:
           TARGET_PORT: "5000"
           TARGET_HOST: "vampi-vulnerable-restler"
-        run: |
-          # Ensure output directory has correct permissions before running
-          mkdir -p output
-          chmod -R 777 output
-          docker-compose -f docker-compose.restler.yml up --build
+        run: docker-compose -f docker-compose.restler.yml up --build
         shell: bash
 
       - name: Upload RESTler Results
@@ -188,8 +183,6 @@ jobs:
         run: |
           docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
           docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
-          # Ensure we have permissions to clean up
-          sudo chown -R $(id -u):$(id -g) ${{ env.BASE_DIR }}/workspace/restler || true
           rm -rf ${{ env.BASE_DIR }}/workspace/restler
         shell: bash
 
