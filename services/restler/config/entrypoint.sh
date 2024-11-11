@@ -18,18 +18,10 @@ if [ ! -f "/workspace/openapi3.yml" ]; then
     exit 1
 fi
 
-# List contents of /workspace to confirm
-echo "Contents of /workspace before compilation:"
-ls -la /workspace
-
 # Compile API specification
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
     --api_spec "/workspace/openapi3.yml"
-
-# List contents after compilation to verify Compile directory
-echo "Contents of /workspace after compilation:"
-ls -la /workspace
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
@@ -49,8 +41,8 @@ dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
     --settings "/workspace/Compile/engine_settings.json" \
-    --target_ip host.docker.internal \
-    --target_port 5000 \
+    --target_ip "${TARGET_IP}" \
+    --target_port "${TARGET_PORT}" \
     --no_ssl
 
 # Run fuzz-lean if enabled
@@ -60,9 +52,9 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
-        --time_budget ${FUZZ_LEAN_TIME_BUDGET} \
-        --target_ip host.docker.internal \
-        --target_port 5000 \
+        --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
         --no_ssl
 fi
 
@@ -73,9 +65,9 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
-        --time_budget ${FUZZ_TIME_BUDGET} \
-        --target_ip host.docker.internal \
-        --target_port 5000 \
+        --time_budget "${FUZZ_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
         --no_ssl
 fi
 
@@ -87,6 +79,5 @@ for dir in Test FuzzLean Fuzz; do
         cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
     fi
 done
-if [ -f "/workspace/coverage_failures_to_investigate.txt" ]; then
-    cp "/workspace/coverage_failures_to_investigate.txt" "/workspace/output/"
-fi
+
+echo "RESTler execution completed!"

@@ -12,18 +12,14 @@ services:
       FUZZ_LEAN_TIME_BUDGET: "0.05"
       RUN_FUZZ: "true"
       FUZZ_TIME_BUDGET: "0.25"
-      VAMPI_RESTLER_URL: ${VAMPI_RESTLER_URL}
+      TARGET_IP: "vampi-vulnerable-restler"
+      TARGET_PORT: "5000"
     volumes:
       - ../../openapi/openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
     networks:
-      cicd_network:
-        aliases:
-          - restler-fuzzer
-    depends_on:
-      - vampi-vulnerable-restler
+      - cicd_network
 
 networks:
   cicd_network:
-    name: ${DOCKER_NETWORK_NAME}
     external: true
