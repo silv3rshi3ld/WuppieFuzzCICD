@@ -103,41 +103,41 @@ jobs:
 
   run_restler:
     runs-on: self-hosted
-    needs: prepare_vampi
+    needs: [prepare_vampi, prepare_docker_network]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set Up Workspace
-        run: mkdir -p ${{ env.BASE_DIR }}/workspace
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
         shell: bash
 
       - name: Copy RESTler Files
         run: |
-          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/
-          cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/
-          cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/
-        shell: bash
-
-      - name: Cleanup existing containers
-        run: |
-          docker rm -f vampi-vulnerable-restler vampi-mongo restler || true
+          cp -r ${{ env.BASE_DIR }}/services/restler/config ${{ env.BASE_DIR }}/workspace/restler/
+          cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
+          cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
         shell: bash
 
       - name: Start VamPI RESTler Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler --remove-orphans || exit 1
+        run: |
+          docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d mongo vampi-vulnerable-restler
+          sleep 10  # Give MongoDB time to initialize
         shell: bash
 
-      - name: Wait for VamPI RESTler
+      - name: Wait for VamPI RESTler with Health Check
         run: |
           echo "Waiting for VamPI RESTler instance..."
+          VAMPI_URL="http://localhost:${{ env.VAMPI_RESTLER_PORT }}"
           timeout=180
           elapsed=0
-          while ! curl -s ${{ secrets.VAMPI_RESTLER_URL }}/ > /dev/null; do
+          while ! curl -s ${VAMPI_URL}/health > /dev/null; do
             if [ $elapsed -ge $timeout ]; then
-              echo "Timed out waiting for VAmPI RESTler instance."
-              docker logs vampi-vulnerable-restler || true
+              echo "Timed out waiting for VamPI RESTler instance."
+              docker logs vampi-vulnerable-restler
               exit 1
             fi
             echo "VamPI not ready. Retrying in 5 seconds..."
@@ -147,18 +147,13 @@ jobs:
           echo "VamPI RESTler instance is up!"
         shell: bash
 
-      - name: Start RESTler Service
-        working-directory: ${{ env.BASE_DIR }}/workspace
-        env:
-          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
-        run: docker-compose -f docker-compose.restler.yml up -d restler --remove-orphans || exit 1
-        shell: bash
-
       - name: Run RESTler
-        working-directory: ${{ env.BASE_DIR }}/workspace
+        working-directory: ${{ env.BASE_DIR }}/workspace/restler
         env:
-          VAMPI_RESTLER_URL: ${{ secrets.VAMPI_RESTLER_URL }}
-        run: docker-compose -f docker-compose.restler.yml up --build --remove-orphans
+          VAMPI_RESTLER_URL: "http://vampi-vulnerable-restler:${{ env.VAMPI_RESTLER_PORT }}"
+          DOCKER_NETWORK_NAME: ${{ env.DOCKER_NETWORK_NAME }}
+        run: |
+          docker-compose -f docker-compose.restler.yml up --build --exit-code-from restler
         shell: bash
 
       - name: Upload RESTler Results
@@ -166,15 +161,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: ${{ env.BASE_DIR }}/workspace/output/**
+          path: ${{ env.BASE_DIR }}/workspace/restler/output
           if-no-files-found: warn
 
       - name: Cleanup RESTler Environment
         if: always()
         run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down --remove-orphans
-          docker-compose -f ${{ env.BASE_DIR }}/workspace/docker-compose.restler.yml down --remove-orphans
-          rm -rf ${{ env.BASE_DIR }}/workspace
+          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
+          docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
         shell: bash
 
   run_wuppiefuzz:

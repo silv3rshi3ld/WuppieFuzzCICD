@@ -4,7 +4,7 @@ services:
   restler:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.restler
     container_name: restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
@@ -17,8 +17,13 @@ services:
       - ../../openapi/openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
     networks:
-      - cicd_network
+      cicd_network:
+        aliases:
+          - restler-fuzzer
+    depends_on:
+      - vampi-vulnerable-restler
 
 networks:
   cicd_network:
+    name: ${DOCKER_NETWORK_NAME}
     external: true
