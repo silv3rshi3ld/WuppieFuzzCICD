@@ -21,6 +21,20 @@ jobs:
   cleanup:
     runs-on: self-hosted
     steps:
+      - name: Check User and Permissions
+        run: |
+          echo "Running as user:"
+          whoami
+          echo "User groups:"
+          groups
+          echo "Current directory:"
+          pwd
+          echo "File ownership of workspace:"
+          ls -la ${{ github.workspace }}
+          echo "Process information:"
+          ps aux | grep actions-runner
+        shell: bash
+        
       - name: Initial Cleanup
         run: |
           # Clean up existing files
