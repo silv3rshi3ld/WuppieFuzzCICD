@@ -1,5 +1,5 @@
 name: Build and Fuzz
-#test
+
 on:
   push:
     branches:
