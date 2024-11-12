@@ -23,11 +23,9 @@ jobs:
     steps:
       - name: Initial Cleanup
         run: |
-          # Clean up any existing files with sudo
-          sudo rm -rf ${{ github.workspace }}/*
-          sudo rm -rf workspace/ wuppiefuzz_workspace/
-          # Ensure runner user owns the workspace
-          sudo chown -R $USER:$USER ${{ github.workspace }}
+          # Clean up existing files
+          rm -rf ${{ github.workspace }}/*
+          rm -rf workspace/ wuppiefuzz_workspace/
         shell: bash
 
   prepare_docker_network:
@@ -41,13 +39,10 @@ jobs:
 
       - name: Setup directories
         run: |
-          sudo mkdir -p $BASE_DIR/services/vampi
-          sudo mkdir -p $BASE_DIR/workspace
-          sudo mkdir -p $BASE_DIR/wuppiefuzz_workspace
-          sudo mkdir -p $HOME/.cargo $HOME/.rustup
-          sudo chown -R $USER:$USER $BASE_DIR
-          sudo chown -R $USER:$USER $HOME/.cargo
-          sudo chown -R $USER:$USER $HOME/.rustup
+          mkdir -p $BASE_DIR/services/vampi
+          mkdir -p $BASE_DIR/workspace
+          mkdir -p $BASE_DIR/wuppiefuzz_workspace
+          mkdir -p $HOME/.cargo $HOME/.rustup
         shell: bash
 
       - name: Validate Docker Compose Files
@@ -67,8 +62,7 @@ jobs:
 
       - name: Create Docker Network if Not Exists
         if: steps.check_network.outputs.exists == 'false'
-        run: |
-          docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
+        run: docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
         shell: bash
 
   prepare_vampi:
@@ -118,14 +112,13 @@ jobs:
       - name: Build WuppieFuzz if needed
         if: steps.cache-binary.outputs.cache-hit != 'true'
         run: |
-          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
           git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
           cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
           cargo build --release
-          sudo cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
           cd ${{ env.BASE_DIR }}
-          sudo rm -rf wuppiefuzz_temp
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          rm -rf wuppiefuzz_temp
         shell: bash
 
       - name: Upload WuppieFuzz Binary
@@ -144,9 +137,8 @@ jobs:
 
       - name: Create Workspace
         run: |
-          sudo mkdir -p ${{ env.BASE_DIR }}/workspace/restler
-          sudo mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/workspace
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
         shell: bash
 
       - name: Copy RESTler Files
@@ -154,182 +146,4 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
           cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
           cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
-          cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
-        shell: bash
-
-      - name: Start VAmPI RESTler Instance
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        env:
-          VAMPI_RESTLER_PORT: ${{ env.VAMPI_RESTLER_PORT }}
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
-        shell: bash
-
-      - name: Wait for VAmPI
-        run: |
-          echo "Waiting for VAmPI RESTler instance..."
-          for i in {1..30}; do
-            if curl -s http://localhost:${{ env.VAMPI_RESTLER_PORT }}/health >/dev/null; then
-              echo "VAmPI is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI failed to become ready"
-              docker logs vampi-vulnerable-restler
-              exit 1
-            fi
-            echo "Waiting for VAmPI to be ready... (attempt $i/30)"
-            sleep 2
-          done
-        shell: bash
-
-      - name: Run RESTler
-        working-directory: ${{ env.BASE_DIR }}/workspace/restler
-        env:
-          TARGET_PORT: "5000"
-          TARGET_HOST: "vampi-vulnerable-restler"
-        run: docker-compose -f docker-compose.restler.yml up --build
-        shell: bash
-
-      - name: Upload RESTler Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-results
-          path: ${{ env.BASE_DIR }}/workspace/restler/output
-          if-no-files-found: warn
-
-      - name: Cleanup RESTler Environment
-        if: always()
-        run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
-          docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
-          sudo rm -rf ${{ env.BASE_DIR }}/workspace/restler
-        shell: bash
-
-  run_wuppiefuzz:
-    runs-on: self-hosted
-    needs: [prepare_vampi, prepare_wuppiefuzz]
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download WuppieFuzz Binary
-        uses: actions/download-artifact@v4
-        with:
-          name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-
-      - name: Setup WuppieFuzz Environment
-        run: |
-          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-          sudo chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
-          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        shell: bash
-
-      - name: Start VAmPI WuppieFuzz Instance
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
-        shell: bash
-
-      - name: Wait for WuppieFuzz Instance to Initialize
-        run: |
-          echo "Waiting for WuppieFuzz instance to become healthy..."
-          for i in {1..30}; do
-            if curl -s http://localhost:${VAMPI_WUPPIEFUZZ_PORT}/health >/dev/null; then
-              echo "WuppieFuzz instance is healthy."
-              exit 0
-            fi
-            echo "Attempt $i of 30: WuppieFuzz instance not ready yet..."
-            docker logs vampi-vulnerable-wuppiefuzz
-            sleep 5
-          done
-          echo "WuppieFuzz instance failed to become healthy in time."
-          docker logs vampi-vulnerable-wuppiefuzz
-          exit 1
-        shell: bash
-
-      - name: Run WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        run: |
-          mkdir -p reports
-          ./wuppiefuzz output-corpus \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml \
-            corpus_directory
-          ./wuppiefuzz fuzz \
-            --report \
-            --log-level=info \
-            --initial-corpus=corpus_directory \
-            --coverage-host=localhost:${VAMPI_WUPPIEFUZZ_PORT} \
-            --timeout=60 \
-            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml
-
-      - name: Upload WuppieFuzz Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
-          if-no-files-found: warn
-
-      - name: Cleanup WuppieFuzz Environment
-        if: always()
-        run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-        shell: bash
-
-  summarize_results:
-    runs-on: self-hosted
-    needs: [run_restler, run_wuppiefuzz]
-    steps:
-      - name: Download All Results
-        uses: actions/download-artifact@v4
-        with:
-          path: all_results
-
-      - name: Create Summary
-        run: |
-          echo "# Fuzzing Results Summary" > summary.md
-          echo "Generated on $(date)" >> summary.md
-          echo "## WuppieFuzz Results" >> summary.md
-          if [ -d "all_results/wuppiefuzz-results" ]; then
-            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results/report.txt || echo "0")
-            echo "Number of issues found: $issues_found" >> summary.md
-            if [ -f "all_results/wuppiefuzz-results/report.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/wuppiefuzz-results/report.txt" >> summary.md
-            fi
-          else
-            echo "No WuppieFuzz results found" >> summary.md
-          fi
-          echo "## RESTler Results" >> summary.md
-          if [ -d "all_results/restler-results" ]; then
-            bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
-            echo "Number of bugs found: $bugs_found" >> summary.md
-            if [ -f "all_results/restler-results/bug_buckets/BugBuckets.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/restler-results/bug_buckets/BugBuckets.txt" >> summary.md
-            fi
-          else
-            echo "No RESTler results found" >> summary.md
-          fi
-
-      - name: Upload Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-summary
-          path: summary.md
-          if-no-files-found: warn
-
-      - name: Final Cleanup
-        if: always()
-        run: |
-          docker container prune -f
-          docker network prune -f
-          sudo rm -rf ${{ env.BASE_DIR }}/workspace
-          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-          sudo rm -rf all_results
-        shell: bash
+          cp ${{ env.BASE_DIR }}/services/restler/Dockerfil
