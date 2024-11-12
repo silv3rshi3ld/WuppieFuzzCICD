@@ -199,7 +199,7 @@ jobs:
       - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
+          # docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
