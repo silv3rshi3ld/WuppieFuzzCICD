@@ -18,32 +18,7 @@ env:
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
-  cleanup:
-    runs-on: self-hosted
-    steps:
-      - name: Check User and Permissions
-        run: |
-          echo "Running as user:"
-          whoami
-          echo "User groups:"
-          groups
-          echo "Current directory:"
-          pwd
-          echo "File ownership of workspace:"
-          ls -la ${{ github.workspace }}
-          echo "Process information:"
-          ps aux | grep actions-runner
-        shell: bash
-        
-      - name: Initial Cleanup
-        run: |
-          # Clean up existing files
-          rm -rf ${{ github.workspace }}/*
-          rm -rf workspace/ wuppiefuzz_workspace/
-        shell: bash
-
   prepare_docker_network:
-    needs: cleanup
     runs-on: self-hosted
     steps:
       - name: Checkout Repository
@@ -205,21 +180,10 @@ jobs:
           path: ${{ env.BASE_DIR }}/workspace/restler/output
           if-no-files-found: warn
 
-      # - name: Cleanup RESTler Environment
-      #   if: always()
-      #   run: |
-      #     docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
-      #     docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
-      #     rm -rf ${{ env.BASE_DIR }}/workspace/restler
-      #   shell: bash
-
   run_wuppiefuzz:
     runs-on: self-hosted
     needs: [prepare_vampi, prepare_wuppiefuzz]
     steps:
-      #- name: Checkout Repository
-      #  uses: actions/checkout@v4
-
       - name: Download WuppieFuzz Binary
         uses: actions/download-artifact@v4
         with:
@@ -278,13 +242,6 @@ jobs:
           name: wuppiefuzz-results
           path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
           if-no-files-found: warn
-
-      # - name: Cleanup WuppieFuzz Environment
-      #   if: always()
-      #   run: |
-      #     docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-      #     rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-      #   shell: bash
 
   summarize_results:
     runs-on: self-hosted
