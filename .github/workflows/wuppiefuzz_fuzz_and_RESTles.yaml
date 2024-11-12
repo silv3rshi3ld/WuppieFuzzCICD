@@ -1,5 +1,5 @@
 name: Build and Fuzz
-#test
+
 on:
   push:
     branches:
@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
@@ -15,7 +18,20 @@ env:
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
+  cleanup:
+    runs-on: self-hosted
+    steps:
+      - name: Initial Cleanup
+        run: |
+          # Clean up any existing files with sudo
+          sudo rm -rf ${{ github.workspace }}/*
+          sudo rm -rf workspace/ wuppiefuzz_workspace/
+          # Ensure runner user owns the workspace
+          sudo chown -R $USER:$USER ${{ github.workspace }}
+        shell: bash
+
   prepare_docker_network:
+    needs: cleanup
     runs-on: self-hosted
     steps:
       - name: Checkout Repository
@@ -25,10 +41,13 @@ jobs:
 
       - name: Setup directories
         run: |
-          mkdir -p $BASE_DIR/services/vampi
-          mkdir -p $BASE_DIR/workspace
-          mkdir -p $BASE_DIR/wuppiefuzz_workspace
-          mkdir -p $HOME/.cargo $HOME/.rustup
+          sudo mkdir -p $BASE_DIR/services/vampi
+          sudo mkdir -p $BASE_DIR/workspace
+          sudo mkdir -p $BASE_DIR/wuppiefuzz_workspace
+          sudo mkdir -p $HOME/.cargo $HOME/.rustup
+          sudo chown -R $USER:$USER $BASE_DIR
+          sudo chown -R $USER:$USER $HOME/.cargo
+          sudo chown -R $USER:$USER $HOME/.rustup
         shell: bash
 
       - name: Validate Docker Compose Files
@@ -99,13 +118,14 @@ jobs:
       - name: Build WuppieFuzz if needed
         if: steps.cache-binary.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
           git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
           cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
           cargo build --release
-          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          sudo cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
           cd ${{ env.BASE_DIR }}
-          rm -rf wuppiefuzz_temp
+          sudo rm -rf wuppiefuzz_temp
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz_bin
         shell: bash
 
       - name: Upload WuppieFuzz Binary
@@ -124,8 +144,9 @@ jobs:
 
       - name: Create Workspace
         run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
+          sudo mkdir -p ${{ env.BASE_DIR }}/workspace/restler
+          sudo mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/workspace
         shell: bash
 
       - name: Copy RESTler Files
@@ -183,7 +204,7 @@ jobs:
         run: |
           docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_restler down
           docker-compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down
-          rm -rf ${{ env.BASE_DIR }}/workspace/restler
+          sudo rm -rf ${{ env.BASE_DIR }}/workspace/restler
         shell: bash
 
   run_wuppiefuzz:
@@ -201,8 +222,9 @@ jobs:
 
       - name: Setup WuppieFuzz Environment
         run: |
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-          chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
+          sudo mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo chmod +x ${{ env.BASE_DIR }}/wuppiefuzz_workspace/wuppiefuzz
+          sudo chown -R $USER:$USER ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         shell: bash
 
       - name: Start VAmPI WuppieFuzz Instance
@@ -256,7 +278,7 @@ jobs:
         if: always()
         run: |
           docker-compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml -p vampi_wuppiefuzz down --remove-orphans
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
         shell: bash
 
   summarize_results:
@@ -307,4 +329,7 @@ jobs:
         run: |
           docker container prune -f
           docker network prune -f
+          sudo rm -rf ${{ env.BASE_DIR }}/workspace
+          sudo rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          sudo rm -rf all_results
         shell: bash
