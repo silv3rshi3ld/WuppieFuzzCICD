@@ -18,6 +18,15 @@ env:
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
+  cleanup_restlerresults:
+    runs-on: self-hosted
+    steps:
+      - name: Remove RestlerResults Directory
+        run: |
+          echo "Attempting to remove RestlerResults directory..."
+          sudo rm -rf "$BASE_DIR/workspace/restler/output/Fuzz/RestlerResults" || echo "Directory not found or already removed."
+        shell: bash
+  
   prepare_docker_network:
     runs-on: self-hosted
     steps:
