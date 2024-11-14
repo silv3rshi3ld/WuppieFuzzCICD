@@ -24,7 +24,7 @@ jobs:
       - name: Remove RestlerResults Directory
         run: |
           echo "Attempting to remove RestlerResults directory..."
-          sudo rm -rf "$BASE_DIR/workspace/restler/output/Fuzz/RestlerResults" || echo "Directory not found or already removed."
+          sudo rm -rf "$BASE_DIR/workspace/restler/output/" || echo "Directory not found or already removed."
         shell: bash
 
   prepare_docker_network:
