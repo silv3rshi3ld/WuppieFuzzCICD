@@ -101,11 +101,8 @@ jobs:
 
       - name: Setup Rust
         if: steps.cache-binary.outputs.cache-hit != 'true'
-        uses: actions-rs/toolchain@v2
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          override: true
-          profile: minimal
           components: rustfmt, clippy
 
       - name: Build WuppieFuzz if needed
