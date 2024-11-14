@@ -26,9 +26,10 @@ jobs:
           echo "Attempting to remove RestlerResults directory..."
           sudo rm -rf "$BASE_DIR/workspace/restler/output/Fuzz/RestlerResults" || echo "Directory not found or already removed."
         shell: bash
-  
+
   prepare_docker_network:
     runs-on: self-hosted
+    needs: cleanup_restlerresults  # Establishes dependency
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
