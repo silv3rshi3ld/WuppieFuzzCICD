@@ -91,7 +91,7 @@ jobs:
 
       - name: Setup Rust
         if: steps.cache-binary.outputs.cache-hit != 'true'
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v2
         with:
           toolchain: stable
           override: true
@@ -199,7 +199,6 @@ jobs:
       - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          # docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d mongo
           docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
@@ -209,15 +208,16 @@ jobs:
           for i in {1..30}; do
             if curl -s http://localhost:${VAMPI_WUPPIEFUZZ_PORT}/health >/dev/null; then
               echo "WuppieFuzz instance is healthy."
-              exit 0
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "WuppieFuzz instance failed to become healthy in time."
+              docker logs vampi-vulnerable-wuppiefuzz
+              exit 1
             fi
             echo "Attempt $i of 30: WuppieFuzz instance not ready yet..."
-            docker logs vampi-vulnerable-wuppiefuzz
             sleep 5
           done
-          echo "WuppieFuzz instance failed to become healthy in time."
-          docker logs vampi-vulnerable-wuppiefuzz
-          exit 1
         shell: bash
 
       - name: Run WuppieFuzz
@@ -234,6 +234,7 @@ jobs:
             --coverage-host=localhost:${VAMPI_WUPPIEFUZZ_PORT} \
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml
+        shell: bash
 
       - name: Upload WuppieFuzz Results
         if: always()
@@ -251,40 +252,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: all_results
-
-      - name: Create Summary
-        run: |
-          echo "# Fuzzing Results Summary" > summary.md
-          echo "Generated on $(date)" >> summary.md
-          echo "## WuppieFuzz Results" >> summary.md
-          if [ -d "all_results/wuppiefuzz-results" ]; then
-            issues_found=$(grep -c 'Issue' all_results/wuppiefuzz-results/report.txt || echo "0")
-            echo "Number of issues found: $issues_found" >> summary.md
-            if [ -f "all_results/wuppiefuzz-results/report.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/wuppiefuzz-results/report.txt" >> summary.md
-            fi
-          else
-            echo "No WuppieFuzz results found" >> summary.md
-          fi
-          echo "## RESTler Results" >> summary.md
-          if [ -d "all_results/restler-results" ]; then
-            bugs_found=$(grep -c 'Bug' all_results/restler-results/bug_buckets/BugBuckets.txt || echo "0")
-            echo "Number of bugs found: $bugs_found" >> summary.md
-            if [ -f "all_results/restler-results/bug_buckets/BugBuckets.txt" ]; then
-              echo "### Detailed Findings" >> summary.md
-              cat "all_results/restler-results/bug_buckets/BugBuckets.txt" >> summary.md
-            fi
-          else
-            echo "No RESTler results found" >> summary.md
-          fi
-
-      - name: Upload Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-summary
-          path: summary.md
           if-no-files-found: warn
+
+      - name: List Downloaded Artifacts
+        run: |
+          echo "Listing WuppieFuzz Results:"
+          ls -la all_results/wuppiefuzz-results || echo "WuppieFuzz results directory not found."
+          
+          echo "Listing RESTler Results:"
+          ls -la all_results/restler-results/bug_buckets || echo "RESTler BugBuckets directory not found."
+        shell: bash
+        continue-on-error: true
 
       - name: Final Cleanup
         if: always()
