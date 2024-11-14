@@ -267,9 +267,8 @@ jobs:
       - name: Final Cleanup
         if: always()
         run: |
-          docker container prune -f
-          docker network prune -f
-          rm -rf ${{ env.BASE_DIR }}/workspace
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-          rm -rf all_results
+          echo "Pruning Docker containers..."
+          docker container prune -f || echo "Failed to prune Docker containers."
+          echo "Pruning Docker networks..."
+          docker network prune -f || echo "Failed to prune Docker networks."
         shell: bash
