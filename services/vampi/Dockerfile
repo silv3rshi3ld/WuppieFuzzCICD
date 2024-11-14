@@ -1,12 +1,12 @@
 FROM python:3.11-alpine as builder
-RUN apk --update add bash nano g++ curl mongodb-tools
+RUN apk --update add bash nano g++
 COPY . /vampi
 WORKDIR /vampi
 RUN pip install -r requirements.txt
 
 # Build a fresh container, copying across files & compiled parts
 FROM python:3.11-alpine
-RUN apk --update add curl mongodb-tools
+RUN apk --update add curl mongodb-tools  # Only runtime tools in final stage
 COPY . /vampi
 WORKDIR /vampi
 COPY --from=builder /usr/local/lib /usr/local/lib
