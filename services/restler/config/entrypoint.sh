@@ -74,10 +74,8 @@ fi
 # Copy results to output directory
 echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
-    if [ -d "/workspace/${dir}/RestlerResults" ]; then
-        mkdir -p "/workspace/output/${dir}"
-        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
+    if [ -d "${dir}/RestlerResults" ]; then
+        mkdir -p "output/${dir}"
+        cp -r "${dir}/RestlerResults" "output/${dir}/RestlerResults"
     fi
 done
-
-echo "RESTler execution completed!"
