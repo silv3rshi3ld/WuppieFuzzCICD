@@ -47,9 +47,9 @@ jobs:
 
       - name: Validate Docker Compose Files
         run: |
-          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
-          docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
-          docker-compose -f $BASE_DIR/services/evomaster/docker-compose.evomaster.yml config -q
+          docker compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
+          docker compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
+          docker compose -f $BASE_DIR/services/evomaster/docker-compose.evomaster.yml config -q
         shell: bash
 
       - name: Check if Docker Network Exists
@@ -75,12 +75,12 @@ jobs:
 
       - name: Remove Any Existing VAmPI Containers
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
+        run: docker compose -f docker-compose.vampi.yml down --remove-orphans || true
         shell: bash
 
       - name: Build VAmPI Images
         working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml build --force-rm
+        run: docker compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
   prepare_wuppiefuzz:
@@ -155,12 +155,12 @@ jobs:
 
       - name: Remove Any Existing EvoMaster Containers
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml down --remove-orphans || true
+        run: docker compose -f docker-compose.evomaster.yml down --remove-orphans || true
         shell: bash
 
       - name: Build EvoMaster Images
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml build --force-rm
+        run: docker compose -f docker-compose.evomaster.yml build --force-rm
         shell: bash
 
   run_restler:
@@ -189,7 +189,7 @@ jobs:
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         env:
           VAMPI_RESTLER_PORT: ${{ env.VAMPI_RESTLER_PORT }}
-        run: docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
+        run: docker compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
         shell: bash
 
       - name: Wait for VAmPI
@@ -215,7 +215,7 @@ jobs:
         env:
           TARGET_PORT: "5000"
           TARGET_HOST: "vampi-vulnerable-restler"
-        run: docker-compose -f docker-compose.restler.yml up --build
+        run: docker compose -f docker-compose.restler.yml up --build
         shell: bash
 
       - name: Upload RESTler Results
@@ -246,7 +246,7 @@ jobs:
       - name: Start VAmPI WuppieFuzz Instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
+          docker compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
         shell: bash
 
       - name: Wait for WuppieFuzz Instance to Initialize
@@ -301,7 +301,7 @@ jobs:
 
       - name: Start VAmPI EvoMaster Instance
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml up -d vampi-evomaster
+        run: docker compose -f docker-compose.evomaster.yml up -d vampi-evomaster
         shell: bash
 
       - name: Wait for VAmPI EvoMaster Instance
@@ -312,7 +312,7 @@ jobs:
               echo "VAmPI EvoMaster instance is ready!"
               break
             fi
-            if [ $i -eq 30 ]; then
+            if [ $i -eq 30]; then
               echo "VAmPI EvoMaster failed to become ready"
               docker logs vampi-evomaster
               exit 1
@@ -324,7 +324,7 @@ jobs:
 
       - name: Run EvoMaster
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml up evomaster
+        run: docker compose -f docker-compose.evomaster.yml up evomaster
         shell: bash
 
       - name: Upload EvoMaster Results
@@ -339,7 +339,7 @@ jobs:
       - name: Stop EvoMaster and VAmPI Containers
         if: always()
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml down --remove-orphans || true
+        run: docker compose -f docker-compose.evomaster.yml down --remove-orphans || true
         shell: bash
 
   summarize_results:
