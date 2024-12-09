@@ -19,22 +19,8 @@ env:
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
-  # Make sure we have docker-compose available on the self-hosted runner
-  setup_compose:
-    runs-on: self-hosted
-    steps:
-      - name: Check docker
-        run: which docker || (echo "Docker not found" && exit 1)
-      - name: Install docker-compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.22.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose version
-        shell: bash
-
   cleanup_restlerresults:
     runs-on: self-hosted
-    needs: setup_compose
     steps:
       - name: Remove RestlerResults Directory
         run: |
@@ -154,7 +140,6 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
         shell: bash
 
-      # Copy the EvoMaster files (make sure Dockerfile.evomaster and entrypoint.sh exist)
       - name: Copy EvoMaster Files
         run: |
           cp ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster ${{ env.BASE_DIR }}/workspace/evomaster/
