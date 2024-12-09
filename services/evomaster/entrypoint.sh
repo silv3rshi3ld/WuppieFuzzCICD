@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 java -jar evomaster.jar \
     -p "$SPEC_PATH" \
