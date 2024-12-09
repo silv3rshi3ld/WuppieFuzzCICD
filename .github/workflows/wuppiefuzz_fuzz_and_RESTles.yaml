@@ -15,6 +15,7 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
+  VAMPI_EVOMASTER_PORT: 5001
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -29,7 +30,7 @@ jobs:
 
   prepare_docker_network:
     runs-on: self-hosted
-    needs: cleanup_restlerresults  # Establishes dependency
+    needs: cleanup_restlerresults
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -48,6 +49,7 @@ jobs:
         run: |
           docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
           docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
+          docker-compose -f $BASE_DIR/services/evomaster/docker-compose.evomaster.yml config -q
         shell: bash
 
       - name: Check if Docker Network Exists
@@ -123,6 +125,42 @@ jobs:
           name: wuppiefuzz-binary
           path: ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz
           if-no-files-found: error
+
+  prepare_evomaster:
+    runs-on: self-hosted
+    needs: prepare_docker_network
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup directories
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster
+          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+        shell: bash
+
+      - name: Copy EvoMaster Files
+        run: |
+          cp ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster ${{ env.BASE_DIR }}/workspace/evomaster/
+          cp ${{ env.BASE_DIR }}/services/evomaster/entrypoint.sh ${{ env.BASE_DIR }}/workspace/evomaster/
+          cp ${{ env.BASE_DIR }}/services/evomaster/docker-compose.evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/
+          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi_evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi_evomaster.yml
+        shell: bash
+
+      - name: Adjust docker-compose for result directory
+        run: |
+          sed -i 's#evomaster_results:/evomaster/results#./evomaster_results:/evomaster/results#g' ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yml
+        shell: bash
+
+      - name: Remove Any Existing EvoMaster Containers
+        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
+        run: docker-compose -f docker-compose.evomaster.yml down --remove-orphans || true
+        shell: bash
+
+      - name: Build EvoMaster Images
+        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
+        run: docker-compose -f docker-compose.evomaster.yml build --force-rm
+        shell: bash
 
   run_restler:
     runs-on: self-hosted
@@ -251,14 +289,78 @@ jobs:
           path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/
           if-no-files-found: warn
 
+  run_evomaster:
+    runs-on: self-hosted
+    needs: [prepare_evomaster, prepare_docker_network]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Start VAmPI EvoMaster Instance
+        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
+        run: docker-compose -f docker-compose.evomaster.yml up -d vampi-evomaster
+        shell: bash
+
+      - name: Wait for VAmPI EvoMaster Instance
+        run: |
+          echo "Waiting for VAmPI EvoMaster instance..."
+          for i in {1..30}; do
+            if curl -s http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}/health >/dev/null; then
+              echo "VAmPI EvoMaster instance is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "VAmPI EvoMaster failed to become ready"
+              docker logs vampi-evomaster
+              exit 1
+            fi
+            echo "Waiting for VAmPI EvoMaster to be ready... (attempt $i/30)"
+            sleep 2
+          done
+        shell: bash
+
+      - name: Run EvoMaster
+        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
+        run: docker-compose -f docker-compose.evomaster.yml up evomaster
+        shell: bash
+
+      - name: Upload EvoMaster Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evomaster-results
+          path: ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+          if-no-files-found: warn
+
+      - name: Stop EvoMaster and VAmPI Containers
+        if: always()
+        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
+        run: docker-compose -f docker-compose.evomaster.yml down --remove-orphans || true
+        shell: bash
+
   summarize_results:
     runs-on: self-hosted
-    needs: [run_restler, run_wuppiefuzz]
+    needs: [run_restler, run_wuppiefuzz, run_evomaster]
     steps:
-      - name: Download All Results
+      - name: Download RESTler Results
         uses: actions/download-artifact@v4
         with:
-          path: all_results
+          name: restler-results
+          path: all_results/restler-results
+          if-no-files-found: warn
+
+      - name: Download WuppieFuzz Results
+        uses: actions/download-artifact@v4
+        with:
+          name: wuppiefuzz-results
+          path: all_results/wuppiefuzz-results
+          if-no-files-found: warn
+
+      - name: Download EvoMaster Results
+        uses: actions/download-artifact@v4
+        with:
+          name: evomaster-results
+          path: all_results/evomaster-results
           if-no-files-found: warn
 
       - name: List Downloaded Artifacts
@@ -268,6 +370,9 @@ jobs:
           
           echo "Listing RESTler Results:"
           ls -la all_results/restler-results/bug_buckets || echo "RESTler BugBuckets directory not found."
+          
+          echo "Listing EvoMaster Results:"
+          ls -la all_results/evomaster-results || echo "EvoMaster results directory not found."
         shell: bash
         continue-on-error: true
 

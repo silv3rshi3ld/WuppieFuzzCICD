@@ -1,0 +1,19 @@
+FROM openjdk:11-jre-slim
+
+ENV EVOMASTER_VERSION=3.3.0
+
+WORKDIR /evomaster
+
+RUN apt-get update && apt-get install -y curl && \
+    curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v${EVOMASTER_VERSION}/evomaster.jar && \
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /evomaster/results
+
+COPY entrypoint.sh /evomaster/entrypoint.sh
+
+RUN chmod +x /evomaster/entrypoint.sh
+
+ENTRYPOINT ["/evomaster/entrypoint.sh"]

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  vampi-evomaster:
+    build:
+      context: ../vampi  # Adjust the path to your VAmPI Dockerfile
+      dockerfile: Dockerfile.vampi
+    container_name: vampi-evomaster
+    environment:
+      VAMPI_PORT: 5001
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./openapi_evomaster.yml:/specs/openapi3.yml:ro
+    networks:
+      - cicd_network
+
+  evomaster:
+    build:
+      context: .
+      dockerfile: Dockerfile.evomaster
+    container_name: evomaster
+    environment:
+      SPEC_PATH: "/specs/openapi3.yml"
+      OUTPUT_DIR: "/evomaster/results"
+      TARGET_URL: "http://vampi-evomaster:5001"
+      TIME_BUDGET: "3600"
+    volumes:
+      - ./openapi_evomaster.yml:/specs/openapi3.yml:ro
+      - ./evomaster_results:/evomaster/results
+    depends_on:
+      - vampi-evomaster
+    networks:
+      - cicd_network
+
+networks:
+  cicd_network:
+    external: true
