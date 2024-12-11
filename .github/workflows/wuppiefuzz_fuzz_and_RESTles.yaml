@@ -145,7 +145,7 @@ jobs:
           cp ${{ env.BASE_DIR }}/services/evomaster/dockerfile.evomaster ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/evomaster/entrypoint.sh ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/evomaster/docker-compose.evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/
-          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi_evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi_evomaster.yml
+          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/evomaster.openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi_evomaster.yml
         shell: bash
 
       - name: Adjust docker-compose for result directory
