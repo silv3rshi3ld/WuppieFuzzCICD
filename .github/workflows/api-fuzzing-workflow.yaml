@@ -211,21 +211,6 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
-              # Create RESTler config
-              cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
-              {
-                "max_combinations": 20,
-                "max_request_execution_time": 10,
-                "max_async_resource_creation_time": 20,
-                "global_producer_timing_delay": 2,
-                "dyn_objects_cache_size": 10,
-                "fuzzing_mode": "directed-smoke-test",
-                "test_all_combinations": false,
-                "test_combinations_settings": {
-                  "max_combinations": 20
-                }
-              }
-              EOF
               ;;
             "wuppiefuzz")
               mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace/{bin,reports,corpus_directory}
@@ -234,6 +219,25 @@ jobs:
               mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
               ;;
           esac
+        shell: bash
+
+      - name: Create RESTler Config
+        if: matrix.fuzzer == 'restler'
+        run: |
+          cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
+          {
+            "max_combinations": 20,
+            "max_request_execution_time": 10,
+            "max_async_resource_creation_time": 20,
+            "global_producer_timing_delay": 2,
+            "dyn_objects_cache_size": 10,
+            "fuzzing_mode": "directed-smoke-test",
+            "test_all_combinations": false,
+            "test_combinations_settings": {
+              "max_combinations": 20
+            }
+          }
+          EOF
         shell: bash
 
       - name: Configure Fuzzer
