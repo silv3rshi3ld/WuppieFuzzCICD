@@ -179,10 +179,11 @@ jobs:
       - name: Copy RESTler Files
         run: |
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/vampi/openapi_specs
           cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
           cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
           cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
+          cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/vampi/openapi_specs/openapi3.yml
         shell: bash
 
       - name: Start VAmPI RESTler Instance
