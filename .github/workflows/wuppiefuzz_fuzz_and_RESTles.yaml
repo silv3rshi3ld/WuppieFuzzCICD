@@ -147,24 +147,45 @@ jobs:
           cp ${{ env.BASE_DIR }}/services/evomaster/entrypoint.sh ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/evomaster/docker-compose.evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/evomaster.openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi_evomaster.yml
-          cp -r ${{ env.BASE_DIR }}/services/vampi/* ${{ env.BASE_DIR }}/workspace/vampi/
-          cp ${{ env.BASE_DIR }}/services/vampi/Dockerfile ${{ env.BASE_DIR }}/workspace/vampi/Dockerfile.vampi
         shell: bash
 
-      - name: Adjust docker-compose for result directory
+      - name: Start VAmPI EvoMaster Instance
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          sed -i 's#evomaster_results:/evomaster/results#./evomaster_results:/evomaster/results#g' ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yml
+          docker compose -f docker-compose.vampi.yml -p vampi_evomaster up -d vampi-vulnerable-evomaster
         shell: bash
 
-      - name: Remove Any Existing EvoMaster Containers
-        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker compose -f docker-compose.evomaster.yml down --remove-orphans || true
+      - name: Wait for VAmPI EvoMaster Instance
+        run: |
+          echo "Waiting for VAmPI EvoMaster instance..."
+          for i in {1..30}; do
+            if curl -s http://localhost:${VAMPI_EVOMASTER_PORT}/health >/dev/null; then
+              echo "VAmPI EvoMaster instance is healthy."
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "VAmPI EvoMaster instance failed to become healthy in time."
+              docker logs vampi-vulnerable-evomaster
+              exit 1
+            fi
+            echo "Attempt $i of 30: VAmPI EvoMaster instance not ready yet..."
+            sleep 5
+          done
         shell: bash
 
-      - name: Build EvoMaster Images
+      - name: Run EvoMaster
         working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker compose -f docker-compose.evomaster.yml build --force-rm
+        run: docker compose -f docker-compose.evomaster.yml up --build
         shell: bash
+
+      - name: Upload EvoMaster Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evomaster-results
+          path: ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+          if-no-files-found: warn
+          retention-days: 1
 
   run_restler:
     runs-on: self-hosted
@@ -303,8 +324,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Start VAmPI EvoMaster Instance
-        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: docker compose -f docker-compose.evomaster.yml up -d vampi-evomaster
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
+        run: |
+          docker compose -f docker-compose.vampi.yml -p vampi_evomaster up -d vampi-vulnerable-evomaster
         shell: bash
 
       - name: Wait for VAmPI EvoMaster Instance

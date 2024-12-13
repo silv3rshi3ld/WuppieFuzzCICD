@@ -69,6 +69,29 @@ services:
       retries: 3
       start_period: 30s
 
+  vampi-vulnerable-evomaster:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: vampi-vulnerable-evomaster
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=1
+      - vulnerable=1
+    ports:
+      - "${VAMPI_EVOMASTER_PORT}:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - cicd_network
+    healthcheck:
+      test: curl -f http://localhost:5000/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   mongo:
     image: mongo:4.2
     container_name: vampi-mongo
