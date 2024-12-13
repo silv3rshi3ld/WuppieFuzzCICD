@@ -86,11 +86,7 @@ jobs:
               ;;
             "wuppiefuzz")
               mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-              # Setup Rust for WuppieFuzz
-              if [ "${{ matrix.fuzzer }}" = "wuppiefuzz" ]; then
-                rustup default stable
-                rustup component add rustfmt clippy
-              fi
+              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
               ;;
             "evomaster")
               mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
@@ -98,20 +94,49 @@ jobs:
           esac
         shell: bash
 
-      - name: Build Fuzzer
+      - name: Get WuppieFuzz Latest Commit
+        if: matrix.fuzzer == 'wuppiefuzz'
+        id: get-commit
         run: |
-          case "${{ matrix.fuzzer }}" in
-            "wuppiefuzz")
-              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-              git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
-              cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
-              cargo build --release
-              cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
-              cd ${{ env.BASE_DIR }}
-              rm -rf wuppiefuzz_temp
-              ;;
-          esac
+          LATEST_COMMIT=$(git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | cut -f1)
+          echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
         shell: bash
+
+      - name: Cache WuppieFuzz Binary
+        if: matrix.fuzzer == 'wuppiefuzz'
+        id: cache-wuppiefuzz
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          key: wuppiefuzz-${{ steps.get-commit.outputs.commit }}
+          restore-keys: |
+            wuppiefuzz-
+
+      - name: Setup Rust for WuppieFuzz
+        if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Build WuppieFuzz
+        if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
+          cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
+          cargo build --release
+          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          cd ${{ env.BASE_DIR }}
+          rm -rf wuppiefuzz_temp
+        shell: bash
+
+      - name: Upload WuppieFuzz Binary
+        if: matrix.fuzzer == 'wuppiefuzz'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz
+          if-no-files-found: error
+          retention-days: 1
 
   prepare_openapi_specs:
     runs-on: self-hosted
@@ -200,8 +225,6 @@ jobs:
             sleep 2
           done
         shell: bash
-
-      # Fuzzer-specific steps would follow...
 
   summarize_results:
     runs-on: self-hosted
