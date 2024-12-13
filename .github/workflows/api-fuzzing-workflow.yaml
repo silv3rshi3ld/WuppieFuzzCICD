@@ -190,8 +190,8 @@ jobs:
             esac
             
             mkdir -p "$OUTPUT_DIR"
-            cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/vampi.openapi3.yml "$OUTPUT_DIR/openapi3.yml"
-            sed -i "s|\${API_URL}|http://localhost:$PORT|g" "$OUTPUT_DIR/openapi3.yml"
+            cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml "$OUTPUT_DIR/openapi3.yml"
+            sed -i "s|http://localhost:5000|http://localhost:$PORT|g" "$OUTPUT_DIR/openapi3.yml"
           done
         shell: bash
 
@@ -263,6 +263,8 @@ jobs:
             -e APP_DEBUG=1 \
             -e FLASK_DEBUG=1 \
             -e FLASK_ENV=development \
+            -e vulnerable=1 \
+            -e tokentimetolive=300 \
             vampi:latest
 
           # Verify container is running
