@@ -36,8 +36,17 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          docker ps -aq | xargs -r docker rm -f
-          docker network prune -f
+          # Stop containers first
+          docker ps -q | xargs -r docker stop || true
+          
+          # Remove containers with pattern matching for our specific containers
+          docker ps -a --format '{{.Names}}' | grep -E 'vampi|mongo' | xargs -r docker rm -f || true
+          
+          # Clean up any remaining containers
+          docker ps -aq | xargs -r docker rm -f || true
+          
+          # Clean up networks
+          docker network ls --filter type=custom -q | xargs -r docker network rm || true
         shell: bash
 
       - name: Create Docker Network
