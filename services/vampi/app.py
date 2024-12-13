@@ -1,6 +1,5 @@
 from config import vuln_app
 import os
-from flask import jsonify
 
 '''
  Decide if you want to server a vulnerable version or not!
@@ -12,10 +11,6 @@ vuln = int(os.getenv('vulnerable', 1))
 # token alive for how many seconds?
 alive = int(os.getenv('tokentimetolive', 60))
 
-
-@vuln_app.app.route('/health')
-def health_check():
-    return jsonify({"status": "healthy"}), 200
 
 # start the app with port 5000 and debug on!
 if __name__ == '__main__':

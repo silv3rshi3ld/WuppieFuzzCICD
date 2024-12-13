@@ -209,24 +209,7 @@ jobs:
       - name: Build VAmPI Image
         run: |
           cd ${{ env.BASE_DIR }}/services/vampi
-          # Update the OpenAPI spec with the correct port
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              PORT=${{ env.VAMPI_RESTLER_PORT }}
-              ;;
-            "wuppiefuzz")
-              PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
-              ;;
-            "evomaster")
-              PORT=${{ env.VAMPI_EVOMASTER_PORT }}
-              ;;
-          esac
-          # Update the server URL in the OpenAPI spec
-          sed -i "s|http://localhost:5000|http://localhost:$PORT|g" openapi_specs/openapi3.yml
-          # Build the image
           sudo docker build -t vampi:latest .
-          # Restore the original OpenAPI spec
-          git checkout openapi_specs/openapi3.yml
         shell: bash
 
       - name: Start VAmPI Container
@@ -277,65 +260,24 @@ jobs:
           sudo docker run -d --name $CONTAINER_NAME \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p $PORT:5000 \
-            -e APP_DEBUG=1 \
-            -e FLASK_DEBUG=1 \
+            -e FLASK_APP=app.py \
             -e FLASK_ENV=development \
             -e vulnerable=1 \
-            -e tokentimetolive=300 \
             vampi:latest
 
-          # Verify container is running
-          echo "Verifying container status..."
-          if ! sudo docker ps | grep -q $CONTAINER_NAME; then
-            echo "Container failed to start. Container logs:"
-            sudo docker logs $CONTAINER_NAME
-            echo "Container status:"
-            sudo docker inspect $CONTAINER_NAME
-            exit 1
-          fi
-
-          # Wait for VAmPI to be ready with more verbose output
+          # Wait for VAmPI to be ready
           echo "Waiting for container to be ready..."
           for i in {1..30}; do
-            echo "Attempt $i: Checking container and port status"
-            
-            # Check if container is still running
-            if ! sudo docker ps | grep -q $CONTAINER_NAME; then
-              echo "Container stopped running. Logs:"
-              sudo docker logs $CONTAINER_NAME
-              exit 1
-            fi
-            
-            # Check port binding
-            echo "Port binding status:"
-            sudo netstat -tulpn | grep $PORT || true
-            
-            # Try health check
-            echo "Attempting health check..."
-            if curl -v --connect-timeout 5 http://localhost:$PORT/health 2>&1; then
-              END_TIME=$(date +%s)
-              DURATION=$((END_TIME - START_TIME))
-              echo "VAmPI is ready after $DURATION seconds"
-              echo "Container resource usage:"
-              sudo docker stats $CONTAINER_NAME --no-stream
+            if curl -s http://localhost:$PORT/health >/dev/null; then
+              echo "VAmPI is ready!"
               break
             fi
-            
             if [ $i -eq 30 ]; then
-              END_TIME=$(date +%s)
-              DURATION=$((END_TIME - START_TIME))
-              echo "VAmPI failed to start after $DURATION seconds"
-              echo "Docker logs:"
+              echo "VAmPI failed to start. Container logs:"
               sudo docker logs $CONTAINER_NAME
-              echo "Container status:"
-              sudo docker inspect $CONTAINER_NAME
-              echo "Process list inside container:"
-              sudo docker exec $CONTAINER_NAME ps aux || true
-              echo "Network interfaces inside container:"
-              sudo docker exec $CONTAINER_NAME ip addr || true
               exit 1
             fi
-            echo "Waiting for VAmPI to start... ($i/30)"
+            echo "Waiting for VAmPI to be ready (attempt $i/30)..."
             sleep 2
           done
           echo "::endgroup::"
