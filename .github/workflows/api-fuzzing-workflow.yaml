@@ -206,6 +206,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Build VAmPI Image
+        run: |
+          cd ${{ env.BASE_DIR }}/services/vampi
+          sudo docker build -t vampi:latest .
+        shell: bash
+
       - name: Start VAmPI Container
         run: |
           case "${{ matrix.fuzzer }}" in
