@@ -1,0 +1,14 @@
+openapi: 3.0.1
+info:
+  title: VAmPI
+  description: OpenAPI v3 specs for VAmPI
+  version: '0.1'
+servers:
+  - url: ${API_URL}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      x-bearerInfoFunc: models.user_model.User.decode_auth_token
