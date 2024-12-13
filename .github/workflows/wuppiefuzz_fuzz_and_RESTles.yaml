@@ -150,10 +150,26 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup directories
+      - name: Setup directories and copy files
         run: |
+          # Create directories
           mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster
           mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+          
+          # Verify source files exist
+          ls -la ${{ env.BASE_DIR }}/services/evomaster/
+          
+          # Copy files with error checking
+          for file in "Dockerfile.evomaster" "entrypoint.sh" "docker-compose.evomaster.yml"; do
+            if [ ! -f "${{ env.BASE_DIR }}/services/evomaster/$file" ]; then
+              echo "Error: File $file not found in services/evomaster/"
+              exit 1
+            fi
+            cp "${{ env.BASE_DIR }}/services/evomaster/$file" "${{ env.BASE_DIR }}/workspace/evomaster/"
+          done
+          
+          # Make entrypoint.sh executable
+          chmod +x ${{ env.BASE_DIR }}/workspace/evomaster/entrypoint.sh
         shell: bash
 
       - name: Copy EvoMaster Files
