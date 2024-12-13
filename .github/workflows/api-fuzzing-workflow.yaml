@@ -248,6 +248,67 @@ jobs:
           esac
         shell: bash
 
+      - name: Run Fuzzer
+        run: |
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              cd ${{ env.BASE_DIR }}/workspace/restler
+              # Start RESTler container
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/config:/config \
+                -v $(pwd)/output:/output \
+                mcr.microsoft.com/restler-fuzzer \
+                compile /config/openapi3.yml
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/config:/config \
+                -v $(pwd)/output:/output \
+                mcr.microsoft.com/restler-fuzzer \
+                fuzz --grammar_file /output/grammar.json \
+                --settings /config/engine_settings.json \
+                --target_endpoint $VAMPI_URL \
+                --time_budget 1
+              ;;
+            
+            "wuppiefuzz")
+              cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+              # Download WuppieFuzz binary
+              mkdir -p bin
+              cp ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz bin/
+              chmod +x bin/wuppiefuzz
+              # Run WuppieFuzz
+              ./bin/wuppiefuzz fuzz \
+                --openapi-path openapi3.yml \
+                --target-url $VAMPI_URL \
+                --output-dir reports \
+                --time-budget 60
+              ;;
+            
+            "evomaster")
+              cd ${{ env.BASE_DIR }}/workspace/evomaster
+              # Start EvoMaster container
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/evomaster_results:/evomaster_results \
+                -e VAMPI_URL=$VAMPI_URL \
+                evomaster:latest \
+                --blackBox true \
+                --bbSwaggerUrl $VAMPI_URL/openapi3.yml \
+                --outputFormat JAVA_JUNIT_4 \
+                --maxTime 1m \
+                --ratePerMinute 100
+              ;;
+          esac
+        shell: bash
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.fuzzer }}-results
+          path: |
+            ${{ env.BASE_DIR }}/workspace/restler/output/**
+            ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/**
+            ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results/**
+          if-no-files-found: warn
+
   summarize_results:
     runs-on: self-hosted
     needs: run_fuzzing
