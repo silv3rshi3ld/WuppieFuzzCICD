@@ -268,7 +268,12 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/services/vampi
-              docker-compose -f docker-compose.yaml -p vampi_restler up -d vampi-vulnerable
+              # Use unique container names for RESTler
+              export COMPOSE_PROJECT_NAME=vampi_restler
+              sed -i 's/container_name: vampi-vulnerable/container_name: vampi-vulnerable-restler/g' docker-compose.yaml
+              sed -i 's/container_name: vampi-secure/container_name: vampi-secure-restler/g' docker-compose.yaml
+              
+              docker-compose -f docker-compose.yaml up -d vampi-vulnerable
               
               echo "Waiting for VAmPI RESTler instance..."
               for i in {1..30}; do
@@ -278,7 +283,7 @@ jobs:
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
+                  docker logs vampi-vulnerable-restler
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -287,6 +292,11 @@ jobs:
               ;;
             *)
               cd ${{ env.BASE_DIR }}/services/vampi
+              # Use unique container names for other fuzzers
+              export COMPOSE_PROJECT_NAME=vampi_${{ matrix.fuzzer }}
+              sed -i 's/container_name: vampi-vulnerable/container_name: vampi-vulnerable-${{ matrix.fuzzer }}/g' docker-compose.yaml
+              sed -i 's/container_name: vampi-secure/container_name: vampi-secure-${{ matrix.fuzzer }}/g' docker-compose.yaml
+              
               docker compose up -d
               
               echo "Waiting for VAmPI vulnerable instance..."
@@ -297,7 +307,7 @@ jobs:
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
+                  docker logs vampi-vulnerable-${{ matrix.fuzzer }}
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -319,7 +329,7 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/workspace/restler
-              TARGET_HOST=vampi-vulnerable \
+              TARGET_HOST=vampi-vulnerable-restler \
               TARGET_PORT=5000 \
               docker-compose -f docker-compose.restler.yml up --build
               ;;
