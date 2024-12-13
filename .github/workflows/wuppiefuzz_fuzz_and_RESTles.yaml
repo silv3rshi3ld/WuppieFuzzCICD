@@ -21,9 +21,6 @@ env:
 jobs:
   initialize_environment:
     runs-on: self-hosted
-    strategy:
-      matrix:
-        worker: [1, 2, 3] # Multiple workers for parallel initialization
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -38,24 +35,10 @@ jobs:
 
       - name: Create Docker Network
         run: |
-          NETWORK_NAME="${DOCKER_NETWORK_NAME}_${{ matrix.worker }}"
-          if ! docker network inspect $NETWORK_NAME >/dev/null 2>&1; then
+          if ! docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
             for i in {1..3}; do
-              # Use completely different subnets for each worker
-              case "${{ matrix.worker }}" in
-                1)
-                  SUBNET="172.20.0.0/16"
-                  ;;
-                2)
-                  SUBNET="172.21.0.0/16"
-                  ;;
-                3)
-                  SUBNET="172.22.0.0/16"
-                  ;;
-              esac
-              
-              if docker network create --subnet=$SUBNET $NETWORK_NAME; then
-                echo "Network $NETWORK_NAME created successfully with subnet $SUBNET"
+              if docker network create --subnet=172.20.0.0/16 $DOCKER_NETWORK_NAME; then
+                echo "Network created successfully"
                 break
               fi
               if [ $i -eq 3 ]; then
@@ -90,7 +73,7 @@ jobs:
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
-      fail-fast: false # Continue with other fuzzers if one fails
+      fail-fast: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -167,33 +150,38 @@ jobs:
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
-        worker: [1, 2, 3] # Multiple workers for parallel fuzzing
-      fail-fast: false # Continue with other combinations if one fails
+      fail-fast: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup VAmPI for Fuzzer
         run: |
-          NETWORK_NAME="${DOCKER_NETWORK_NAME}_${{ matrix.worker }}"
-          PORT_OFFSET=$(( (${{ matrix.worker }} - 1) * 10 ))
-          
+          # Set port based on fuzzer
           case "${{ matrix.fuzzer }}" in
             "restler")
-              export VAMPI_PORT=$(( ${{ env.VAMPI_RESTLER_PORT }} + $PORT_OFFSET ))
+              export VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}
               ;;
             "wuppiefuzz")
-              export VAMPI_PORT=$(( ${{ env.VAMPI_WUPPIEFUZZ_PORT }} + $PORT_OFFSET ))
+              export VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
               ;;
             "evomaster")
-              export VAMPI_PORT=$(( ${{ env.VAMPI_EVOMASTER_PORT }} + $PORT_OFFSET ))
+              export VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}
               ;;
           esac
           
-          # Start VAmPI instance with unique network and port
+          # Create docker-compose override file for network configuration
+          cat > docker-compose.override.yml <<EOL
+          networks:
+            default:
+              name: ${{ env.DOCKER_NETWORK_NAME }}
+              external: true
+          EOL
+          
+          # Start VAmPI instance
           docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml \
-            -p vampi_${{ matrix.fuzzer }}_${{ matrix.worker }} \
-            --network $NETWORK_NAME \
+            -f docker-compose.override.yml \
+            -p vampi_${{ matrix.fuzzer }} \
             up -d vampi-vulnerable-${{ matrix.fuzzer }}
           
           # Wait for VAmPI to be healthy
