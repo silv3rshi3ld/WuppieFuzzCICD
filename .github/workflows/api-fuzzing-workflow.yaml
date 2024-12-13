@@ -220,16 +220,10 @@ jobs:
               ;;
           esac
           
-          # Start MongoDB container
-          sudo docker run -d --name vampi-mongo-${{ matrix.fuzzer }} \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            mongo:4.4
-
           # Start VAmPI container
           sudo docker run -d --name vampi-${{ matrix.fuzzer }} \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p $PORT:5000 \
-            -e MONGO_HOST=vampi-mongo-${{ matrix.fuzzer }} \
             vampi:latest
 
           # Wait for VAmPI to be ready
