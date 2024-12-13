@@ -36,22 +36,20 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          # Disconnect containers from network first
-          for container in $(sudo docker ps -aq); do
-            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
-          done
-
-          # Stop all containers with sudo
-          sudo docker ps -q | xargs -r sudo docker stop || true
+          # Force remove the network first
+          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
           
-          # Remove our specific containers with sudo
-          sudo docker ps -a --format '{{.Names}}' | grep -E 'vampi|mongo' | xargs -r sudo docker rm -f || true
+          # Kill all containers (more aggressive than stop)
+          sudo docker ps -q | xargs -r sudo docker kill 2>/dev/null || true
           
-          # Remove any remaining containers with sudo
-          sudo docker ps -aq | xargs -r sudo docker rm -f || true
+          # Force remove all containers without stopping
+          sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
           
-          # Remove networks with sudo
-          sudo docker network ls --filter type=custom -q | xargs -r sudo docker network rm || true
+          # Final cleanup of any dangling resources
+          sudo docker system prune -f --volumes 2>/dev/null || true
+          
+          # Sleep to allow system to settle
+          sleep 5
         shell: bash
 
       - name: Create Docker Network
