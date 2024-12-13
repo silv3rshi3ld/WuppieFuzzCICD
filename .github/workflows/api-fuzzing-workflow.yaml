@@ -232,17 +232,21 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               PORT=${{ env.VAMPI_RESTLER_PORT }}
+              CONTAINER_NAME="vampi-vulnerable-restler"
               ;;
             "wuppiefuzz")
               PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
+              CONTAINER_NAME="vampi-vulnerable-wuppiefuzz"
               ;;
             "evomaster")
               PORT=${{ env.VAMPI_EVOMASTER_PORT }}
+              CONTAINER_NAME="vampi-vulnerable-evomaster"
               ;;
           esac
           
           echo "::group::Container Cleanup"
-          echo "Removing any existing container..."
+          echo "Removing any existing containers..."
+          sudo docker rm -f $CONTAINER_NAME || true
           sudo docker rm -f vampi-${{ matrix.fuzzer }} || true
           echo "Current running containers:"
           sudo docker ps
@@ -253,32 +257,63 @@ jobs:
           echo "Starting VAmPI container for ${{ matrix.fuzzer }} at $(date)"
           
           # Start VAmPI container with debug logging
-          sudo docker run -d --name vampi-${{ matrix.fuzzer }} \
+          sudo docker run -d --name $CONTAINER_NAME \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p $PORT:5000 \
             -e APP_DEBUG=1 \
+            -e FLASK_DEBUG=1 \
+            -e FLASK_ENV=development \
             vampi:latest
+
+          # Verify container is running
+          echo "Verifying container status..."
+          if ! sudo docker ps | grep -q $CONTAINER_NAME; then
+            echo "Container failed to start. Container logs:"
+            sudo docker logs $CONTAINER_NAME
+            echo "Container status:"
+            sudo docker inspect $CONTAINER_NAME
+            exit 1
+          fi
 
           # Wait for VAmPI to be ready with more verbose output
           echo "Waiting for container to be ready..."
           for i in {1..30}; do
-            echo "Attempt $i: Checking http://localhost:$PORT/health"
-            if curl -v http://localhost:$PORT/health 2>&1; then
+            echo "Attempt $i: Checking container and port status"
+            
+            # Check if container is still running
+            if ! sudo docker ps | grep -q $CONTAINER_NAME; then
+              echo "Container stopped running. Logs:"
+              sudo docker logs $CONTAINER_NAME
+              exit 1
+            fi
+            
+            # Check port binding
+            echo "Port binding status:"
+            sudo netstat -tulpn | grep $PORT || true
+            
+            # Try health check
+            echo "Attempting health check..."
+            if curl -v --connect-timeout 5 http://localhost:$PORT/health 2>&1; then
               END_TIME=$(date +%s)
               DURATION=$((END_TIME - START_TIME))
               echo "VAmPI is ready after $DURATION seconds"
               echo "Container resource usage:"
-              sudo docker stats vampi-${{ matrix.fuzzer }} --no-stream
+              sudo docker stats $CONTAINER_NAME --no-stream
               break
             fi
+            
             if [ $i -eq 30 ]; then
               END_TIME=$(date +%s)
               DURATION=$((END_TIME - START_TIME))
               echo "VAmPI failed to start after $DURATION seconds"
               echo "Docker logs:"
-              sudo docker logs vampi-${{ matrix.fuzzer }}
+              sudo docker logs $CONTAINER_NAME
               echo "Container status:"
-              sudo docker inspect vampi-${{ matrix.fuzzer }}
+              sudo docker inspect $CONTAINER_NAME
+              echo "Process list inside container:"
+              sudo docker exec $CONTAINER_NAME ps aux || true
+              echo "Network interfaces inside container:"
+              sudo docker exec $CONTAINER_NAME ip addr || true
               exit 1
             fi
             echo "Waiting for VAmPI to start... ($i/30)"
@@ -288,11 +323,13 @@ jobs:
 
           echo "::group::Final Status"
           echo "Container status:"
-          sudo docker ps --filter "name=vampi-${{ matrix.fuzzer }}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          sudo docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
           echo "Container resource usage:"
-          sudo docker stats vampi-${{ matrix.fuzzer }} --no-stream
+          sudo docker stats $CONTAINER_NAME --no-stream
           echo "Network connectivity:"
           sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+          echo "Container logs:"
+          sudo docker logs $CONTAINER_NAME
           echo "::endgroup::"
         shell: bash
 
