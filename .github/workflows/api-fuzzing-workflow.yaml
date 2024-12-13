@@ -13,9 +13,9 @@ permissions:
 
 env:
   DOCKER_NETWORK_NAME: cicd_network
-  VAMPI_RESTLER_PORT: 5003
-  VAMPI_WUPPIEFUZZ_PORT: 5002
-  VAMPI_EVOMASTER_PORT: 5001
+  VAMPI_RESTLER_PORT: 5012
+  VAMPI_WUPPIEFUZZ_PORT: 5022
+  VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -268,46 +268,109 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/services/vampi
-              # Use unique container names for RESTler
-              export COMPOSE_PROJECT_NAME=vampi_restler
-              sed -i 's/container_name: vampi-vulnerable/container_name: vampi-vulnerable-restler/g' docker-compose.yaml
-              sed -i 's/container_name: vampi-secure/container_name: vampi-secure-restler/g' docker-compose.yaml
               
-              docker-compose -f docker-compose.yaml up -d vampi-vulnerable
+              # Generate random ports and container suffix
+              SUFFIX=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
+              VULNERABLE_PORT=$(shuf -i 10000-20000 -n 1)
+              SECURE_PORT=$(shuf -i 10000-20000 -n 1)
+              
+              # Create a temporary docker-compose file with unique ports and names
+              cp docker-compose.yaml docker-compose.restler.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-vulnerable/container_name: vampi-vulnerable-$SUFFIX/g" docker-compose.restler.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-secure/container_name: vampi-secure-$SUFFIX/g" docker-compose.restler.$SUFFIX.yaml
+              sed -i "s/- 5001:5000/- $SECURE_PORT:5000/g" docker-compose.restler.$SUFFIX.yaml
+              sed -i "s/- 5002:5000/- $VULNERABLE_PORT:5000/g" docker-compose.restler.$SUFFIX.yaml
+              
+              export COMPOSE_PROJECT_NAME=vampi_restler_$SUFFIX
+              docker-compose -f docker-compose.restler.$SUFFIX.yaml up -d vampi-vulnerable-$SUFFIX
+              
+              # Export the port and container name for the fuzzer to use
+              echo "VAMPI_CONTAINER=vampi-vulnerable-$SUFFIX" >> $GITHUB_ENV
+              echo "VAMPI_PORT=$VULNERABLE_PORT" >> $GITHUB_ENV
               
               echo "Waiting for VAmPI RESTler instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:${{ env.VAMPI_RESTLER_PORT }}/health >/dev/null; then
+                if curl -s http://localhost:$VULNERABLE_PORT/health >/dev/null; then
                   echo "VAmPI RESTler instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable-restler
+                  docker logs vampi-vulnerable-$SUFFIX
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
                 sleep 2
               done
               ;;
-            *)
+            "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/services/vampi
-              # Use unique container names for other fuzzers
-              export COMPOSE_PROJECT_NAME=vampi_${{ matrix.fuzzer }}
-              sed -i 's/container_name: vampi-vulnerable/container_name: vampi-vulnerable-${{ matrix.fuzzer }}/g' docker-compose.yaml
-              sed -i 's/container_name: vampi-secure/container_name: vampi-secure-${{ matrix.fuzzer }}/g' docker-compose.yaml
               
-              docker compose up -d
+              # Generate random ports and container suffix
+              SUFFIX=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
+              VULNERABLE_PORT=$(shuf -i 10000-20000 -n 1)
+              SECURE_PORT=$(shuf -i 10000-20000 -n 1)
               
-              echo "Waiting for VAmPI vulnerable instance..."
+              # Create a temporary docker-compose file with unique ports and names
+              cp docker-compose.yaml docker-compose.wuppiefuzz.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-vulnerable/container_name: vampi-vulnerable-$SUFFIX/g" docker-compose.wuppiefuzz.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-secure/container_name: vampi-secure-$SUFFIX/g" docker-compose.wuppiefuzz.$SUFFIX.yaml
+              sed -i "s/- 5001:5000/- $SECURE_PORT:5000/g" docker-compose.wuppiefuzz.$SUFFIX.yaml
+              sed -i "s/- 5002:5000/- $VULNERABLE_PORT:5000/g" docker-compose.wuppiefuzz.$SUFFIX.yaml
+              
+              export COMPOSE_PROJECT_NAME=vampi_wuppiefuzz_$SUFFIX
+              docker-compose -f docker-compose.wuppiefuzz.$SUFFIX.yaml up -d vampi-vulnerable-$SUFFIX
+              
+              # Export the port and container name for the fuzzer to use
+              echo "VAMPI_CONTAINER=vampi-vulnerable-$SUFFIX" >> $GITHUB_ENV
+              echo "VAMPI_PORT=$VULNERABLE_PORT" >> $GITHUB_ENV
+              
+              echo "Waiting for VAmPI WuppieFuzz instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5002/health >/dev/null; then
-                  echo "VAmPI vulnerable instance is ready!"
+                if curl -s http://localhost:$VULNERABLE_PORT/health >/dev/null; then
+                  echo "VAmPI WuppieFuzz instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable-${{ matrix.fuzzer }}
+                  docker logs vampi-vulnerable-$SUFFIX
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+            "evomaster")
+              cd ${{ env.BASE_DIR }}/services/vampi
+              
+              # Generate random ports and container suffix
+              SUFFIX=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
+              VULNERABLE_PORT=$(shuf -i 10000-20000 -n 1)
+              SECURE_PORT=$(shuf -i 10000-20000 -n 1)
+              
+              # Create a temporary docker-compose file with unique ports and names
+              cp docker-compose.yaml docker-compose.evomaster.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-vulnerable/container_name: vampi-vulnerable-$SUFFIX/g" docker-compose.evomaster.$SUFFIX.yaml
+              sed -i "s/container_name: vampi-secure/container_name: vampi-secure-$SUFFIX/g" docker-compose.evomaster.$SUFFIX.yaml
+              sed -i "s/- 5001:5000/- $SECURE_PORT:5000/g" docker-compose.evomaster.$SUFFIX.yaml
+              sed -i "s/- 5002:5000/- $VULNERABLE_PORT:5000/g" docker-compose.evomaster.$SUFFIX.yaml
+              
+              export COMPOSE_PROJECT_NAME=vampi_evomaster_$SUFFIX
+              docker-compose -f docker-compose.evomaster.$SUFFIX.yaml up -d vampi-vulnerable-$SUFFIX
+              
+              # Export the port and container name for the fuzzer to use
+              echo "VAMPI_CONTAINER=vampi-vulnerable-$SUFFIX" >> $GITHUB_ENV
+              echo "VAMPI_PORT=$VULNERABLE_PORT" >> $GITHUB_ENV
+              
+              echo "Waiting for VAmPI EvoMaster instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:$VULNERABLE_PORT/health >/dev/null; then
+                  echo "VAmPI EvoMaster instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable-$SUFFIX
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -329,9 +392,9 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/workspace/restler
-              TARGET_HOST=vampi-vulnerable-restler \
-              TARGET_PORT=5000 \
-              docker-compose -f docker-compose.restler.yml up --build
+              TARGET_HOST=vampi-vulnerable-${SUFFIX} \
+              TARGET_PORT=${VULNERABLE_PORT} \
+              docker-compose -f docker-compose.restler.$SUFFIX.yml up --build
               ;;
             
             "wuppiefuzz")
@@ -339,7 +402,7 @@ jobs:
               chmod +x bin/wuppiefuzz
 
               # Update OpenAPI spec with correct port
-              sed -i 's|http://localhost:5000|http://localhost:5002|g' openapi3.yml
+              sed -i 's|http://localhost:5000|http://localhost:'${VULNERABLE_PORT}'|g' openapi3.yml
 
               # Run WuppieFuzz
               ./bin/wuppiefuzz output-corpus \
@@ -350,7 +413,7 @@ jobs:
                 --report \
                 --log-level=info \
                 --initial-corpus=corpus_directory \
-                --coverage-host=localhost:5002 \
+                --coverage-host=localhost:${VULNERABLE_PORT} \
                 --timeout=60 \
                 openapi3.yml
               ;;
@@ -360,10 +423,10 @@ jobs:
               # Start EvoMaster container
               sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
                 -v $(pwd)/evomaster_results:/evomaster_results \
-                -e VAMPI_URL=$VAMPI_URL \
+                -e VAMPI_URL=http://localhost:${VULNERABLE_PORT}/openapi3.yml \
                 evomaster:latest \
                 --blackBox true \
-                --bbSwaggerUrl $VAMPI_URL/openapi3.yml \
+                --bbSwaggerUrl http://localhost:${VULNERABLE_PORT}/openapi3.yml \
                 --outputFormat JAVA_JUNIT_4 \
                 --maxTime 1m \
                 --ratePerMinute 100
@@ -380,6 +443,24 @@ jobs:
             ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/**
             ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results/**
           if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd ${{ env.BASE_DIR }}/services/vampi
+          
+          # Clean up all docker-compose files and their containers
+          for file in docker-compose.*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Cleaning up containers from $file"
+              docker-compose -f "$file" down --remove-orphans
+              rm "$file"
+            fi
+          done
+          
+          # Additional cleanup of any stray containers
+          docker ps -a | grep 'vampi-' | awk '{print $1}' | xargs -r docker rm -f
+        shell: bash
 
   summarize_results:
     runs-on: self-hosted
