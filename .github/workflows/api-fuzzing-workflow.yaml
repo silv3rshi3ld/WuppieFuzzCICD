@@ -311,6 +311,9 @@ jobs:
               cp ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz bin/
               chmod +x bin/wuppiefuzz
 
+              # Update OpenAPI spec with correct port
+              sed -i 's|http://localhost:5000|http://localhost:5002|g' openapi3.yml
+
               # Start VAmPI vulnerable instance
               cd ${{ env.BASE_DIR }}/services/vampi
               docker compose up -d
@@ -329,7 +332,7 @@ jobs:
               # Run WuppieFuzz
               cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
               ./bin/wuppiefuzz output-corpus \
-                --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
+                --openapi-spec=openapi3.yml \
                 corpus_directory
 
               ./bin/wuppiefuzz fuzz \
@@ -338,7 +341,7 @@ jobs:
                 --initial-corpus=corpus_directory \
                 --coverage-host=localhost:5002 \
                 --timeout=60 \
-                ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
+                openapi3.yml
               ;;
             
             "evomaster")
