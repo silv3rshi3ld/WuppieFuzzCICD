@@ -208,59 +208,43 @@ jobs:
 
       - name: Create Workspace Directories
         run: |
-          # Create directories for each fuzzer
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace/{bin,reports}
-          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
-
-          # Create RESTler config
-          cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
-          {
-            "max_combinations": 20,
-            "max_request_execution_time": 10,
-            "max_async_resource_creation_time": 20,
-            "global_producer_timing_delay": 2,
-            "dyn_objects_cache_size": 10,
-            "fuzzing_mode": "directed-smoke-test",
-            "test_all_combinations": false,
-            "test_combinations_settings": {
-              "max_combinations": 20
-            }
-          }
-          EOF
-        shell: bash
-
-      - name: Start VAmPI Container
-        run: |
-          cd ${{ env.BASE_DIR }}/services/vampi
-          
-          # Start VAmPI using docker-compose (this will start both secure and vulnerable instances)
-          sudo docker compose up -d
-          
-          # Wait for the vulnerable instance to be ready
-          echo "Waiting for VAmPI vulnerable instance to be ready..."
-          for i in {1..30}; do
-            if curl -s http://localhost:5002/health >/dev/null; then
-              echo "VAmPI vulnerable instance is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI failed to start. Container logs:"
-              sudo docker logs vampi-vulnerable
-              exit 1
-            fi
-            echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-            sleep 2
-          done
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
+              # Create RESTler config
+              cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
+              {
+                "max_combinations": 20,
+                "max_request_execution_time": 10,
+                "max_async_resource_creation_time": 20,
+                "global_producer_timing_delay": 2,
+                "dyn_objects_cache_size": 10,
+                "fuzzing_mode": "directed-smoke-test",
+                "test_all_combinations": false,
+                "test_combinations_settings": {
+                  "max_combinations": 20
+                }
+              }
+              EOF
+              ;;
+            "wuppiefuzz")
+              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace/{bin,reports,corpus_directory}
+              ;;
+            "evomaster")
+              mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+              ;;
+          esac
         shell: bash
 
       - name: Configure Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
             "restler")
-              # Copy OpenAPI spec to RESTler config
-              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/config/
-              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              # Copy RESTler files
+              cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
+              cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
+              cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
+              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
               ;;
             "wuppiefuzz")
               # Copy OpenAPI spec to WuppieFuzz workspace
@@ -275,62 +259,73 @@ jobs:
           esac
         shell: bash
 
+      - name: Start VAmPI Container
+        run: |
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              cd ${{ env.BASE_DIR }}/services/vampi
+              docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
+              
+              echo "Waiting for VAmPI RESTler instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:${{ env.VAMPI_RESTLER_PORT }}/health >/dev/null; then
+                  echo "VAmPI RESTler instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable-restler
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+            *)
+              cd ${{ env.BASE_DIR }}/services/vampi
+              docker compose up -d
+              
+              echo "Waiting for VAmPI vulnerable instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:5002/health >/dev/null; then
+                  echo "VAmPI vulnerable instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+          esac
+        shell: bash
+
       - name: Download WuppieFuzz Binary
         if: matrix.fuzzer == 'wuppiefuzz'
         uses: actions/download-artifact@v4
         with:
           name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/bin
 
       - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/workspace/restler
-              # Start RESTler container
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/config:/config \
-                -v $(pwd)/output:/output \
-                mcr.microsoft.com/restler-fuzzer \
-                compile /config/openapi3.yml
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/config:/config \
-                -v $(pwd)/output:/output \
-                mcr.microsoft.com/restler-fuzzer \
-                fuzz --grammar_file /output/grammar.json \
-                --settings /config/engine_settings.json \
-                --target_endpoint $VAMPI_URL \
-                --time_budget 1
+              docker-compose -f docker-compose.restler.yml up --build
               ;;
             
             "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-              
-              # Download and setup WuppieFuzz binary
-              mkdir -p bin reports corpus_directory
-              cp ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz bin/
               chmod +x bin/wuppiefuzz
 
               # Update OpenAPI spec with correct port
               sed -i 's|http://localhost:5000|http://localhost:5002|g' openapi3.yml
 
-              # Start VAmPI vulnerable instance
-              cd ${{ env.BASE_DIR }}/services/vampi
-              docker compose up -d
-              
-              echo "Waiting for VAmPI to initialize..."
-              for i in {1..30}; do
-                if curl -s http://localhost:5002/health >/dev/null; then
-                  echo "VAmPI instance is healthy."
-                  break
-                fi
-                echo "Attempt $i of 30: VAmPI instance not ready yet..."
-                docker logs vampi-vulnerable
-                sleep 5
-              done
-
               # Run WuppieFuzz
-              cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
               ./bin/wuppiefuzz output-corpus \
                 --openapi-spec=openapi3.yml \
                 corpus_directory
