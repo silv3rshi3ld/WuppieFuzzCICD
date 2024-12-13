@@ -209,7 +209,24 @@ jobs:
       - name: Build VAmPI Image
         run: |
           cd ${{ env.BASE_DIR }}/services/vampi
+          # Update the OpenAPI spec with the correct port
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              PORT=${{ env.VAMPI_RESTLER_PORT }}
+              ;;
+            "wuppiefuzz")
+              PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
+              ;;
+            "evomaster")
+              PORT=${{ env.VAMPI_EVOMASTER_PORT }}
+              ;;
+          esac
+          # Update the server URL in the OpenAPI spec
+          sed -i "s|http://localhost:5000|http://localhost:$PORT|g" openapi_specs/openapi3.yml
+          # Build the image
           sudo docker build -t vampi:latest .
+          # Restore the original OpenAPI spec
+          git checkout openapi_specs/openapi3.yml
         shell: bash
 
       - name: Start VAmPI Container
