@@ -313,7 +313,7 @@ jobs:
 
               # Start VAmPI vulnerable instance
               cd ${{ env.BASE_DIR }}/services/vampi
-              docker-compose -f docker-compose.yaml up -d
+              docker compose up -d
               
               echo "Waiting for VAmPI to initialize..."
               for i in {1..30}; do
@@ -403,7 +403,7 @@ jobs:
         run: |
           echo "Cleaning up Docker resources..."
           # Clean up containers
-          sudo docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml down --remove-orphans || true
+          sudo docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.yaml down --remove-orphans || true
           sudo docker compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down --remove-orphans || true
           sudo docker compose -f ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yml down --remove-orphans || true
           
