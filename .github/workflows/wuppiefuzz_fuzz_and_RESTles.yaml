@@ -138,6 +138,7 @@ jobs:
         run: |
           mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster
           mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+          mkdir -p ${{ env.BASE_DIR }}/workspace/vampi
         shell: bash
 
       - name: Copy EvoMaster Files
@@ -146,6 +147,7 @@ jobs:
           cp ${{ env.BASE_DIR }}/services/evomaster/entrypoint.sh ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/evomaster/docker-compose.evomaster.yml ${{ env.BASE_DIR }}/workspace/evomaster/
           cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/evomaster.openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi_evomaster.yml
+          cp -r ${{ env.BASE_DIR }}/services/vampi/* ${{ env.BASE_DIR }}/workspace/vampi/
         shell: bash
 
       - name: Adjust docker-compose for result directory
