@@ -275,6 +275,13 @@ jobs:
           esac
         shell: bash
 
+      - name: Download WuppieFuzz Binary
+        if: matrix.fuzzer == 'wuppiefuzz'
+        uses: actions/download-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
+
       - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
