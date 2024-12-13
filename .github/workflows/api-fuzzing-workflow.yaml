@@ -33,6 +33,13 @@ jobs:
           mkdir -p $HOME/.cargo $HOME/.rustup
         shell: bash
 
+      - name: Cleanup Previous Containers
+        if: always()
+        run: |
+          docker ps -aq | xargs -r docker rm -f
+          docker network prune -f
+        shell: bash
+
       - name: Create Docker Network
         run: |
           if ! docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
@@ -187,48 +194,43 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup VAmPI for Fuzzer
+      - name: Start VAmPI Container
         run: |
-          # Set port based on fuzzer
           case "${{ matrix.fuzzer }}" in
             "restler")
-              export VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}
+              PORT=${{ env.VAMPI_RESTLER_PORT }}
               ;;
             "wuppiefuzz")
-              export VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
+              PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
               ;;
             "evomaster")
-              export VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}
+              PORT=${{ env.VAMPI_EVOMASTER_PORT }}
               ;;
           esac
           
-          # Create docker-compose override file for network configuration
-          cat > docker-compose.override.yml <<EOL
-          networks:
-            default:
-              name: ${{ env.DOCKER_NETWORK_NAME }}
-              external: true
-          EOL
-          
-          # Start VAmPI instance
-          docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml \
-            -f docker-compose.override.yml \
-            -p vampi_${{ matrix.fuzzer }} \
-            up -d vampi-vulnerable-${{ matrix.fuzzer }}
-          
-          # Wait for VAmPI to be healthy
-          echo "Waiting for VAmPI instance..."
+          # Start MongoDB container
+          docker run -d --name vampi-mongo-${{ matrix.fuzzer }} \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            mongo:4.4
+
+          # Start VAmPI container
+          docker run -d --name vampi-${{ matrix.fuzzer }} \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -p $PORT:5000 \
+            -e MONGO_HOST=vampi-mongo-${{ matrix.fuzzer }} \
+            vampi:latest
+
+          # Wait for VAmPI to be ready
           for i in {1..30}; do
-            if curl -s http://localhost:$VAMPI_PORT/health >/dev/null; then
-              echo "VAmPI is healthy!"
+            if curl -s http://localhost:$PORT/health > /dev/null; then
+              echo "VAmPI is ready"
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "VAmPI failed to become healthy"
-              docker logs vampi-vulnerable-${{ matrix.fuzzer }}
+              echo "VAmPI failed to start"
               exit 1
             fi
-            echo "Waiting... (attempt $i/30)"
+            echo "Waiting for VAmPI to start... ($i/30)"
             sleep 2
           done
         shell: bash
