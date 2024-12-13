@@ -200,7 +200,7 @@ jobs:
     needs: [prepare_fuzzers, prepare_openapi_specs]
     strategy:
       matrix:
-        fuzzer: [wuppiefuzz]
+        fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
       - name: Checkout Repository
@@ -257,9 +257,19 @@ jobs:
       - name: Configure Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
+            "restler")
+              # Copy OpenAPI spec to RESTler config
+              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/config/
+              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              ;;
             "wuppiefuzz")
               # Copy OpenAPI spec to WuppieFuzz workspace
               cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/wuppiefuzz_workspace/
+              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              ;;
+            "evomaster")
+              # Copy OpenAPI spec to EvoMaster workspace
+              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/
               echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
               ;;
           esac
@@ -268,6 +278,24 @@ jobs:
       - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
+            "restler")
+              cd ${{ env.BASE_DIR }}/workspace/restler
+              # Start RESTler container
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/config:/config \
+                -v $(pwd)/output:/output \
+                mcr.microsoft.com/restler-fuzzer \
+                compile /config/openapi3.yml
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/config:/config \
+                -v $(pwd)/output:/output \
+                mcr.microsoft.com/restler-fuzzer \
+                fuzz --grammar_file /output/grammar.json \
+                --settings /config/engine_settings.json \
+                --target_endpoint $VAMPI_URL \
+                --time_budget 1
+              ;;
+            
             "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
               
@@ -306,12 +334,18 @@ jobs:
                 ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
               ;;
             
-            "restler")
-              echo "Skipping RESTler for now..."
-              ;;
-            
             "evomaster")
-              echo "Skipping EvoMaster for now..."
+              cd ${{ env.BASE_DIR }}/workspace/evomaster
+              # Start EvoMaster container
+              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
+                -v $(pwd)/evomaster_results:/evomaster_results \
+                -e VAMPI_URL=$VAMPI_URL \
+                evomaster:latest \
+                --blackBox true \
+                --bbSwaggerUrl $VAMPI_URL/openapi3.yml \
+                --outputFormat JAVA_JUNIT_4 \
+                --maxTime 1m \
+                --ratePerMinute 100
               ;;
           esac
         shell: bash
