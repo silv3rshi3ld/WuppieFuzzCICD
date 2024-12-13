@@ -81,9 +81,9 @@ jobs:
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           # Cleanup existing containers
-          sudo docker compose -f docker-compose.vampi.yml down --remove-orphans || true
+          sudo docker compose -f docker-compose.yaml down --remove-orphans || true
           # Build fresh images
-          sudo docker compose -f docker-compose.vampi.yml build --force-rm
+          sudo docker compose -f docker-compose.yaml build --force-rm
         shell: bash
 
   prepare_fuzzers:
@@ -206,92 +206,46 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build VAmPI Image
-        run: |
-          cd ${{ env.BASE_DIR }}/services/vampi
-          sudo docker build -t vampi:latest .
-        shell: bash
-
       - name: Start VAmPI Container
         run: |
-          echo "::group::Container Resource Information"
-          echo "Starting container setup at $(date)"
-          echo "Available system resources:"
-          free -h
-          df -h
-          echo "::endgroup::"
-
-          # Create network if it doesn't exist
-          echo "::group::Network Setup"
-          echo "Creating/checking network..."
-          sudo docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
-          echo "Current docker networks:"
-          sudo docker network ls
-          echo "::endgroup::"
+          cd ${{ env.BASE_DIR }}/services/vampi
           
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              PORT=${{ env.VAMPI_RESTLER_PORT }}
-              CONTAINER_NAME="vampi-vulnerable-restler"
-              ;;
-            "wuppiefuzz")
-              PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
-              CONTAINER_NAME="vampi-vulnerable-wuppiefuzz"
-              ;;
-            "evomaster")
-              PORT=${{ env.VAMPI_EVOMASTER_PORT }}
-              CONTAINER_NAME="vampi-vulnerable-evomaster"
-              ;;
-          esac
+          # Start VAmPI using docker-compose (this will start both secure and vulnerable instances)
+          sudo docker compose up -d
           
-          echo "::group::Container Cleanup"
-          echo "Removing any existing containers..."
-          sudo docker rm -f $CONTAINER_NAME || true
-          sudo docker rm -f vampi-${{ matrix.fuzzer }} || true
-          echo "Current running containers:"
-          sudo docker ps
-          echo "::endgroup::"
-          
-          echo "::group::Container Startup"
-          START_TIME=$(date +%s)
-          echo "Starting VAmPI container for ${{ matrix.fuzzer }} at $(date)"
-          
-          # Start VAmPI container with debug logging
-          sudo docker run -d --name $CONTAINER_NAME \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -p $PORT:5000 \
-            -e FLASK_APP=app.py \
-            -e FLASK_ENV=development \
-            -e vulnerable=1 \
-            vampi:latest
-
-          # Wait for VAmPI to be ready
-          echo "Waiting for container to be ready..."
+          # Wait for the vulnerable instance to be ready
+          echo "Waiting for VAmPI vulnerable instance to be ready..."
           for i in {1..30}; do
-            if curl -s http://localhost:$PORT/health >/dev/null; then
-              echo "VAmPI is ready!"
+            if curl -s http://localhost:5002/health >/dev/null; then
+              echo "VAmPI vulnerable instance is ready!"
               break
             fi
             if [ $i -eq 30 ]; then
               echo "VAmPI failed to start. Container logs:"
-              sudo docker logs $CONTAINER_NAME
+              sudo docker logs vampi-vulnerable
               exit 1
             fi
             echo "Waiting for VAmPI to be ready (attempt $i/30)..."
             sleep 2
           done
-          echo "::endgroup::"
+        shell: bash
 
-          echo "::group::Final Status"
-          echo "Container status:"
-          sudo docker ps --filter "name=$CONTAINER_NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-          echo "Container resource usage:"
-          sudo docker stats $CONTAINER_NAME --no-stream
-          echo "Network connectivity:"
-          sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
-          echo "Container logs:"
-          sudo docker logs $CONTAINER_NAME
-          echo "::endgroup::"
+      - name: Configure Fuzzer
+        run: |
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              # Point Restler to the vulnerable instance
+              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              ;;
+            "wuppiefuzz")
+              # Point WuppieFuzz to the vulnerable instance
+              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              ;;
+            "evomaster")
+              # Point Evomaster to the vulnerable instance
+              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
+              ;;
+          esac
         shell: bash
 
   summarize_results:
