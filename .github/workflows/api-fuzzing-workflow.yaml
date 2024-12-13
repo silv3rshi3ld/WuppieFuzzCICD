@@ -197,14 +197,38 @@ jobs:
 
   run_fuzzing:
     runs-on: self-hosted
-    needs: [setup_target_application, prepare_fuzzers, prepare_openapi_specs]
+    needs: [prepare_fuzzers, prepare_openapi_specs]
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        fuzzer: [wuppiefuzz]
       fail-fast: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Create Workspace Directories
+        run: |
+          # Create directories for each fuzzer
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace/{bin,reports}
+          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
+
+          # Create RESTler config
+          cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
+          {
+            "max_combinations": 20,
+            "max_request_execution_time": 10,
+            "max_async_resource_creation_time": 20,
+            "global_producer_timing_delay": 2,
+            "dyn_objects_cache_size": 10,
+            "fuzzing_mode": "directed-smoke-test",
+            "test_all_combinations": false,
+            "test_combinations_settings": {
+              "max_combinations": 20
+            }
+          }
+          EOF
+        shell: bash
 
       - name: Start VAmPI Container
         run: |
@@ -233,16 +257,9 @@ jobs:
       - name: Configure Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
-            "restler")
-              # Point Restler to the vulnerable instance
-              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
-              ;;
             "wuppiefuzz")
-              # Point WuppieFuzz to the vulnerable instance
-              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
-              ;;
-            "evomaster")
-              # Point Evomaster to the vulnerable instance
+              # Copy OpenAPI spec to WuppieFuzz workspace
+              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/wuppiefuzz_workspace/
               echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
               ;;
           esac
@@ -251,50 +268,50 @@ jobs:
       - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
-            "restler")
-              cd ${{ env.BASE_DIR }}/workspace/restler
-              # Start RESTler container
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/config:/config \
-                -v $(pwd)/output:/output \
-                mcr.microsoft.com/restler-fuzzer \
-                compile /config/openapi3.yml
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/config:/config \
-                -v $(pwd)/output:/output \
-                mcr.microsoft.com/restler-fuzzer \
-                fuzz --grammar_file /output/grammar.json \
-                --settings /config/engine_settings.json \
-                --target_endpoint $VAMPI_URL \
-                --time_budget 1
-              ;;
-            
             "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-              # Download WuppieFuzz binary
-              mkdir -p bin
+              
+              # Download and setup WuppieFuzz binary
+              mkdir -p bin reports corpus_directory
               cp ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz bin/
               chmod +x bin/wuppiefuzz
+
+              # Start VAmPI vulnerable instance
+              cd ${{ env.BASE_DIR }}/services/vampi
+              docker-compose -f docker-compose.yaml up -d
+              
+              echo "Waiting for VAmPI to initialize..."
+              for i in {1..30}; do
+                if curl -s http://localhost:5002/health >/dev/null; then
+                  echo "VAmPI instance is healthy."
+                  break
+                fi
+                echo "Attempt $i of 30: VAmPI instance not ready yet..."
+                docker logs vampi-vulnerable
+                sleep 5
+              done
+
               # Run WuppieFuzz
+              cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+              ./bin/wuppiefuzz output-corpus \
+                --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
+                corpus_directory
+
               ./bin/wuppiefuzz fuzz \
-                --openapi-path openapi3.yml \
-                --target-url $VAMPI_URL \
-                --output-dir reports \
-                --time-budget 60
+                --report \
+                --log-level=info \
+                --initial-corpus=corpus_directory \
+                --coverage-host=localhost:5002 \
+                --timeout=60 \
+                ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
+              ;;
+            
+            "restler")
+              echo "Skipping RESTler for now..."
               ;;
             
             "evomaster")
-              cd ${{ env.BASE_DIR }}/workspace/evomaster
-              # Start EvoMaster container
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/evomaster_results:/evomaster_results \
-                -e VAMPI_URL=$VAMPI_URL \
-                evomaster:latest \
-                --blackBox true \
-                --bbSwaggerUrl $VAMPI_URL/openapi3.yml \
-                --outputFormat JAVA_JUNIT_4 \
-                --maxTime 1m \
-                --ratePerMinute 100
+              echo "Skipping EvoMaster for now..."
               ;;
           esac
         shell: bash
