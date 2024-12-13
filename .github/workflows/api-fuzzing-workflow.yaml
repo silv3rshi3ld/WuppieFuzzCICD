@@ -36,24 +36,29 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          # Stop containers first
-          docker ps -q | xargs -r docker stop || true
+          # Disconnect containers from network first
+          for container in $(sudo docker ps -aq); do
+            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
+          done
+
+          # Stop all containers with sudo
+          sudo docker ps -q | xargs -r sudo docker stop || true
           
-          # Remove containers with pattern matching for our specific containers
-          docker ps -a --format '{{.Names}}' | grep -E 'vampi|mongo' | xargs -r docker rm -f || true
+          # Remove our specific containers with sudo
+          sudo docker ps -a --format '{{.Names}}' | grep -E 'vampi|mongo' | xargs -r sudo docker rm -f || true
           
-          # Clean up any remaining containers
-          docker ps -aq | xargs -r docker rm -f || true
+          # Remove any remaining containers with sudo
+          sudo docker ps -aq | xargs -r sudo docker rm -f || true
           
-          # Clean up networks
-          docker network ls --filter type=custom -q | xargs -r docker network rm || true
+          # Remove networks with sudo
+          sudo docker network ls --filter type=custom -q | xargs -r sudo docker network rm || true
         shell: bash
 
       - name: Create Docker Network
         run: |
-          if ! docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
+          if ! sudo docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
             for i in {1..3}; do
-              if docker network create --subnet=172.20.0.0/16 $DOCKER_NETWORK_NAME; then
+              if sudo docker network create --subnet=172.20.0.0/16 $DOCKER_NETWORK_NAME; then
                 echo "Network created successfully"
                 break
               fi
@@ -78,9 +83,9 @@ jobs:
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           # Cleanup existing containers
-          docker compose -f docker-compose.vampi.yml down --remove-orphans || true
+          sudo docker compose -f docker-compose.vampi.yml down --remove-orphans || true
           # Build fresh images
-          docker compose -f docker-compose.vampi.yml build --force-rm
+          sudo docker compose -f docker-compose.vampi.yml build --force-rm
         shell: bash
 
   prepare_fuzzers:
@@ -218,12 +223,12 @@ jobs:
           esac
           
           # Start MongoDB container
-          docker run -d --name vampi-mongo-${{ matrix.fuzzer }} \
+          sudo docker run -d --name vampi-mongo-${{ matrix.fuzzer }} \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             mongo:4.4
 
           # Start VAmPI container
-          docker run -d --name vampi-${{ matrix.fuzzer }} \
+          sudo docker run -d --name vampi-${{ matrix.fuzzer }} \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p $PORT:5000 \
             -e MONGO_HOST=vampi-mongo-${{ matrix.fuzzer }} \
@@ -266,9 +271,9 @@ jobs:
         if: always()
         run: |
           echo "Pruning Docker containers..."
-          docker container prune -f || echo "Failed to prune Docker containers."
+          sudo docker container prune -f || echo "Failed to prune Docker containers."
           echo "Pruning Docker networks..."
-          docker network prune -f || echo "Failed to prune Docker networks."
+          sudo docker network prune -f || echo "Failed to prune Docker networks."
         shell: bash
 
   cleanup_all:
@@ -280,13 +285,13 @@ jobs:
         run: |
           echo "Cleaning up Docker resources..."
           # Clean up containers
-          docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml down --remove-orphans || true
-          docker compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down --remove-orphans || true
-          docker compose -f ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yml down --remove-orphans || true
+          sudo docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.vampi.yml down --remove-orphans || true
+          sudo docker compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yml down --remove-orphans || true
+          sudo docker compose -f ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yml down --remove-orphans || true
           
           # Remove network if it exists
-          if docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
-            docker network rm $DOCKER_NETWORK_NAME || true
+          if sudo docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
+            sudo docker network rm $DOCKER_NETWORK_NAME || true
           fi
         shell: bash
 
