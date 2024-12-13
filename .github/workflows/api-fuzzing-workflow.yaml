@@ -248,7 +248,7 @@ jobs:
               cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
               cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
               cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/restler.openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
+              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
               ;;
             "wuppiefuzz")
               # Copy OpenAPI spec to WuppieFuzz workspace
