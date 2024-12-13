@@ -214,6 +214,21 @@ jobs:
 
       - name: Start VAmPI Container
         run: |
+          echo "::group::Container Resource Information"
+          echo "Starting container setup at $(date)"
+          echo "Available system resources:"
+          free -h
+          df -h
+          echo "::endgroup::"
+
+          # Create network if it doesn't exist
+          echo "::group::Network Setup"
+          echo "Creating/checking network..."
+          sudo docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+          echo "Current docker networks:"
+          sudo docker network ls
+          echo "::endgroup::"
+          
           case "${{ matrix.fuzzer }}" in
             "restler")
               PORT=${{ env.VAMPI_RESTLER_PORT }}
@@ -226,25 +241,59 @@ jobs:
               ;;
           esac
           
-          # Start VAmPI container
+          echo "::group::Container Cleanup"
+          echo "Removing any existing container..."
+          sudo docker rm -f vampi-${{ matrix.fuzzer }} || true
+          echo "Current running containers:"
+          sudo docker ps
+          echo "::endgroup::"
+          
+          echo "::group::Container Startup"
+          START_TIME=$(date +%s)
+          echo "Starting VAmPI container for ${{ matrix.fuzzer }} at $(date)"
+          
+          # Start VAmPI container with debug logging
           sudo docker run -d --name vampi-${{ matrix.fuzzer }} \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p $PORT:5000 \
+            -e APP_DEBUG=1 \
             vampi:latest
 
-          # Wait for VAmPI to be ready
+          # Wait for VAmPI to be ready with more verbose output
+          echo "Waiting for container to be ready..."
           for i in {1..30}; do
-            if curl -s http://localhost:$PORT/health > /dev/null; then
-              echo "VAmPI is ready"
+            echo "Attempt $i: Checking http://localhost:$PORT/health"
+            if curl -v http://localhost:$PORT/health 2>&1; then
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              echo "VAmPI is ready after $DURATION seconds"
+              echo "Container resource usage:"
+              sudo docker stats vampi-${{ matrix.fuzzer }} --no-stream
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "VAmPI failed to start"
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              echo "VAmPI failed to start after $DURATION seconds"
+              echo "Docker logs:"
+              sudo docker logs vampi-${{ matrix.fuzzer }}
+              echo "Container status:"
+              sudo docker inspect vampi-${{ matrix.fuzzer }}
               exit 1
             fi
             echo "Waiting for VAmPI to start... ($i/30)"
             sleep 2
           done
+          echo "::endgroup::"
+
+          echo "::group::Final Status"
+          echo "Container status:"
+          sudo docker ps --filter "name=vampi-${{ matrix.fuzzer }}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+          echo "Container resource usage:"
+          sudo docker stats vampi-${{ matrix.fuzzer }} --no-stream
+          echo "Network connectivity:"
+          sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+          echo "::endgroup::"
         shell: bash
 
   summarize_results:
