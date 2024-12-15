@@ -268,7 +268,7 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5012 COMPOSE_PROJECT_NAME=vampi_restler docker-compose up -d vampi-vulnerable
+              PORT=5012 COMPOSE_PROJECT_NAME=vampi_restler docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI RESTler instance..."
               for i in {1..30}; do
@@ -285,14 +285,14 @@ jobs:
                 sleep 2
               done
               
-              # Start RESTler with its own docker-compose
+              # Start RESTler with its own docker compose
               cd ${{ env.BASE_DIR }}/services/restler
-              docker-compose -f docker-compose.restler.yml up --build
+              docker compose -f docker-compose.restler.yml up --build
               ;;
               
             "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5022 COMPOSE_PROJECT_NAME=vampi_wuppiefuzz docker-compose up -d vampi-vulnerable
+              PORT=5022 COMPOSE_PROJECT_NAME=vampi_wuppiefuzz docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI WuppieFuzz instance..."
               for i in {1..30}; do
@@ -309,14 +309,14 @@ jobs:
                 sleep 2
               done
               
-              # Start WuppieFuzz using its docker-compose
+              # Start WuppieFuzz using its docker compose
               cd ${{ env.BASE_DIR }}/services/wuppiefuzz
-              VAMPI_WUPPIEFUZZ_URL=http://localhost:5022 docker-compose -f docker-compose.wuppie.yml up --build
+              VAMPI_WUPPIEFUZZ_URL=http://localhost:5022 docker compose -f docker-compose.wuppie.yml up --build
               ;;
               
             "evomaster")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5032 COMPOSE_PROJECT_NAME=vampi_evomaster docker-compose up -d vampi-vulnerable
+              PORT=5032 COMPOSE_PROJECT_NAME=vampi_evomaster docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI EvoMaster instance..."
               for i in {1..30}; do
@@ -333,9 +333,9 @@ jobs:
                 sleep 2
               done
               
-              # Start EvoMaster with its own docker-compose
+              # Start EvoMaster with its own docker compose
               cd ${{ env.BASE_DIR }}/services/evomaster
-              docker-compose -f docker-compose.evomaster.yml up --build
+              docker compose -f docker-compose.evomaster.yml up --build
               ;;
           esac
         shell: bash
@@ -352,7 +352,7 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/workspace/restler
-              docker-compose -f docker-compose.restler.yaml up --build
+              docker compose -f docker-compose.restler.yaml up --build
               ;;
             
             "wuppiefuzz")
@@ -403,12 +403,11 @@ jobs:
         run: |
           cd ${{ env.BASE_DIR }}/services/vampi
           
-          # Clean up all docker-compose files and their containers
+          # Clean up all docker compose files and their containers
           for file in docker-compose.*.yaml; do
             if [ -f "$file" ]; then
-              echo "Cleaning up containers from $file"
-              docker-compose -f "$file" down --remove-orphans
-              rm "$file"
+              echo "Cleaning up $file"
+              docker compose -f "$file" down --remove-orphans
             fi
           done
           
