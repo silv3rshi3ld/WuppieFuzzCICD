@@ -50,57 +50,42 @@ jobs:
         run: |
           echo "Setting up Docker Swarm..."
           
-          # Get the IP address (more robust method)
-          IP=$(ip route get 1 | awk '{print $7;exit}' 2>/dev/null || hostname -I | awk '{print $1}')
-          echo "Using IP: $IP"
-          
           # Force leave any existing swarm
           docker swarm leave -f || true
           sleep 2
           
-          echo "Initializing new swarm..."
-          if docker swarm init --advertise-addr $IP; then
-            echo "Successfully initialized swarm as manager"
-            
-            # Get and store join tokens
-            MANAGER_TOKEN=$(docker swarm join-token manager -q)
-            WORKER_TOKEN=$(docker swarm join-token worker -q)
-            echo "SWARM_MANAGER_TOKEN=$MANAGER_TOKEN" >> $GITHUB_ENV
-            echo "SWARM_WORKER_TOKEN=$WORKER_TOKEN" >> $GITHUB_ENV
-            echo "SWARM_MANAGER_IP=$IP" >> $GITHUB_ENV
-            
-            # Create overlay network
-            echo "Creating overlay network..."
-            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-            sleep 2
-            docker network create \
-              --driver overlay \
-              --attachable \
-              --subnet 10.0.0.0/16 \
-              ${{ env.DOCKER_NETWORK_NAME }} || {
-                echo "Failed to create network with subnet, trying without subnet..."
-                docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}
-              }
-          else
-            echo "Failed to initialize swarm, checking if we can join existing..."
-            if [[ -n "${{ env.SWARM_WORKER_TOKEN }}" && -n "${{ env.SWARM_MANAGER_IP }}" ]]; then
-              echo "Attempting to join existing swarm..."
-              docker swarm join --token ${{ env.SWARM_WORKER_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377
-            else
-              echo "No existing swarm credentials found. This might be the first run."
-              exit 1
-            fi
+          # Get the IP address
+          IP=$(hostname -I | awk '{print $1}')
+          echo "Using IP: $IP"
+          
+          # Initialize swarm
+          if ! docker swarm init --advertise-addr $IP; then
+            echo "Failed to initialize swarm"
+            exit 1
           fi
+          
+          # Get and store tokens
+          MANAGER_TOKEN=$(docker swarm join-token manager -q)
+          WORKER_TOKEN=$(docker swarm join-token worker -q)
+          echo "SWARM_MANAGER_TOKEN=${MANAGER_TOKEN}" >> $GITHUB_ENV
+          echo "SWARM_WORKER_TOKEN=${WORKER_TOKEN}" >> $GITHUB_ENV
+          echo "SWARM_MANAGER_IP=${IP}" >> $GITHUB_ENV
+          
+          # Create network
+          echo "Creating overlay network..."
+          docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }} || {
+            echo "Failed to create network"
+            docker network ls
+            exit 1
+          }
           
           # Verify setup
           echo "=== Swarm Status ==="
           docker info | grep -A5 "Swarm:"
           echo "=== Node List ==="
-          docker node ls || echo "Not a manager node"
+          docker node ls
           echo "=== Network List ==="
           docker network ls
-          echo "=== Network Details ==="
-          docker network inspect ${{ env.DOCKER_NETWORK_NAME }} || echo "Network not accessible from this node"
         shell: bash
 
       - name: Verify Environment
@@ -146,31 +131,35 @@ jobs:
         run: |
           cd services/vampi
           
-          # Cleanup any existing containers and networks
-          echo "Cleaning up existing containers and networks..."
+          # Cleanup any existing containers
+          echo "Cleaning up existing containers..."
           docker compose down -v || true
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          sleep 2
           
-          # Create network with retry logic
-          echo "Creating overlay network..."
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}; then
-              echo "Network created successfully"
-              break
-            fi
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-              echo "Failed to create network after $MAX_RETRIES attempts"
+          # Ensure we're in the swarm
+          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
+            echo "Node not in swarm, joining..."
+            docker swarm join --token ${{ env.SWARM_WORKER_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377 || {
+              echo "Failed to join swarm"
               exit 1
-            fi
-            echo "Failed to create network, attempt $RETRY_COUNT of $MAX_RETRIES"
-            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-            sleep 5
-          done
+            }
+          fi
+          
+          # Verify network exists
+          if ! docker network ls | grep -q ${{ env.DOCKER_NETWORK_NAME }}; then
+            echo "Network not found, waiting for it..."
+            for i in {1..30}; do
+              if docker network ls | grep -q ${{ env.DOCKER_NETWORK_NAME }}; then
+                echo "Network is now available"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "Network never became available"
+                exit 1
+              fi
+              echo "Waiting for network... attempt $i/30"
+              sleep 1
+            done
+          fi
           
           # Start containers
           echo "Starting VAmPI for ${{ matrix.fuzzer }} on port ${{ env.VAMPI_PORT }}"
