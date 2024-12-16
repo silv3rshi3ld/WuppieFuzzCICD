@@ -14,6 +14,8 @@ services:
     timeout: 5s
     retries: 3
     start_period: 5s
+  restart: "no"
+  stop_grace_period: 1s
 
  vampi-vulnerable:
   build: ./
@@ -30,6 +32,8 @@ services:
     timeout: 5s
     retries: 3
     start_period: 5s
+  restart: "no"
+  stop_grace_period: 1s
 
 networks:
   cicd_network:

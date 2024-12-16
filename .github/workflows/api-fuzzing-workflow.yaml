@@ -37,20 +37,34 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          # Force remove the network first
-          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
+          # Stop all containers first
+          docker ps -q | xargs -r docker stop || true
           
-          # Kill all containers (more aggressive than stop)
-          sudo docker ps -q | xargs -r sudo docker kill 2>/dev/null || true
+          # Kill any stuck containers
+          docker ps -q | xargs -r docker kill || true
           
-          # Force remove all containers without stopping
-          sudo docker ps -aq | xargs -r sudo docker rm -f 2>/dev/null || true
+          # Remove containers with force
+          docker ps -aq | xargs -r docker rm -f || true
           
-          # Final cleanup of any dangling resources
-          sudo docker system prune -f --volumes 2>/dev/null || true
+          # Remove all custom networks
+          docker network ls --filter type=custom -q | xargs -r docker network rm || true
           
-          # Sleep to allow system to settle
-          sleep 5
+          # Remove any dangling images
+          docker image prune -f || true
+          
+          # Remove any unused volumes
+          docker volume prune -f || true
+          
+          # Final system prune
+          docker system prune -af --volumes || true
+          
+          # Verify cleanup
+          echo "Remaining containers:"
+          docker ps -a
+          echo "Remaining networks:"
+          docker network ls
+          echo "Remaining volumes:"
+          docker volume ls
         shell: bash
 
       - name: Create Docker Network
@@ -294,9 +308,46 @@ jobs:
           docker ps -a | grep 'vampi-' | awk '{print $1}' | xargs -r docker rm -f
         shell: bash
 
+  cleanup:
+    if: always()
+    needs: [run_fuzzing]
+    runs-on: self-hosted
+    steps:
+      - name: Cleanup Containers and Networks
+        if: always()
+        run: |
+          # Stop all running containers
+          docker ps -q | xargs -r docker stop
+
+          # Remove all containers
+          docker ps -aq | xargs -r docker rm -f
+
+          # Remove all networks except default ones
+          docker network ls --filter type=custom -q | xargs -r docker network rm
+
+          # Prune everything with force
+          docker system prune -af --volumes
+        shell: bash
+
+      - name: Verify Cleanup
+        if: always()
+        run: |
+          # List any remaining containers
+          echo "Remaining containers:"
+          docker ps -a
+          
+          # List any remaining networks
+          echo "Remaining networks:"
+          docker network ls
+          
+          # List any remaining volumes
+          echo "Remaining volumes:"
+          docker volume ls
+        shell: bash
+
   summarize_results:
     runs-on: self-hosted
-    needs: run_fuzzing
+    needs: cleanup
     steps:
       - name: Download Fuzzer Results
         uses: actions/download-artifact@v4
