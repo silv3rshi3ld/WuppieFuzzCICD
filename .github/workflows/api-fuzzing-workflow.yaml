@@ -15,96 +15,68 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5022
   VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
-  # List of fuzzers
   FUZZERS: restler wuppiefuzz evomaster
+  MAX_STARTUP_RETRIES: 3
+  HEALTH_CHECK_TIMEOUT: 30
 
 jobs:
   initialize_environment:
     runs-on: self-hosted
     outputs:
-      swarm-manager-ip: ${{ steps.set-outputs.outputs.swarm-manager-ip }}
-      swarm-worker-token: ${{ steps.set-outputs.outputs.swarm-worker-token }}
+      swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
+      swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Base Directories
+      - name: Docker Info
+        run: docker info
+
+      - id: setup_swarm
+        name: Setup or Join Docker Swarm
         run: |
-          mkdir -p ${{ env.BASE_DIR }}/services/vampi
-          mkdir -p ${{ env.BASE_DIR }}/workspace
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-          mkdir -p $HOME/.cargo $HOME/.rustup
-
-      - name: Cleanup Previous Containers
-        if: always()
-        run: |
-          echo "Cleaning up previous containers..."
-          docker ps -q | xargs -r docker rm -f || true
-          echo "Cleanup complete"
-
-      - name: Setup Docker Swarm
-        run: |
-          echo "Setting up Docker Swarm..."
-
-          # Force leave any existing swarm
-          docker swarm leave -f || true
-          sleep 2
-
-          # Get the IP address
-          IP=$(hostname -I | awk '{print $1}')
-          echo "Using IP: $IP"
-
-          # Initialize swarm
-          if ! docker swarm init --advertise-addr $IP; then
-            echo "Failed to initialize swarm"
-            exit 1
+          # Check if already in a swarm
+          SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}')
+          if [ "$SWARM_STATE" = "active" ]; then
+            echo "Node is already part of a swarm"
+            MANAGER_TOKEN=$(docker swarm join-token manager -q)
+            WORKER_TOKEN=$(docker swarm join-token worker -q)
+            IP=$(docker info --format '{{ .Swarm.NodeAddr }}')
+          else
+            echo "Initializing new swarm..."
+            # Get primary interface IP
+            IP=$(ip -4 addr show scope global dev $(ip route | awk '/default/ {print $5}') | grep inet | awk '{print $2}' | cut -d/ -f1)
+            
+            if ! docker swarm init --advertise-addr $IP; then
+              echo "::error::Failed to initialize swarm"
+              exit 1
+            fi
+            
+            MANAGER_TOKEN=$(docker swarm join-token manager -q)
+            WORKER_TOKEN=$(docker swarm join-token worker -q)
+            
+            echo "Creating overlay network..."
+            if ! docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}; then
+              echo "::error::Failed to create overlay network"
+              docker swarm leave --force
+              exit 1
+            fi
           fi
 
-          # Get and store tokens
-          MANAGER_TOKEN=$(docker swarm join-token manager -q)
-          WORKER_TOKEN=$(docker swarm join-token worker -q)
-
-          # Create network
-          echo "Creating overlay network..."
-          docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }} || {
-            echo "Failed to create network"
-            docker network ls
-            exit 1
-          }
-
-          echo "Swarm and network created successfully."
-          
-          # Print info
-          echo "=== Swarm Status ==="
-          docker info | grep -A5 "Swarm:"
-          echo "=== Node List ==="
+          # Verify swarm status
           docker node ls
-          echo "=== Network List ==="
-          docker network ls
           
-          # Store outputs for downstream jobs
           echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Verify Environment
-        run: |
-          echo "=== Docker Info ==="
-          docker info
-          echo "=== Process List ==="
-          ps aux | grep docker
-
       - name: Verify Network
         run: |
-          echo "Network details:"
-          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
-
-      # A placeholder step to produce outputs
-      - id: set-outputs
-        run: |
-          # No-op step, outputs already set above
-          echo "Swarm outputs set."
-
+          if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }}; then
+            echo "::error::Network verification failed"
+            exit 1
+          fi
+          echo "Network configuration:"
+          docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format '{{json .}}'
 
   setup_target_application:
     runs-on: self-hosted
@@ -120,90 +92,71 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Verify Directory Structure
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Contents of current directory:"
-          ls -la
-          echo "Contents of services directory:"
-          ls -la services || echo "services directory not found"
-
       - name: Set VAMPI_PORT
         run: |
-          if [ "${{ matrix.fuzzer }}" = "restler" ]; then
-            echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
-          elif [ "${{ matrix.fuzzer }}" = "wuppiefuzz" ]; then
-            echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
-          else
-            echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
-          fi
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
+              ;;
+            "wuppiefuzz")
+              echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
+              ;;
+            "evomaster")
+              echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
+              ;;
+          esac
 
-      - name: Start VAmPI Container
+      - name: Join Swarm and Start VAmPI
         run: |
-          cd services/vampi
-          
-          # Cleanup any existing containers
-          echo "Cleaning up existing containers..."
-          docker compose down -v || true
-          
           # Ensure we're in the swarm
           if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
-            echo "Node not in swarm, joining..."
-            docker swarm join --token ${{ env.SWARM_WORKER_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377 || {
-              echo "Failed to join swarm"
+            echo "Joining swarm..."
+            if ! docker swarm join --token ${{ env.SWARM_WORKER_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377; then
+              echo "::error::Failed to join swarm"
               exit 1
-            }
+            fi
           fi
+
+          cd services/vampi
           
-          # Verify network exists
-          if ! docker network ls | grep -q ${{ env.DOCKER_NETWORK_NAME }}; then
-            echo "Network not found, waiting for it..."
-            for i in {1..30}; do
-              if docker network ls | grep -q ${{ env.DOCKER_NETWORK_NAME }}; then
-                echo "Network is now available"
-                break
-              fi
-              if [ $i -eq 30 ]; then
-                echo "Network never became available"
-                exit 1
-              fi
-              echo "Waiting for network... attempt $i/30"
-              sleep 1
-            done
-          fi
+          # Cleanup any existing instances
+          docker compose down -v || true
           
-          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port $VAMPI_PORT"
+          # Set required environment variables
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
-          
-          # Try to start containers with retry
-          MAX_RETRIES=3
+
           RETRY_COUNT=0
-          
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
+            echo "Starting VAmPI (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
+            
             if docker compose up -d; then
-              # Wait for containers to be healthy
-              for i in {1..30}; do
+              # Wait for service health
+              for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
                 if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
-                  echo "VAmPI is up and running"
+                  echo "VAmPI is healthy and responding"
                   docker compose ps
+                  # Additional health verification
+                  if docker compose logs | grep -i error; then
+                    echo "::warning::Found errors in logs, but service is responding"
+                  fi
                   exit 0
                 fi
-                echo "Waiting for VAmPI to be ready... attempt $i/30"
+                echo "Waiting for VAmPI to be ready... ($i/${{ env.HEALTH_CHECK_TIMEOUT }})"
                 sleep 1
               done
             fi
-            
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Failed to start/verify containers, attempt $RETRY_COUNT of $MAX_RETRIES"
+
+            echo "::warning::Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
             docker compose down -v
-            sleep 5
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ] && sleep 5
           done
-          
-          echo "Failed to start containers after $MAX_RETRIES attempts"
+
+          echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
+          echo "Docker Compose Logs:"
           docker compose logs
           exit 1
-
 
   prepare_fuzzers:
     runs-on: self-hosted
@@ -262,7 +215,6 @@ jobs:
           path: tools
           retention-days: 1
 
-
   prepare_openapi_specs:
     runs-on: self-hosted
     needs: [setup_target_application]
@@ -303,7 +255,6 @@ jobs:
             ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
             ${{ env.BASE_DIR }}/wuppiefuzz_workspace/openapi3.yml
           retention-days: 1
-
 
   run_fuzzing:
     runs-on: self-hosted
@@ -387,7 +338,6 @@ jobs:
             tools/**/results
             tools/**/output
           retention-days: 1
-
 
   summarize_results:
     runs-on: self-hosted
