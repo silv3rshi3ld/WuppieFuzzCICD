@@ -138,6 +138,13 @@ jobs:
               cd services/vampi || exit 1
               echo "Starting VAmPI for EvoMaster on port 5032"
               
+              # Check if port is already in use
+              if netstat -tuln | grep :5032; then
+                echo "Port 5032 is already in use!"
+                docker ps -a | grep 5032
+                exit 1
+              fi
+              
               # Clean up any existing container first
               docker rm -f vampi-vulnerable-5032 || true
               
