@@ -37,34 +37,11 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          # Stop all containers first
-          docker ps -q | xargs -r docker stop || true
+          # Stop and remove any existing containers from previous runs
+          docker ps -q | xargs -r docker rm -f || true
           
-          # Kill any stuck containers
-          docker ps -q | xargs -r docker kill || true
-          
-          # Remove containers with force
-          docker ps -aq | xargs -r docker rm -f || true
-          
-          # Remove all custom networks
-          docker network ls --filter type=custom -q | xargs -r docker network rm || true
-          
-          # Remove any dangling images
-          docker image prune -f || true
-          
-          # Remove any unused volumes
-          docker volume prune -f || true
-          
-          # Final system prune
-          docker system prune -af --volumes || true
-          
-          # Verify cleanup
-          echo "Remaining containers:"
-          docker ps -a
-          echo "Remaining networks:"
-          docker network ls
-          echo "Remaining volumes:"
-          docker volume ls
+          # Remove the network if it exists
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
         shell: bash
 
       - name: Create Docker Network
@@ -74,18 +51,28 @@ jobs:
   setup_target_application:
     runs-on: self-hosted
     needs: [initialize_environment]
+    strategy:
+      matrix:
+        fuzzer: [restler, wuppiefuzz, evomaster]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Create Docker Network
-        run: docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+      - name: Verify Directory Structure
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Contents of current directory:"
+          ls -la
+          echo "Contents of services directory:"
+          ls -la services || echo "services directory not found"
+        shell: bash
 
       - name: Start VAmPI Container
         run: |
           case "${{ matrix.fuzzer }}" in
             "restler")
-              cd ${{ env.BASE_DIR }}/services/vampi
+              cd services/vampi || exit 1
+              echo "Starting VAmPI for RESTler on port 5012"
               PORT=5012 docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI RESTler instance..."
@@ -105,7 +92,8 @@ jobs:
               ;;
               
             "wuppiefuzz")
-              cd ${{ env.BASE_DIR }}/services/vampi
+              cd services/vampi || exit 1
+              echo "Starting VAmPI for WuppieFuzz on port 5022"
               PORT=5022 docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI WuppieFuzz instance..."
@@ -125,7 +113,8 @@ jobs:
               ;;
               
             "evomaster")
-              cd ${{ env.BASE_DIR }}/services/vampi
+              cd services/vampi || exit 1
+              echo "Starting VAmPI for EvoMaster on port 5032"
               PORT=5032 docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI EvoMaster instance..."
@@ -144,6 +133,7 @@ jobs:
               done
               ;;
           esac
+        shell: bash
 
   prepare_fuzzers:
     runs-on: self-hosted
@@ -199,8 +189,8 @@ jobs:
       - name: Install Build Dependencies
         if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libssl-dev
+          apt-get update
+          apt-get install -y build-essential pkg-config libssl-dev
         shell: bash
 
       - name: Build WuppieFuzz
@@ -261,21 +251,27 @@ jobs:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
             "restler")
-              cd ${{ env.BASE_DIR }}/services/restler
+              cd services/restler || exit 1
+              echo "Running RESTler fuzzer"
               docker compose -f docker-compose.restler.yml up --build
               ;;
               
             "wuppiefuzz")
-              cd ${{ env.BASE_DIR }}/services/wuppiefuzz
+              cd services/wuppiefuzz || exit 1
+              echo "Running WuppieFuzz fuzzer"
               VAMPI_WUPPIEFUZZ_URL=http://vampi-vulnerable:5000 docker compose -f docker-compose.wuppie.yml up --build
               ;;
               
             "evomaster")
-              cd ${{ env.BASE_DIR }}/services/evomaster
+              cd services/evomaster || exit 1
+              echo "Running EvoMaster fuzzer"
               docker compose -f docker-compose.evomaster.yml up --build
               ;;
           esac
@@ -308,46 +304,9 @@ jobs:
           docker ps -a | grep 'vampi-' | awk '{print $1}' | xargs -r docker rm -f
         shell: bash
 
-  cleanup:
-    if: always()
-    needs: [run_fuzzing]
-    runs-on: self-hosted
-    steps:
-      - name: Cleanup Containers and Networks
-        if: always()
-        run: |
-          # Stop all running containers
-          docker ps -q | xargs -r docker stop
-
-          # Remove all containers
-          docker ps -aq | xargs -r docker rm -f
-
-          # Remove all networks except default ones
-          docker network ls --filter type=custom -q | xargs -r docker network rm
-
-          # Prune everything with force
-          docker system prune -af --volumes
-        shell: bash
-
-      - name: Verify Cleanup
-        if: always()
-        run: |
-          # List any remaining containers
-          echo "Remaining containers:"
-          docker ps -a
-          
-          # List any remaining networks
-          echo "Remaining networks:"
-          docker network ls
-          
-          # List any remaining volumes
-          echo "Remaining volumes:"
-          docker volume ls
-        shell: bash
-
   summarize_results:
     runs-on: self-hosted
-    needs: cleanup
+    needs: run_fuzzing
     steps:
       - name: Download Fuzzer Results
         uses: actions/download-artifact@v4
@@ -367,34 +326,7 @@ jobs:
         if: always()
         run: |
           echo "Pruning Docker containers..."
-          sudo docker container prune -f || echo "Failed to prune Docker containers."
+          docker container prune -f || echo "Failed to prune Docker containers."
           echo "Pruning Docker networks..."
-          sudo docker network prune -f || echo "Failed to prune Docker networks."
-        shell: bash
-
-  cleanup_all:
-    runs-on: self-hosted
-    needs: summarize_results
-    if: always()
-    steps:
-      - name: Cleanup Docker Resources
-        run: |
-          echo "Cleaning up Docker resources..."
-          # Clean up containers
-          sudo docker compose -f ${{ env.BASE_DIR }}/services/vampi/docker-compose.yaml down --remove-orphans || true
-          sudo docker compose -f ${{ env.BASE_DIR }}/workspace/restler/docker-compose.restler.yaml down --remove-orphans || true
-          sudo docker compose -f ${{ env.BASE_DIR }}/workspace/evomaster/docker-compose.evomaster.yaml down --remove-orphans || true
-          
-          # Remove network if it exists
-          if sudo docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
-            sudo docker network rm $DOCKER_NETWORK_NAME || true
-          fi
-        shell: bash
-
-      - name: Cleanup Workspace
-        run: |
-          echo "Cleaning up workspace..."
-          rm -rf ${{ env.BASE_DIR }}/workspace/restler/output/* || true
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/* || true
-          rm -rf ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results/* || true
+          docker network prune -f || echo "Failed to prune Docker networks."
         shell: bash
