@@ -27,19 +27,8 @@ jobs:
       swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
       network-id: ${{ steps.setup_network.outputs.network-id }}
-      runner-names: ${{ steps.get-runners.outputs.runner-names }}
+      manager-hostname: ${{ steps.setup_swarm.outputs.manager-hostname }}
     steps:
-      - name: Get Runner Names
-        id: get-runners
-        run: |
-          # Get list of all self-hosted runners
-          RUNNERS=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                       -H "Accept: application/vnd.github.v3+json" \
-                       https://api.github.com/repos/${{ github.repository }}/actions/runners | \
-                   jq -r '.runners[] | select(.status=="online") | .name' | \
-                   jq -R -s -c 'split("\n")[:-1]')
-          echo "runner-names=$RUNNERS" >> $GITHUB_OUTPUT
-
       - name: Cleanup Previous Setup
         run: |
           echo "Cleaning up previous setup..."
@@ -52,7 +41,9 @@ jobs:
         run: |
           # Get primary interface IP
           IP=$(ip -4 addr show scope global | grep inet | head -n1 | awk '{print $2}' | cut -d/ -f1)
+          HOSTNAME=$(hostname)
           echo "Using IP: $IP"
+          echo "Manager Hostname: $HOSTNAME"
           
           # Initialize swarm
           if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
@@ -64,6 +55,7 @@ jobs:
           
           echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
+          echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
 
       - id: setup_network
         name: Setup Overlay Network
@@ -89,16 +81,15 @@ jobs:
   join_swarm:
     needs: initialize_swarm
     runs-on: self-hosted
-    if: needs.initialize_swarm.outputs.runner-names != ''
     strategy:
       matrix:
-        runner: ${{ fromJson(needs.initialize_swarm.outputs.runner-names) }}
+        fuzzer: [restler, wuppiefuzz, evomaster]
+      fail-fast: false
     steps:
       - name: Join Swarm
         run: |
-          # Only join if this is not the manager node
           HOSTNAME=$(hostname)
-          if [ "$HOSTNAME" != "${{ needs.initialize_swarm.outputs.swarm-manager-ip }}" ]; then
+          if [ "$HOSTNAME" != "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
             echo "Joining swarm as worker..."
             docker swarm leave --force || true
             sleep 2
