@@ -247,11 +247,11 @@ jobs:
           java -jar evomaster.jar --version
           echo "Creating EvoMaster configuration..."
           cat > evomaster.yml <<EOL
-blackBox: true
-testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
-openApiUrl: ./openapi3.yml
-outputFormat: JAVA_JUNIT_5
-maxTime: 1h
+          blackBox: true
+          testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
+          openApiUrl: ./openapi3.yml
+          outputFormat: JAVA_JUNIT_5
+          maxTime: 1h
 EOL
           echo "EvoMaster setup complete"
 
