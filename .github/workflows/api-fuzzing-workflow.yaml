@@ -39,43 +39,64 @@ jobs:
       - name: Cleanup Previous Containers
         if: always()
         run: |
-          # Stop and remove any existing containers from previous runs
+          echo "Cleaning up previous containers..."
           docker ps -q | xargs -r docker rm -f || true
+          echo "Cleanup complete"
         shell: bash
 
-      - name: Setup Docker Swarm and Network
+      - name: Setup Docker Swarm
         run: |
+          echo "Setting up Docker Swarm..."
+          
           # Get the IP address
           IP=$(hostname -I | awk '{print $1}')
           echo "Using IP: $IP"
           
-          # Leave any existing swarm first
-          docker swarm leave -f || true
-          
-          # Initialize new swarm
-          docker swarm init --advertise-addr $IP || {
-            echo "Failed to initialize swarm"
-            docker swarm init --force-new-cluster --advertise-addr $IP
-          }
-          
-          # Remove old network if it exists
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          # Check if already in swarm
+          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
+            echo "Node not in swarm, initializing..."
+            # Try to initialize as manager
+            if docker swarm init --advertise-addr $IP; then
+              echo "Successfully initialized swarm as manager"
+              # Get the join token for other runners
+              WORKER_TOKEN=$(docker swarm join-token worker -q)
+              echo "SWARM_TOKEN=$WORKER_TOKEN" >> $GITHUB_ENV
+              echo "SWARM_MANAGER_IP=$IP" >> $GITHUB_ENV
+            else
+              echo "Failed to initialize as manager, trying to join existing swarm..."
+              # Here you would need to have a way to get the manager's IP and token
+              # This could be stored in GitHub secrets or environment variables
+              if [[ -n "${{ env.SWARM_TOKEN }}" && -n "${{ env.SWARM_MANAGER_IP }}" ]]; then
+                docker swarm join --token ${{ env.SWARM_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377
+                echo "Successfully joined existing swarm"
+              else
+                echo "No existing swarm found and failed to initialize. Exiting."
+                exit 1
+              fi
+            fi
+          else
+            echo "Node already in swarm"
+            docker node ls
+          fi
           
           # Create overlay network
-          docker network create \
-            --driver overlay \
-            --attachable \
-            --subnet 10.0.0.0/16 \
-            --gateway 10.0.0.1 \
-            ${{ env.DOCKER_NETWORK_NAME }} || {
-            echo "Failed to create network, trying to recreate..."
-            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-            docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}
-          }
+          if ! docker network ls | grep -q ${{ env.DOCKER_NETWORK_NAME }}; then
+            echo "Creating overlay network..."
+            docker network create \
+              --driver overlay \
+              --attachable \
+              --subnet 10.0.0.0/16 \
+              --gateway 10.0.0.1 \
+              ${{ env.DOCKER_NETWORK_NAME }}
+          else
+            echo "Network ${{ env.DOCKER_NETWORK_NAME }} already exists"
+          fi
           
-          # Verify network creation
-          echo "Network details:"
-          docker network ls | grep ${{ env.DOCKER_NETWORK_NAME }}
+          # Verify setup
+          echo "Swarm status:"
+          docker node ls
+          echo "Network status:"
+          docker network ls
           docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
         shell: bash
 
