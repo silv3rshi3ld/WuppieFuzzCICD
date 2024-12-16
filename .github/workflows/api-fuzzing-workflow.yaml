@@ -21,18 +21,24 @@ env:
   NETWORK_TIMEOUT: 60
 
 jobs:
-  initialize_environment:
+  initialize_swarm:
     runs-on: self-hosted
     outputs:
       swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
       network-id: ${{ steps.setup_network.outputs.network-id }}
+      runner-names: ${{ steps.get-runners.outputs.runner-names }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Docker Info
-        run: docker info
+      - name: Get Runner Names
+        id: get-runners
+        run: |
+          # Get list of all self-hosted runners
+          RUNNERS=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                       -H "Accept: application/vnd.github.v3+json" \
+                       https://api.github.com/repos/${{ github.repository }}/actions/runners | \
+                   jq -r '.runners[] | select(.status=="online") | .name' | \
+                   jq -R -s -c 'split("\n")[:-1]')
+          echo "runner-names=$RUNNERS" >> $GITHUB_OUTPUT
 
       - name: Cleanup Previous Setup
         run: |
@@ -42,17 +48,13 @@ jobs:
           sleep 5
 
       - id: setup_swarm
-        name: Setup or Join Docker Swarm
+        name: Setup Swarm Manager
         run: |
-          # Get all network interfaces IPs
-          echo "Available network interfaces:"
-          ip -4 addr show
-
-          # Get primary interface IP that other nodes can reach
+          # Get primary interface IP
           IP=$(ip -4 addr show scope global | grep inet | head -n1 | awk '{print $2}' | cut -d/ -f1)
           echo "Using IP: $IP"
           
-          # Initialize swarm with all network interfaces
+          # Initialize swarm
           if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
             echo "::error::Failed to initialize swarm"
             exit 1
@@ -66,7 +68,6 @@ jobs:
       - id: setup_network
         name: Setup Overlay Network
         run: |
-          # Create the overlay network with specific subnet and encryption
           echo "Creating overlay network..."
           NETWORK_ID=$(docker network create \
             --driver overlay \
@@ -82,21 +83,38 @@ jobs:
           fi
 
           echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
-          
-          # Wait for network to be ready
-          echo "Waiting for network propagation..."
           sleep 10
-          
-          # Verify network
           docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
 
-  setup_target_application:
+  join_swarm:
+    needs: initialize_swarm
     runs-on: self-hosted
-    needs: [initialize_environment]
-    env:
-      SWARM_MANAGER_IP: ${{ needs.initialize_environment.outputs.swarm-manager-ip }}
-      SWARM_WORKER_TOKEN: ${{ needs.initialize_environment.outputs.swarm-worker-token }}
-      NETWORK_ID: ${{ needs.initialize_environment.outputs.network-id }}
+    if: needs.initialize_swarm.outputs.runner-names != ''
+    strategy:
+      matrix:
+        runner: ${{ fromJson(needs.initialize_swarm.outputs.runner-names) }}
+    steps:
+      - name: Join Swarm
+        run: |
+          # Only join if this is not the manager node
+          HOSTNAME=$(hostname)
+          if [ "$HOSTNAME" != "${{ needs.initialize_swarm.outputs.swarm-manager-ip }}" ]; then
+            echo "Joining swarm as worker..."
+            docker swarm leave --force || true
+            sleep 2
+            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}:2377; then
+              echo "::error::Failed to join swarm"
+              exit 1
+            fi
+            echo "Successfully joined swarm"
+            sleep 5
+          else
+            echo "This is the manager node, skipping join"
+          fi
+
+  setup_target_application:
+    needs: [initialize_swarm, join_swarm]
+    runs-on: self-hosted
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
@@ -119,55 +137,13 @@ jobs:
               ;;
           esac
 
-      - name: Join Swarm and Configure Network
-        run: |
-          # Check if already in swarm
-          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
-            echo "Joining swarm..."
-            if ! docker swarm join --token ${{ env.SWARM_WORKER_TOKEN }} ${{ env.SWARM_MANAGER_IP }}:2377; then
-              echo "::error::Failed to join swarm"
-              exit 1
-            fi
-            echo "Successfully joined swarm"
-            sleep 10
-          fi
-
-          # Verify swarm status
-          docker node ls
-
-          # Wait for network to be available
-          echo "Waiting for network to be available..."
-          TIMEOUT=30
-          START_TIME=$(date +%s)
-          
-          while true; do
-            CURRENT_TIME=$(date +%s)
-            ELAPSED=$((CURRENT_TIME - START_TIME))
-            
-            if [ $ELAPSED -gt $TIMEOUT ]; then
-              echo "::error::Network verification timed out"
-              exit 1
-            fi
-            
-            if docker network ls | grep -q "${{ env.NETWORK_ID }}"; then
-              echo "Network is available"
-              docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
-              break
-            fi
-            
-            echo "Waiting for network... (${ELAPSED}s/$TIMEOUT)"
-            sleep 5
-          done
-
       - name: Start VAmPI
         run: |
           cd services/vampi
           
-          # Cleanup any existing instances
           docker compose down -v || true
           sleep 5
           
-          # Set required environment variables
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
 
@@ -176,7 +152,6 @@ jobs:
             echo "Starting VAmPI (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
             
             if docker compose up -d; then
-              # Wait for service health
               for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
                 if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
                   echo "VAmPI is healthy and responding"
@@ -196,17 +171,13 @@ jobs:
           done
 
           echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
-          echo "Docker Compose Logs:"
           docker compose logs
           docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
           exit 1
 
   prepare_fuzzers:
     runs-on: self-hosted
-    needs: [initialize_environment]
-    env:
-      SWARM_MANAGER_IP: ${{ needs.initialize_environment.outputs.swarm-manager-ip }}
-      SWARM_WORKER_TOKEN: ${{ needs.initialize_environment.outputs.swarm-worker-token }}
+    needs: [initialize_swarm]
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
@@ -231,25 +202,36 @@ jobs:
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Setting up and running EvoMaster using Docker..."
-          cd services/evomaster
           
-          # Copy OpenAPI spec to the correct location
-          cp ../../openapi_specs/openapi3.yml ./openapi_evomaster.yml
+          mkdir -p tools/evomaster
           
-          # Create results directory
-          mkdir -p evomaster_results
+          cp services/vampi/openapi_specs/openapi3.yml tools/evomaster/openapi3.yml || {
+            echo "Failed to copy OpenAPI spec"
+            ls -la services/vampi/openapi_specs/
+            exit 1
+          }
           
-          # Build and run EvoMaster container
-          docker compose -f docker-compose.evomaster.yml up --build
-          
-          # Check if results were generated
-          if [ -d "evomaster_results" ]; then
-            echo "Test results generated successfully"
-            ls -la evomaster_results/
-          else
-            echo "No results directory found"
+          if [ ! -f tools/evomaster/openapi3.yml ]; then
+            echo "OpenAPI spec not found at tools/evomaster/openapi3.yml"
+            pwd
+            ls -la tools/evomaster/
             exit 1
           fi
+          
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v $(pwd)/tools/evomaster:/evomaster \
+            -e VAMPI_PORT=$VAMPI_PORT \
+            evomaster/evomaster-app \
+            --blackBox true \
+            --bbSwaggerUrl http://vampi-secure-${VAMPI_PORT}:5000/api/v1/docs \
+            --outputFormat JAVA_JUNIT \
+            --testTimeout 60 \
+            --maxTime 1h \
+            --ratePerMinute 60 \
+            --statistics true \
+            --baseUrlOfSut http://vampi-secure-${VAMPI_PORT}:5000 \
+            --enableBasicAssertions true
 
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v3
@@ -389,7 +371,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Download and summarize results for all fuzzers
       - name: Download RESTler Results
         uses: actions/download-artifact@v4
         with:
