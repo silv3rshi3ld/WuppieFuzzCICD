@@ -122,7 +122,7 @@ jobs:
   setup_target_application:
     runs-on: self-hosted
     needs: [initialize_environment]
-    environment:
+    env:
       SWARM_MANAGER_IP: ${{ needs.initialize_environment.outputs.swarm-manager-ip }}
       SWARM_WORKER_TOKEN: ${{ needs.initialize_environment.outputs.swarm-worker-token }}
     strategy:
@@ -196,7 +196,7 @@ jobs:
   prepare_fuzzers:
     runs-on: self-hosted
     needs: [initialize_environment]
-    environment:
+    env:
       SWARM_MANAGER_IP: ${{ needs.initialize_environment.outputs.swarm-manager-ip }}
       SWARM_WORKER_TOKEN: ${{ needs.initialize_environment.outputs.swarm-worker-token }}
     strategy:
