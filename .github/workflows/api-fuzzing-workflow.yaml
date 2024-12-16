@@ -2,11 +2,9 @@ name: API Fuzzing Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -17,14 +15,15 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5022
   VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
+  # List of fuzzers
+  FUZZERS: restler wuppiefuzz evomaster
 
 jobs:
   initialize_environment:
     runs-on: self-hosted
     outputs:
-      runner-label: ${{ runner.name }}
-      swarm-manager-ip: ${{ env.SWARM_MANAGER_IP }}
-      swarm-worker-token: ${{ env.SWARM_WORKER_TOKEN }}
+      swarm-manager-ip: ${{ steps.set-outputs.outputs.swarm-manager-ip }}
+      swarm-worker-token: ${{ steps.set-outputs.outputs.swarm-worker-token }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -36,7 +35,6 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
           mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
           mkdir -p $HOME/.cargo $HOME/.rustup
-        shell: bash
 
       - name: Cleanup Previous Containers
         if: always()
@@ -44,33 +42,29 @@ jobs:
           echo "Cleaning up previous containers..."
           docker ps -q | xargs -r docker rm -f || true
           echo "Cleanup complete"
-        shell: bash
 
       - name: Setup Docker Swarm
         run: |
           echo "Setting up Docker Swarm..."
-          
+
           # Force leave any existing swarm
           docker swarm leave -f || true
           sleep 2
-          
+
           # Get the IP address
           IP=$(hostname -I | awk '{print $1}')
           echo "Using IP: $IP"
-          
+
           # Initialize swarm
           if ! docker swarm init --advertise-addr $IP; then
             echo "Failed to initialize swarm"
             exit 1
           fi
-          
+
           # Get and store tokens
           MANAGER_TOKEN=$(docker swarm join-token manager -q)
           WORKER_TOKEN=$(docker swarm join-token worker -q)
-          echo "SWARM_MANAGER_TOKEN=${MANAGER_TOKEN}" >> $GITHUB_ENV
-          echo "SWARM_WORKER_TOKEN=${WORKER_TOKEN}" >> $GITHUB_ENV
-          echo "SWARM_MANAGER_IP=${IP}" >> $GITHUB_ENV
-          
+
           # Create network
           echo "Creating overlay network..."
           docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }} || {
@@ -78,31 +72,39 @@ jobs:
             docker network ls
             exit 1
           }
+
+          echo "Swarm and network created successfully."
           
-          # Verify setup
+          # Print info
           echo "=== Swarm Status ==="
           docker info | grep -A5 "Swarm:"
           echo "=== Node List ==="
           docker node ls
           echo "=== Network List ==="
           docker network ls
-        shell: bash
+          
+          # Store outputs for downstream jobs
+          echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
+          echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Verify Environment
         run: |
-          echo "=== Environment Variables ==="
-          env | grep SWARM || echo "No SWARM variables set"
           echo "=== Docker Info ==="
           docker info
           echo "=== Process List ==="
           ps aux | grep docker
-        shell: bash
 
       - name: Verify Network
         run: |
           echo "Network details:"
           docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
-        shell: bash
+
+      # A placeholder step to produce outputs
+      - id: set-outputs
+        run: |
+          # No-op step, outputs already set above
+          echo "Swarm outputs set."
+
 
   setup_target_application:
     runs-on: self-hosted
@@ -125,7 +127,16 @@ jobs:
           ls -la
           echo "Contents of services directory:"
           ls -la services || echo "services directory not found"
-        shell: bash
+
+      - name: Set VAMPI_PORT
+        run: |
+          if [ "${{ matrix.fuzzer }}" = "restler" ]; then
+            echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
+          elif [ "${{ matrix.fuzzer }}" = "wuppiefuzz" ]; then
+            echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
+          else
+            echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
+          fi
 
       - name: Start VAmPI Container
         run: |
@@ -161,9 +172,8 @@ jobs:
             done
           fi
           
-          # Start containers
-          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port ${{ env.VAMPI_PORT }}"
-          export PORT=${{ env.VAMPI_PORT }}
+          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port $VAMPI_PORT"
+          export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
           
           # Try to start containers with retry
@@ -174,7 +184,7 @@ jobs:
             if docker compose up -d; then
               # Wait for containers to be healthy
               for i in {1..30}; do
-                if curl -s http://localhost:${{ env.VAMPI_PORT }}/api/v1/docs > /dev/null; then
+                if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
                   echo "VAmPI is up and running"
                   docker compose ps
                   exit 0
@@ -193,9 +203,7 @@ jobs:
           echo "Failed to start containers after $MAX_RETRIES attempts"
           docker compose logs
           exit 1
-        env:
-          VAMPI_PORT: ${{ matrix.fuzzer == 'restler' && env.VAMPI_RESTLER_PORT || matrix.fuzzer == 'wuppiefuzz' && env.VAMPI_WUPPIEFUZZ_PORT || env.VAMPI_EVOMASTER_PORT }}
-        shell: bash
+
 
   prepare_fuzzers:
     runs-on: self-hosted
@@ -216,58 +224,44 @@ jobs:
         run: |
           echo "Setting up RESTler..."
           # RESTler setup steps here
-        shell: bash
 
       - name: Setup WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
-        shell: bash
 
       - name: Setup EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Setting up EvoMaster..."
-          
-          # Create evomaster directory
           mkdir -p tools/evomaster
           cd tools/evomaster
-          
-          # Download EvoMaster JAR
           echo "Downloading EvoMaster..."
           curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v3.3.0/evomaster.jar
-          
-          # Verify download
           if [ ! -f evomaster.jar ]; then
             echo "Failed to download EvoMaster"
             exit 1
           fi
-          
-          # Test EvoMaster installation
           echo "Testing EvoMaster installation..."
           java -jar evomaster.jar --version
-          
-          # Create evomaster configuration
           echo "Creating EvoMaster configuration..."
-          cat > evomaster.yml << EOL
-          blackBox: true
-          testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
-          openApiUrl: ./openapi_specs/openapi3.yml
-          outputFormat: JAVA_JUNIT_5
-          maxTime: 1h
-          EOL
-          
+          cat > evomaster.yml <<EOL
+blackBox: true
+testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
+openApiUrl: ./openapi3.yml
+outputFormat: JAVA_JUNIT_5
+maxTime: 1h
+EOL
           echo "EvoMaster setup complete"
-        shell: bash
 
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: fuzzer-${{ matrix.fuzzer }}-artifacts
-          path: |
-            tools/**/*
+          path: tools
           retention-days: 1
+
 
   prepare_openapi_specs:
     runs-on: self-hosted
@@ -279,17 +273,17 @@ jobs:
 
       - name: Generate OpenAPI Specs
         run: |
-          for fuzzer in "restler" "wuppiefuzz" "evomaster"; do
+          for fuzzer in restler wuppiefuzz evomaster; do
             case $fuzzer in
-              "restler")
+              restler)
                 PORT=${{ env.VAMPI_RESTLER_PORT }}
                 OUTPUT_DIR="${{ env.BASE_DIR }}/workspace/restler"
                 ;;
-              "wuppiefuzz")
+              wuppiefuzz)
                 PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
                 OUTPUT_DIR="${{ env.BASE_DIR }}/wuppiefuzz_workspace"
                 ;;
-              "evomaster")
+              evomaster)
                 PORT=${{ env.VAMPI_EVOMASTER_PORT }}
                 OUTPUT_DIR="${{ env.BASE_DIR }}/workspace/evomaster"
                 ;;
@@ -299,7 +293,17 @@ jobs:
             cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml "$OUTPUT_DIR/openapi3.yml"
             sed -i "s|http://localhost:5000|http://localhost:$PORT|g" "$OUTPUT_DIR/openapi3.yml"
           done
-        shell: bash
+
+      - name: Upload OpenAPI Specs
+        uses: actions/upload-artifact@v3
+        with:
+          name: openapi-specs
+          path: |
+            ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
+            ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
+            ${{ env.BASE_DIR }}/wuppiefuzz_workspace/openapi3.yml
+          retention-days: 1
+
 
   run_fuzzing:
     runs-on: self-hosted
@@ -324,36 +328,39 @@ jobs:
           name: openapi-specs
           path: openapi_specs
 
+      - name: Set VAMPI_PORT
+        run: |
+          if [ "${{ matrix.fuzzer }}" = "restler" ]; then
+            echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
+          elif [ "${{ matrix.fuzzer }}" = "wuppiefuzz" ]; then
+            echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
+          else
+            echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
+          fi
+
       - name: Run RESTler
         if: matrix.fuzzer == 'restler'
         run: |
           echo "Running RESTler..."
           # RESTler execution steps here
-        shell: bash
 
       - name: Run WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
           echo "Running WuppieFuzz..."
           # WuppieFuzz execution steps here
-        shell: bash
 
       - name: Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Running EvoMaster..."
           cd tools/evomaster
-          
-          # Ensure EvoMaster jar is executable
           chmod +x evomaster.jar
-          
-          # Create results directory
           mkdir -p results
           
           echo "Starting EvoMaster with configuration:"
           cat evomaster.yml
           
-          # Run EvoMaster
           java -jar evomaster.jar \
             --blackBox true \
             --testTargetUrl http://localhost:${{ env.VAMPI_EVOMASTER_PORT }} \
@@ -364,8 +371,6 @@ jobs:
             --problemType REST
           
           echo "EvoMaster execution completed"
-          
-          # Check results
           if [ -d "results" ]; then
             echo "Test results generated successfully"
             ls -la results/
@@ -373,7 +378,6 @@ jobs:
             echo "No results directory found"
             exit 1
           fi
-        shell: bash
 
       - name: Upload Fuzzing Results
         uses: actions/upload-artifact@v3
@@ -384,23 +388,44 @@ jobs:
             tools/**/output
           retention-days: 1
 
+
   summarize_results:
     runs-on: self-hosted
     needs: run_fuzzing
     steps:
-      - name: Download Fuzzer Results
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Download and summarize results for all fuzzers
+      - name: Download RESTler Results
         uses: actions/download-artifact@v4
         with:
-          name: fuzzing-results-${{ matrix.fuzzer }}
-          path: all_results/${{ matrix.fuzzer }}-results
+          name: fuzzing-results-restler
+          path: all_results/restler-results
+          if-no-files-found: warn
+
+      - name: Download WuppieFuzz Results
+        uses: actions/download-artifact@v4
+        with:
+          name: fuzzing-results-wuppiefuzz
+          path: all_results/wuppiefuzz-results
+          if-no-files-found: warn
+
+      - name: Download EvoMaster Results
+        uses: actions/download-artifact@v4
+        with:
+          name: fuzzing-results-evomaster
+          path: all_results/evomaster-results
           if-no-files-found: warn
 
       - name: List Downloaded Artifacts
         run: |
-          echo "Listing ${{ matrix.fuzzer }} Results:"
-          ls -la all_results/${{ matrix.fuzzer }}-results || echo "${{ matrix.fuzzer }} results directory not found."
-        shell: bash
-        continue-on-error: true
+          echo "Listing RESTler Results:"
+          ls -la all_results/restler-results || echo "No RESTler results found."
+          echo "Listing WuppieFuzz Results:"
+          ls -la all_results/wuppiefuzz-results || echo "No WuppieFuzz results found."
+          echo "Listing EvoMaster Results:"
+          ls -la all_results/evomaster-results || echo "No EvoMaster results found."
 
       - name: Final Cleanup
         if: always()
@@ -409,4 +434,3 @@ jobs:
           docker container prune -f || echo "Failed to prune Docker containers."
           echo "Pruning Docker networks..."
           docker network prune -f || echo "Failed to prune Docker networks."
-        shell: bash
