@@ -267,9 +267,9 @@ jobs:
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Setting up EvoMaster..."
-          cd ${{ github.workspace }}/services/evomaster
-          docker build -t evomaster:latest -f Dockerfile.evomaster .
-          mkdir -p evomaster_results
+          cd "${{ github.workspace }}"
+          docker build -t evomaster:latest -f services/evomaster/Dockerfile.evomaster services/evomaster
+          mkdir -p services/evomaster/evomaster_results
 
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v3
@@ -368,11 +368,11 @@ jobs:
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Running EvoMaster..."
-          cd ${{ github.workspace }}/services/evomaster
+          cd "${{ github.workspace }}"
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v ${PWD}/openapi3.yml:/specs/openapi3.yml:ro \
-            -v ${PWD}/evomaster_results:/evomaster/results \
+            -v "${PWD}/services/evomaster/openapi3.yml:/specs/openapi3.yml:ro" \
+            -v "${PWD}/services/evomaster/evomaster_results:/evomaster/results" \
             -e SPEC_PATH="/specs/openapi3.yml" \
             -e OUTPUT_DIR="/evomaster/results" \
             -e TARGET_URL="http://vampi-vulnerable-evomaster:${{ env.VAMPI_PORT }}" \
