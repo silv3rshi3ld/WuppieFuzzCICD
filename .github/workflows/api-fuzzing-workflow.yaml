@@ -52,8 +52,17 @@ jobs:
       - id: setup_swarm
         name: Setup Swarm Manager
         run: |
-          IP=${{ secrets.MANAGER_IP }}
           HOSTNAME=$(hostname)
+          echo "Hostname: $HOSTNAME"
+          
+          if [[ "$HOSTNAME" == *"runner" && "$HOSTNAME" != *"runner2" ]]; then
+            IP="127.0.0.1"
+            echo "This is the main runner, using localhost"
+          else
+            IP="${{ secrets.MANAGER_IP }}"
+            echo "This is not the main runner, using manager IP"
+          fi
+          
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
           
