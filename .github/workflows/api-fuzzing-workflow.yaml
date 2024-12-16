@@ -51,13 +51,13 @@ jobs:
       - id: setup_swarm
         name: Setup Swarm Manager
         run: |
-          # Get primary interface IP
-          IP=$(ip -4 addr show scope global | grep inet | head -n1 | awk '{print $2}' | cut -d/ -f1)
+          # Use MANAGER_IP from secrets
+          IP=${{ secrets.MANAGER_IP }}
           HOSTNAME=$(hostname)
-          echo "Using IP: $IP"
+          echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
           
-          # Initialize swarm
+          # Initialize swarm with known manager IP
           if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
             echo "::error::Failed to initialize swarm"
             exit 1
