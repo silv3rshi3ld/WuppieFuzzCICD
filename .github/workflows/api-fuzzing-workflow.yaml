@@ -116,7 +116,12 @@ jobs:
 
       - name: Join Swarm
         run: |
+          set -e
           HOSTNAME=$(hostname)
+          echo "Current Hostname: $HOSTNAME"
+          echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
+          echo "Manager IP: ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}"
+
           if [ "$HOSTNAME" != "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
             echo "Joining swarm as worker..."
             if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}:2377; then
@@ -142,6 +147,8 @@ jobs:
             done
           else
             echo "This is the manager node, skipping join"
+          fi
+        shell: bash
 
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
