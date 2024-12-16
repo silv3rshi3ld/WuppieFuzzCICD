@@ -13,9 +13,10 @@ env:
   DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5012
   VAMPI_WUPPIEFUZZ_PORT: 5022
-  VAMPI_EVOMASTER_PORT: 5032
+  # Removed VAMPI_EVOMASTER_PORT
   BASE_DIR: ${{ github.workspace }}
-  FUZZERS: restler wuppiefuzz evomaster
+  # Only restler and wuppiefuzz now
+  FUZZERS: restler wuppiefuzz
   MAX_STARTUP_RETRIES: 3
   HEALTH_CHECK_TIMEOUT: 30
   NETWORK_TIMEOUT: 60
@@ -33,7 +34,7 @@ jobs:
         run: |
           echo "Cleaning up previous setup..."
           # Kill any processes using our ports
-          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
+          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }}; do
             pid=$(lsof -ti :$port) || true
             if [ ! -z "$pid" ]; then
               echo "Killing process using port $port"
@@ -51,13 +52,11 @@ jobs:
       - id: setup_swarm
         name: Setup Swarm Manager
         run: |
-          # Use MANAGER_IP from secrets
           IP=${{ secrets.MANAGER_IP }}
           HOSTNAME=$(hostname)
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
           
-          # Initialize swarm with known manager IP
           if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
             echo "::error::Failed to initialize swarm"
             exit 1
@@ -95,13 +94,13 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        fuzzer: [restler, wuppiefuzz]
       fail-fast: false
     steps:
       - name: Cleanup Worker
         run: |
           # Kill any processes using our ports
-          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
+          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }}; do
             pid=$(lsof -ti :$port) || true
             if [ ! -z "$pid" ]; then
               echo "Killing process using port $port"
@@ -143,14 +142,13 @@ jobs:
             done
           else
             echo "This is the manager node, skipping join"
-          fi
 
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
     runs-on: self-hosted
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        fuzzer: [restler, wuppiefuzz]
       fail-fast: false
     steps:
       - name: Checkout Repository
@@ -164,9 +162,6 @@ jobs:
               ;;
             "wuppiefuzz")
               echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
-              ;;
-            "evomaster")
-              echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
               ;;
           esac
 
@@ -237,7 +232,7 @@ jobs:
     needs: [initialize_swarm]
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        fuzzer: [restler, wuppiefuzz]
       fail-fast: false
     steps:
       - name: Checkout Repository
@@ -255,40 +250,7 @@ jobs:
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
 
-      - name: Setup and Run EvoMaster
-        if: matrix.fuzzer == 'evomaster'
-        run: |
-          echo "Setting up and running EvoMaster using Docker..."
-          
-          mkdir -p tools/evomaster
-          
-          cp services/vampi/openapi_specs/openapi3.yml tools/evomaster/openapi3.yml || {
-            echo "Failed to copy OpenAPI spec"
-            ls -la services/vampi/openapi_specs/
-            exit 1
-          }
-          
-          if [ ! -f tools/evomaster/openapi3.yml ]; then
-            echo "OpenAPI spec not found at tools/evomaster/openapi3.yml"
-            pwd
-            ls -la tools/evomaster/
-            exit 1
-          fi
-          
-          docker run --rm \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v $(pwd)/tools/evomaster:/evomaster \
-            -e VAMPI_PORT=$VAMPI_PORT \
-            evomaster/evomaster-app \
-            --blackBox true \
-            --bbSwaggerUrl http://vampi-secure-${VAMPI_PORT}:5000/api/v1/docs \
-            --outputFormat JAVA_JUNIT \
-            --testTimeout 60 \
-            --maxTime 1h \
-            --ratePerMinute 60 \
-            --statistics true \
-            --baseUrlOfSut http://vampi-secure-${VAMPI_PORT}:5000 \
-            --enableBasicAssertions true
+      # Removed EvoMaster setup and run
 
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v3
@@ -307,7 +269,7 @@ jobs:
 
       - name: Generate OpenAPI Specs
         run: |
-          for fuzzer in restler wuppiefuzz evomaster; do
+          for fuzzer in restler wuppiefuzz; do
             case $fuzzer in
               restler)
                 PORT=${{ env.VAMPI_RESTLER_PORT }}
@@ -316,10 +278,6 @@ jobs:
               wuppiefuzz)
                 PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
                 OUTPUT_DIR="${{ env.BASE_DIR }}/wuppiefuzz_workspace"
-                ;;
-              evomaster)
-                PORT=${{ env.VAMPI_EVOMASTER_PORT }}
-                OUTPUT_DIR="${{ env.BASE_DIR }}/workspace/evomaster"
                 ;;
             esac
             
@@ -334,7 +292,6 @@ jobs:
           name: openapi-specs
           path: |
             ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
-            ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
             ${{ env.BASE_DIR }}/wuppiefuzz_workspace/openapi3.yml
           retention-days: 1
 
@@ -343,7 +300,7 @@ jobs:
     needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        fuzzer: [restler, wuppiefuzz]
       fail-fast: false
     steps:
       - name: Checkout Repository
@@ -367,8 +324,6 @@ jobs:
             echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
           elif [ "${{ matrix.fuzzer }}" = "wuppiefuzz" ]; then
             echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
-          else
-            echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
           fi
 
       - name: Run RESTler
@@ -383,34 +338,7 @@ jobs:
           echo "Running WuppieFuzz..."
           # WuppieFuzz execution steps here
 
-      - name: Run EvoMaster
-        if: matrix.fuzzer == 'evomaster'
-        run: |
-          echo "Running EvoMaster..."
-          cd tools/evomaster
-          chmod +x evomaster.jar
-          mkdir -p results
-          
-          echo "Starting EvoMaster with configuration:"
-          cat evomaster.yml
-          
-          java -jar evomaster.jar \
-            --blackBox true \
-            --testTargetUrl http://localhost:${{ env.VAMPI_EVOMASTER_PORT }} \
-            --openApiUrl ../../openapi_specs/openapi3.yml \
-            --outputFormat JAVA_JUNIT_5 \
-            --maxTime 1h \
-            --outputFolder ./results \
-            --problemType REST
-          
-          echo "EvoMaster execution completed"
-          if [ -d "results" ]; then
-            echo "Test results generated successfully"
-            ls -la results/
-          else
-            echo "No results directory found"
-            exit 1
-          fi
+      # Removed EvoMaster run step
 
       - name: Upload Fuzzing Results
         uses: actions/upload-artifact@v3
@@ -442,12 +370,7 @@ jobs:
           path: all_results/wuppiefuzz-results
           if-no-files-found: warn
 
-      - name: Download EvoMaster Results
-        uses: actions/download-artifact@v4
-        with:
-          name: fuzzing-results-evomaster
-          path: all_results/evomaster-results
-          if-no-files-found: warn
+      # Removed EvoMaster results section
 
       - name: List Downloaded Artifacts
         run: |
@@ -455,8 +378,6 @@ jobs:
           ls -la all_results/restler-results || echo "No RESTler results found."
           echo "Listing WuppieFuzz Results:"
           ls -la all_results/wuppiefuzz-results || echo "No WuppieFuzz results found."
-          echo "Listing EvoMaster Results:"
-          ls -la all_results/evomaster-results || echo "No EvoMaster results found."
 
       - name: Final Cleanup
         if: always()
