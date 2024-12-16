@@ -55,13 +55,8 @@ jobs:
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
           
-          # Always use the actual IP, never localhost, so workers can connect
-          IP="${{ secrets.MANAGER_IP }}"
-          if [[ -z "$IP" ]]; then
-            echo "::error::MANAGER_IP secret is not set"
-            exit 1
-          fi
-          
+          # Using hardcoded IP for testing
+          IP="134.221.210.62"
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
           
