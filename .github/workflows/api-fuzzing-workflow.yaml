@@ -30,6 +30,7 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/services/vampi
           mkdir -p ${{ env.BASE_DIR }}/workspace
           mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
           mkdir -p $HOME/.cargo $HOME/.rustup
         shell: bash
 
@@ -56,39 +57,79 @@ jobs:
         run: docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
         shell: bash
 
-      - name: Create Docker Network
-        run: |
-          if ! sudo docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
-            for i in {1..3}; do
-              if sudo docker network create --subnet=172.20.0.0/16 $DOCKER_NETWORK_NAME; then
-                echo "Network created successfully"
-                break
-              fi
-              if [ $i -eq 3 ]; then
-                echo "Failed to create network after 3 attempts"
-                exit 1
-              fi
-              echo "Attempt $i failed, retrying..."
-              sleep 2
-            done
-          fi
-        shell: bash
-
   setup_target_application:
     runs-on: self-hosted
-    needs: initialize_environment
+    needs: [initialize_environment]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build VAmPI Docker Images
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
+      - name: Create Docker Network
+        run: docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+
+      - name: Start VAmPI Container
         run: |
-          # Cleanup existing containers
-          sudo docker compose -f docker-compose.yaml down --remove-orphans || true
-          # Build fresh images
-          sudo docker compose -f docker-compose.yaml build --force-rm
-        shell: bash
+          case "${{ matrix.fuzzer }}" in
+            "restler")
+              cd ${{ env.BASE_DIR }}/services/vampi
+              PORT=5012 docker compose up -d vampi-vulnerable
+              
+              echo "Waiting for VAmPI RESTler instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:5012/ >/dev/null; then
+                  echo "VAmPI RESTler instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+              
+            "wuppiefuzz")
+              cd ${{ env.BASE_DIR }}/services/vampi
+              PORT=5022 docker compose up -d vampi-vulnerable
+              
+              echo "Waiting for VAmPI WuppieFuzz instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:5022/ >/dev/null; then
+                  echo "VAmPI WuppieFuzz instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+              
+            "evomaster")
+              cd ${{ env.BASE_DIR }}/services/vampi
+              PORT=5032 docker compose up -d vampi-vulnerable
+              
+              echo "Waiting for VAmPI EvoMaster instance..."
+              for i in {1..30}; do
+                if curl -s http://localhost:5032/ >/dev/null; then
+                  echo "VAmPI EvoMaster instance is ready!"
+                  break
+                fi
+                if [ $i -eq 30 ]; then
+                  echo "VAmPI failed to start. Container logs:"
+                  docker logs vampi-vulnerable
+                  exit 1
+                fi
+                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+                sleep 2
+              done
+              ;;
+          esac
 
   prepare_fuzzers:
     runs-on: self-hosted
@@ -201,193 +242,27 @@ jobs:
 
   run_fuzzing:
     runs-on: self-hosted
-    needs: [prepare_fuzzers, prepare_openapi_specs]
+    needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
-      fail-fast: false
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Create Workspace Directories
+      - name: Run Fuzzer
         run: |
           case "${{ matrix.fuzzer }}" in
             "restler")
-              mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
-              ;;
-            "wuppiefuzz")
-              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace/{bin,reports,corpus_directory}
-              ;;
-            "evomaster")
-              mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
-              ;;
-          esac
-        shell: bash
-
-      - name: Create RESTler Config
-        if: matrix.fuzzer == 'restler'
-        run: |
-          cat > ${{ env.BASE_DIR }}/workspace/restler/config/engine_settings.json << 'EOF'
-          {
-            "max_combinations": 20,
-            "max_request_execution_time": 10,
-            "max_async_resource_creation_time": 20,
-            "global_producer_timing_delay": 2,
-            "dyn_objects_cache_size": 10,
-            "fuzzing_mode": "directed-smoke-test",
-            "test_all_combinations": false,
-            "test_combinations_settings": {
-              "max_combinations": 20
-            }
-          }
-          EOF
-        shell: bash
-
-      - name: Configure Fuzzer
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              # Copy RESTler files
-              cp -r ${{ env.BASE_DIR }}/services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
-              cp ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
-              cp ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
-              ;;
-            "wuppiefuzz")
-              # Copy OpenAPI spec to WuppieFuzz workspace
-              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/wuppiefuzz_workspace/
-              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
-              ;;
-            "evomaster")
-              # Copy OpenAPI spec to EvoMaster workspace
-              cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/
-              echo "VAMPI_URL=http://localhost:5002" >> $GITHUB_ENV
-              ;;
-          esac
-        shell: bash
-
-      - name: Start VAmPI Container
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5012 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
-              
-              echo "Waiting for VAmPI RESTler instance..."
-              for i in {1..30}; do
-                if curl -s http://localhost:5012/ >/dev/null; then
-                  echo "VAmPI RESTler instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              
-              # Start RESTler with its own docker compose
               cd ${{ env.BASE_DIR }}/services/restler
               docker compose -f docker-compose.restler.yml up --build
               ;;
               
             "wuppiefuzz")
-              cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5022 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
-              
-              echo "Waiting for VAmPI WuppieFuzz instance..."
-              for i in {1..30}; do
-                if curl -s http://localhost:5022/ >/dev/null; then
-                  echo "VAmPI WuppieFuzz instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              
-              # Start WuppieFuzz with its own docker compose
               cd ${{ env.BASE_DIR }}/services/wuppiefuzz
               VAMPI_WUPPIEFUZZ_URL=http://vampi-vulnerable:5000 docker compose -f docker-compose.wuppie.yml up --build
               ;;
               
             "evomaster")
-              cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5032 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
-              
-              echo "Waiting for VAmPI EvoMaster instance..."
-              for i in {1..30}; do
-                if curl -s http://localhost:5032/ >/dev/null; then
-                  echo "VAmPI EvoMaster instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              
-              # Start EvoMaster with its own docker compose
               cd ${{ env.BASE_DIR }}/services/evomaster
               docker compose -f docker-compose.evomaster.yml up --build
-              ;;
-          esac
-        shell: bash
-
-      - name: Download WuppieFuzz Binary
-        if: matrix.fuzzer == 'wuppiefuzz'
-        uses: actions/download-artifact@v4
-        with:
-          name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/bin
-
-      - name: Run Fuzzer
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              cd ${{ env.BASE_DIR }}/workspace/restler
-              docker compose -f docker-compose.restler.yaml up --build
-              ;;
-            
-            "wuppiefuzz")
-              cd ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-              chmod +x bin/wuppiefuzz
-
-              # Update OpenAPI spec with correct port
-              sed -i 's|http://localhost:5000|http://localhost:5022|g' openapi3.yml
-
-              # Run WuppieFuzz
-              ./bin/wuppiefuzz output-corpus \
-                --report \
-                --log-level=info \
-                --initial-corpus=corpus_directory \
-                --coverage-host=localhost:5022 \
-                --timeout=60 \
-                openapi3.yml
-              ;;
-            
-            "evomaster")
-              cd ${{ env.BASE_DIR }}/workspace/evomaster
-              # Start EvoMaster container
-              sudo docker run --rm --network ${{ env.DOCKER_NETWORK_NAME }} \
-                -v $(pwd)/evomaster_results:/evomaster_results \
-                -e VAMPI_URL=http://localhost:5032/openapi3.yml \
-                evomaster:latest \
-                --blackBox true \
-                --bbSwaggerUrl http://localhost:5032/openapi3.yml \
-                --outputFormat JAVA_JUNIT_4 \
-                --maxTime 1m \
-                --ratePerMinute 100
               ;;
           esac
         shell: bash
