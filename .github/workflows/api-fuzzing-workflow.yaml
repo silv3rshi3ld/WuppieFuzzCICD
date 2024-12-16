@@ -73,17 +73,29 @@ jobs:
             "restler")
               cd services/vampi || exit 1
               echo "Starting VAmPI for RESTler on port 5012"
+              
+              # Clean up any existing container first
+              docker rm -f vampi-vulnerable-5012 || true
+              
+              # Start the container with debug output
               PORT=5012 docker compose up -d vampi-vulnerable
+              
+              # Show container status
+              echo "Container status:"
+              docker ps -a
+              echo "Network status:"
+              docker network inspect cicd_network
               
               echo "Waiting for VAmPI RESTler instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5012/ >/dev/null; then
+                if curl -s -f http://localhost:5012/; then
                   echo "VAmPI RESTler instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
+                  docker logs vampi-vulnerable-5012
+                  docker ps -a
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."

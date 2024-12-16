@@ -1,7 +1,7 @@
 services:
  vampi-secure:
   build: ./
-  container_name: vampi-secure
+  container_name: vampi-secure-${PORT:-5001}
   ports:
    - ${PORT:-5001}:5000
   environment:
@@ -9,17 +9,17 @@ services:
   networks:
    - cicd_network
   healthcheck:
-    test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
-    interval: 10s
-    timeout: 5s
-    retries: 3
-    start_period: 5s
+    test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+    start_period: 2s
   restart: "no"
   stop_grace_period: 1s
 
  vampi-vulnerable:
   build: ./
-  container_name: vampi-vulnerable
+  container_name: vampi-vulnerable-${PORT:-5002}
   ports:
    - ${PORT:-5002}:5000
   environment:
@@ -27,11 +27,11 @@ services:
   networks:
    - cicd_network
   healthcheck:
-    test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
-    interval: 10s
-    timeout: 5s
-    retries: 3
-    start_period: 5s
+    test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+    start_period: 2s
   restart: "no"
   stop_grace_period: 1s
 
