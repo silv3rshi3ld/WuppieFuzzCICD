@@ -7,6 +7,12 @@ services:
    - 5001:5000
   environment:
    - vulnerable=0
+  healthcheck:
+    test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 5s
 
  vampi-vulnerable:
   build: ./
@@ -15,3 +21,9 @@ services:
    - 5002:5000
   environment:
    - vulnerable=1
+  healthcheck:
+    test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 5s
