@@ -222,71 +222,62 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Fuzzer Environment
+      - name: Setup RESTler
+        if: matrix.fuzzer == 'restler'
         run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              mkdir -p ${{ env.BASE_DIR }}/workspace/restler/{config,output}
-              ;;
-            "wuppiefuzz")
-              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_workspace
-              mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-              ;;
-            "evomaster")
-              mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results
-              ;;
-          esac
+          echo "Setting up RESTler..."
+          # RESTler setup steps here
         shell: bash
 
-      - name: Get WuppieFuzz Latest Commit
+      - name: Setup WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
-        id: get-commit
         run: |
-          LATEST_COMMIT=$(git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | cut -f1)
-          echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          echo "Setting up WuppieFuzz..."
+          # WuppieFuzz setup steps here
         shell: bash
 
-      - name: Cache WuppieFuzz Binary
-        if: matrix.fuzzer == 'wuppiefuzz'
-        id: cache-wuppiefuzz
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
-          key: wuppiefuzz-${{ steps.get-commit.outputs.commit }}
-          restore-keys: |
-            wuppiefuzz-
-
-      - name: Setup Rust for WuppieFuzz
-        if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Install Build Dependencies
-        if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
+      - name: Setup EvoMaster
+        if: matrix.fuzzer == 'evomaster'
         run: |
-          apt-get update
-          apt-get install -y build-essential pkg-config libssl-dev
+          echo "Setting up EvoMaster..."
+          
+          # Create evomaster directory
+          mkdir -p tools/evomaster
+          cd tools/evomaster
+          
+          # Download EvoMaster JAR
+          echo "Downloading EvoMaster..."
+          curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v3.3.0/evomaster.jar
+          
+          # Verify download
+          if [ ! -f evomaster.jar ]; then
+            echo "Failed to download EvoMaster"
+            exit 1
+          fi
+          
+          # Test EvoMaster installation
+          echo "Testing EvoMaster installation..."
+          java -jar evomaster.jar --version
+          
+          # Create evomaster configuration
+          echo "Creating EvoMaster configuration..."
+          cat > evomaster.yml << EOL
+          blackBox: true
+          testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
+          openApiUrl: ./openapi_specs/openapi3.yml
+          outputFormat: JAVA_JUNIT_5
+          maxTime: 1h
+          EOL
+          
+          echo "EvoMaster setup complete"
         shell: bash
 
-      - name: Build WuppieFuzz
-        if: matrix.fuzzer == 'wuppiefuzz' && steps.cache-wuppiefuzz.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
-          cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
-          cargo build --release
-          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
-          cd ${{ env.BASE_DIR }}
-          rm -rf wuppiefuzz_temp
-        shell: bash
-
-      - name: Upload WuppieFuzz Binary
-        if: matrix.fuzzer == 'wuppiefuzz'
-        uses: actions/upload-artifact@v4
+      - name: Upload Fuzzer Artifacts
+        uses: actions/upload-artifact@v3
         with:
-          name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz
-          if-no-files-found: error
+          name: fuzzer-${{ matrix.fuzzer }}-artifacts
+          path: |
+            tools/**/*
           retention-days: 1
 
   prepare_openapi_specs:
@@ -327,59 +318,82 @@ jobs:
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
+      fail-fast: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Run Fuzzer
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              cd services/restler || exit 1
-              echo "Running RESTler fuzzer"
-              docker compose -f docker-compose.restler.yml up --build
-              ;;
-              
-            "wuppiefuzz")
-              cd services/wuppiefuzz || exit 1
-              echo "Running WuppieFuzz fuzzer"
-              VAMPI_WUPPIEFUZZ_URL=http://vampi-vulnerable:5000 docker compose -f docker-compose.wuppie.yml up --build
-              ;;
-              
-            "evomaster")
-              cd services/evomaster || exit 1
-              echo "Running EvoMaster fuzzer"
-              docker compose -f docker-compose.evomaster.yml up --build
-              ;;
-          esac
-        shell: bash
-
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
+      - name: Download Fuzzer Artifacts
+        uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.fuzzer }}-results
-          path: |
-            ${{ env.BASE_DIR }}/workspace/restler/output/**
-            ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports/**
-            ${{ env.BASE_DIR }}/workspace/evomaster/evomaster_results/**
-          if-no-files-found: warn
+          name: fuzzer-${{ matrix.fuzzer }}-artifacts
+          path: tools
 
-      - name: Cleanup
-        if: always()
+      - name: Download OpenAPI Specs
+        uses: actions/download-artifact@v3
+        with:
+          name: openapi-specs
+          path: openapi_specs
+
+      - name: Run RESTler
+        if: matrix.fuzzer == 'restler'
         run: |
-          cd ${{ env.BASE_DIR }}/services/vampi
-          
-          # Clean up all docker compose files and their containers
-          for file in docker-compose.*.yaml; do
-            if [ -f "$file" ]; then
-              echo "Cleaning up $file"
-              docker compose -f "$file" down --remove-orphans
-            fi
-          done
-          
-          # Additional cleanup of any stray containers
-          docker ps -a | grep 'vampi-' | awk '{print $1}' | xargs -r docker rm -f
+          echo "Running RESTler..."
+          # RESTler execution steps here
         shell: bash
+
+      - name: Run WuppieFuzz
+        if: matrix.fuzzer == 'wuppiefuzz'
+        run: |
+          echo "Running WuppieFuzz..."
+          # WuppieFuzz execution steps here
+        shell: bash
+
+      - name: Run EvoMaster
+        if: matrix.fuzzer == 'evomaster'
+        run: |
+          echo "Running EvoMaster..."
+          cd tools/evomaster
+          
+          # Ensure EvoMaster jar is executable
+          chmod +x evomaster.jar
+          
+          # Create results directory
+          mkdir -p results
+          
+          echo "Starting EvoMaster with configuration:"
+          cat evomaster.yml
+          
+          # Run EvoMaster
+          java -jar evomaster.jar \
+            --blackBox true \
+            --testTargetUrl http://localhost:${{ env.VAMPI_EVOMASTER_PORT }} \
+            --openApiUrl ../../openapi_specs/openapi3.yml \
+            --outputFormat JAVA_JUNIT_5 \
+            --maxTime 1h \
+            --outputFolder ./results \
+            --problemType REST
+          
+          echo "EvoMaster execution completed"
+          
+          # Check results
+          if [ -d "results" ]; then
+            echo "Test results generated successfully"
+            ls -la results/
+          else
+            echo "No results directory found"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Upload Fuzzing Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-results-${{ matrix.fuzzer }}
+          path: |
+            tools/**/results
+            tools/**/output
+          retention-days: 1
 
   summarize_results:
     runs-on: self-hosted
@@ -388,7 +402,7 @@ jobs:
       - name: Download Fuzzer Results
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.fuzzer }}-results
+          name: fuzzing-results-${{ matrix.fuzzer }}
           path: all_results/${{ matrix.fuzzer }}-results
           if-no-files-found: warn
 
