@@ -648,3 +648,20 @@ paths:
                   message:
                     type: string
                     example: 'Book not found!'
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      operationId: api_views.health.health_check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy

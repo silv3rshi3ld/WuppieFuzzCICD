@@ -278,7 +278,7 @@ jobs:
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_restler_vampi-vulnerable_1
+                  docker logs vampi_restler-vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -302,16 +302,12 @@ jobs:
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_wuppiefuzz_vampi-vulnerable_1
+                  docker logs vampi_wuppiefuzz-vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
                 sleep 2
               done
-              
-              # Start WuppieFuzz using its docker compose
-              cd ${{ env.BASE_DIR }}/services/wuppiefuzz
-              VAMPI_WUPPIEFUZZ_URL=http://localhost:5022 docker compose -f docker-compose.wuppie.yml up --build
               ;;
               
             "evomaster")
@@ -326,7 +322,7 @@ jobs:
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_evomaster_vampi-vulnerable_1
+                  docker logs vampi_evomaster-vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
