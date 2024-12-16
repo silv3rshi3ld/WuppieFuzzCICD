@@ -34,7 +34,13 @@ services:
     start_period: 2s
   restart: "no"
   stop_grace_period: 1s
+  deploy:
+    mode: replicated
+    replicas: 1
+    endpoint_mode: vip
 
 networks:
   cicd_network:
     external: true
+    driver: overlay
+    attachable: true

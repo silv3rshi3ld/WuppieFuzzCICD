@@ -21,6 +21,8 @@ env:
 jobs:
   initialize_environment:
     runs-on: self-hosted
+    outputs:
+      runner-label: ${{ runner.name }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -39,17 +41,52 @@ jobs:
         run: |
           # Stop and remove any existing containers from previous runs
           docker ps -q | xargs -r docker rm -f || true
-          
-          # Remove the network if it exists
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
         shell: bash
 
-      - name: Create Docker Network
-        run: docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+      - name: Setup Docker Swarm and Network
+        run: |
+          # Get the IP address
+          IP=$(hostname -I | awk '{print $1}')
+          echo "Using IP: $IP"
+          
+          # Leave any existing swarm first
+          docker swarm leave -f || true
+          
+          # Initialize new swarm
+          docker swarm init --advertise-addr $IP || {
+            echo "Failed to initialize swarm"
+            docker swarm init --force-new-cluster --advertise-addr $IP
+          }
+          
+          # Remove old network if it exists
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          
+          # Create overlay network
+          docker network create \
+            --driver overlay \
+            --attachable \
+            --subnet 10.0.0.0/16 \
+            --gateway 10.0.0.1 \
+            ${{ env.DOCKER_NETWORK_NAME }} || {
+            echo "Failed to create network, trying to recreate..."
+            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+            docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}
+          }
+          
+          # Verify network creation
+          echo "Network details:"
+          docker network ls | grep ${{ env.DOCKER_NETWORK_NAME }}
+          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+        shell: bash
+
+      - name: Verify Network
+        run: |
+          echo "Network details:"
+          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
         shell: bash
 
   setup_target_application:
-    runs-on: self-hosted
+    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
     needs: [initialize_environment]
     strategy:
       matrix:
@@ -69,113 +106,57 @@ jobs:
 
       - name: Start VAmPI Container
         run: |
+          cd services/vampi || exit 1
+          
+          # Set port based on fuzzer
           case "${{ matrix.fuzzer }}" in
-            "restler")
-              cd services/vampi || exit 1
-              echo "Starting VAmPI for RESTler on port 5012"
-              
-              # Clean up any existing container first
-              docker rm -f vampi-vulnerable-5012 || true
-              
-              # Start the container with debug output
-              PORT=5012 docker compose up -d vampi-vulnerable
-              
-              # Show container status
-              echo "Container status:"
-              docker ps -a
-              echo "Network status:"
-              docker network inspect cicd_network
-              
-              echo "Waiting for VAmPI RESTler instance..."
-              for i in {1..30}; do
-                if curl -s -f http://localhost:5012/; then
-                  echo "VAmPI RESTler instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable-5012
-                  docker ps -a
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              ;;
-              
-            "wuppiefuzz")
-              cd services/vampi || exit 1
-              echo "Starting VAmPI for WuppieFuzz on port 5022"
-              
-              # Clean up any existing container first
-              docker rm -f vampi-vulnerable-5022 || true
-              
-              # Start the container with debug output
-              PORT=5022 docker compose up -d vampi-vulnerable
-              
-              # Show container status
-              echo "Container status:"
-              docker ps -a
-              
-              echo "Waiting for VAmPI WuppieFuzz instance..."
-              for i in {1..30}; do
-                if curl -s -f http://localhost:5022/; then
-                  echo "VAmPI WuppieFuzz instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable-5022
-                  docker ps -a
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              ;;
-              
-            "evomaster")
-              cd services/vampi || exit 1
-              echo "Starting VAmPI for EvoMaster on port 5032"
-              
-              # Check if port is already in use
-              if netstat -tuln | grep :5032; then
-                echo "Port 5032 is already in use!"
-                docker ps -a | grep 5032
-                exit 1
-              fi
-              
-              # Clean up any existing container first
-              docker rm -f vampi-vulnerable-5032 || true
-              
-              # Start the container with debug output
-              PORT=5032 docker compose up -d vampi-vulnerable
-              
-              # Show container status
-              echo "Container status:"
-              docker ps -a
-              
-              echo "Waiting for VAmPI EvoMaster instance..."
-              for i in {1..30}; do
-                if curl -s -f http://localhost:5032/; then
-                  echo "VAmPI EvoMaster instance is ready!"
-                  break
-                fi
-                if [ $i -eq 30 ]; then
-                  echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable-5032
-                  docker ps -a
-                  exit 1
-                fi
-                echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-                sleep 2
-              done
-              ;;
+            "restler")     PORT=${{ env.VAMPI_RESTLER_PORT }} ;;
+            "wuppiefuzz") PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }} ;;
+            "evomaster")  PORT=${{ env.VAMPI_EVOMASTER_PORT }} ;;
           esac
+          
+          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port $PORT"
+          
+          # Check if port is already in use
+          if netstat -tuln | grep ":$PORT"; then
+            echo "Port $PORT is already in use!"
+            docker ps -a | grep $PORT
+            exit 1
+          fi
+          
+          # Clean up any existing container
+          docker rm -f vampi-vulnerable-$PORT || true
+          
+          # Start container
+          PORT=$PORT docker compose up -d vampi-vulnerable
+          
+          # Verify container status
+          echo "Container status:"
+          docker ps -a
+          echo "Network status:"
+          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+          
+          # Wait for container to be ready
+          echo "Waiting for VAmPI instance..."
+          for i in {1..30}; do
+            if curl -s -f -m 5 http://localhost:$PORT/; then
+              echo "VAmPI instance is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "VAmPI failed to start. Debug info:"
+              docker logs vampi-vulnerable-$PORT
+              docker ps -a
+              docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+              exit 1
+            fi
+            echo "Waiting for VAmPI to be ready (attempt $i/30)..."
+            sleep 2
+          done
         shell: bash
 
   prepare_fuzzers:
-    runs-on: self-hosted
+    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
     needs: initialize_environment
     strategy:
       matrix:
@@ -253,7 +234,7 @@ jobs:
           retention-days: 1
 
   prepare_openapi_specs:
-    runs-on: self-hosted
+    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
     needs: initialize_environment
     steps:
       - name: Checkout Repository
@@ -284,7 +265,7 @@ jobs:
         shell: bash
 
   run_fuzzing:
-    runs-on: self-hosted
+    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
     needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
     strategy:
       matrix:
