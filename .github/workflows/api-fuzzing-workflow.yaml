@@ -231,29 +231,29 @@ jobs:
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
 
-      - name: Setup EvoMaster
+      - name: Setup and Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
-          echo "Setting up EvoMaster..."
-          mkdir -p tools/evomaster
-          cd tools/evomaster
-          echo "Downloading EvoMaster..."
-          curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v3.3.0/evomaster.jar
-          if [ ! -f evomaster.jar ]; then
-            echo "Failed to download EvoMaster"
+          echo "Setting up and running EvoMaster using Docker..."
+          cd services/evomaster
+          
+          # Copy OpenAPI spec to the correct location
+          cp ../../openapi_specs/openapi3.yml ./openapi_evomaster.yml
+          
+          # Create results directory
+          mkdir -p evomaster_results
+          
+          # Build and run EvoMaster container
+          docker compose -f docker-compose.evomaster.yml up --build
+          
+          # Check if results were generated
+          if [ -d "evomaster_results" ]; then
+            echo "Test results generated successfully"
+            ls -la evomaster_results/
+          else
+            echo "No results directory found"
             exit 1
           fi
-          echo "Testing EvoMaster installation..."
-          java -jar evomaster.jar --version
-          echo "Creating EvoMaster configuration..."
-          cat > evomaster.yml <<EOL
-          blackBox: true
-          testTargetUrl: http://localhost:${{ env.VAMPI_EVOMASTER_PORT }}
-          openApiUrl: ./openapi3.yml
-          outputFormat: JAVA_JUNIT_5
-          maxTime: 1h
-EOL
-          echo "EvoMaster setup complete"
 
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v3
