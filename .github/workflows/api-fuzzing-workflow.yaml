@@ -289,11 +289,16 @@ jobs:
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
 
+      - name: Checkout Repository
+        uses: actions/checkout@v4.0.0
+
       - name: Setup EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Setting up EvoMaster..."
-          cd "${{ github.workspace }}/services/evomaster"
+          cd "${{ github.workspace }}"
+          cd services/evomaster
+          ls -la  # Debug: list files to verify we're in the right place
           docker compose -f docker-compose.evomaster.yml build --no-cache evomaster
           mkdir -p evomaster_results
 
