@@ -146,35 +146,44 @@ jobs:
         run: |
           cd services/vampi
           
-          # Cleanup any existing containers
-          echo "Cleaning up existing containers..."
-          docker compose down -v
+          # Cleanup any existing containers and networks
+          echo "Cleaning up existing containers and networks..."
+          docker compose down -v || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          sleep 2
           
-          # Wait for network to be ready
-          echo "Waiting for network to be ready..."
-          for i in {1..30}; do
-            if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
-              echo "Network ${{ env.DOCKER_NETWORK_NAME }} is ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Network ${{ env.DOCKER_NETWORK_NAME }} not ready after 30 seconds"
-              exit 1
-            fi
-            echo "Waiting for network... attempt $i/30"
-            sleep 1
-          done
-          
-          # Start container with retry logic
-          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port ${{ env.VAMPI_PORT }}"
+          # Create network with retry logic
+          echo "Creating overlay network..."
           MAX_RETRIES=3
           RETRY_COUNT=0
           
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if PORT=${{ env.VAMPI_PORT }} docker compose up -d; then
-              echo "Container started successfully"
-              
-              # Wait for container to be ready
+            if docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}; then
+              echo "Network created successfully"
+              break
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "Failed to create network after $MAX_RETRIES attempts"
+              exit 1
+            fi
+            echo "Failed to create network, attempt $RETRY_COUNT of $MAX_RETRIES"
+            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+            sleep 5
+          done
+          
+          # Start containers
+          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port ${{ env.VAMPI_PORT }}"
+          export PORT=${{ env.VAMPI_PORT }}
+          export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
+          
+          # Try to start containers with retry
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if docker compose up -d; then
+              # Wait for containers to be healthy
               for i in {1..30}; do
                 if curl -s http://localhost:${{ env.VAMPI_PORT }}/api/v1/docs > /dev/null; then
                   echo "VAmPI is up and running"
@@ -184,18 +193,16 @@ jobs:
                 echo "Waiting for VAmPI to be ready... attempt $i/30"
                 sleep 1
               done
-              
-              echo "VAmPI failed to become ready"
-              docker compose logs
-              docker compose down -v
             fi
             
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "Failed to start container, attempt $RETRY_COUNT of $MAX_RETRIES"
+            echo "Failed to start/verify containers, attempt $RETRY_COUNT of $MAX_RETRIES"
+            docker compose down -v
             sleep 5
           done
           
-          echo "Failed to start container after $MAX_RETRIES attempts"
+          echo "Failed to start containers after $MAX_RETRIES attempts"
+          docker compose logs
           exit 1
         env:
           VAMPI_PORT: ${{ matrix.fuzzer == 'restler' && env.VAMPI_RESTLER_PORT || matrix.fuzzer == 'wuppiefuzz' && env.VAMPI_WUPPIEFUZZ_PORT || env.VAMPI_EVOMASTER_PORT }}
