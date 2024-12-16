@@ -55,12 +55,11 @@ jobs:
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
           
-          if [[ "$HOSTNAME" == *"runner" && "$HOSTNAME" != *"runner2" ]]; then
-            IP="127.0.0.1"
-            echo "This is the main runner, using localhost"
-          else
-            IP="${{ secrets.MANAGER_IP }}"
-            echo "This is not the main runner, using manager IP"
+          # Always use the actual IP, never localhost, so workers can connect
+          IP="${{ secrets.MANAGER_IP }}"
+          if [[ -z "$IP" ]]; then
+            echo "::error::MANAGER_IP secret is not set"
+            exit 1
           fi
           
           echo "Using Manager IP: $IP"
