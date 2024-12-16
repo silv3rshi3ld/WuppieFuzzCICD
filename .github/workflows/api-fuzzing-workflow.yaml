@@ -18,6 +18,7 @@ env:
   FUZZERS: restler wuppiefuzz evomaster
   MAX_STARTUP_RETRIES: 3
   HEALTH_CHECK_TIMEOUT: 30
+  NETWORK_TIMEOUT: 60
 
 jobs:
   initialize_environment:
@@ -32,51 +33,78 @@ jobs:
       - name: Docker Info
         run: docker info
 
+      - name: Cleanup Previous Setup
+        run: |
+          echo "Cleaning up previous setup..."
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker swarm leave --force || true
+          sleep 5
+
       - id: setup_swarm
         name: Setup or Join Docker Swarm
         run: |
-          # Check if already in a swarm
-          SWARM_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}')
-          if [ "$SWARM_STATE" = "active" ]; then
-            echo "Node is already part of a swarm"
-            MANAGER_TOKEN=$(docker swarm join-token manager -q)
-            WORKER_TOKEN=$(docker swarm join-token worker -q)
-            IP=$(docker info --format '{{ .Swarm.NodeAddr }}')
-          else
-            echo "Initializing new swarm..."
-            # Get primary interface IP
-            IP=$(ip -4 addr show scope global dev $(ip route | awk '/default/ {print $5}') | grep inet | awk '{print $2}' | cut -d/ -f1)
-            
-            if ! docker swarm init --advertise-addr $IP; then
-              echo "::error::Failed to initialize swarm"
-              exit 1
+          # Get primary interface IP
+          IP=$(ip -4 addr show scope global dev $(ip route | awk '/default/ {print $5}') | grep inet | awk '{print $2}' | cut -d/ -f1)
+          echo "Using IP: $IP"
+          
+          # Initialize swarm
+          if ! docker swarm init --advertise-addr $IP; then
+            echo "::error::Failed to initialize swarm"
+            exit 1
+          fi
+          
+          MANAGER_TOKEN=$(docker swarm join-token manager -q)
+          WORKER_TOKEN=$(docker swarm join-token worker -q)
+          
+          # Create network with retry logic
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Creating overlay network (Attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+            if docker network create --driver overlay --attachable --subnet 10.0.1.0/24 ${{ env.DOCKER_NETWORK_NAME }}; then
+              echo "Network created successfully"
+              break
             fi
             
-            MANAGER_TOKEN=$(docker swarm join-token manager -q)
-            WORKER_TOKEN=$(docker swarm join-token worker -q)
-            
-            echo "Creating overlay network..."
-            if ! docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }}; then
-              echo "::error::Failed to create overlay network"
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "::error::Failed to create network after $MAX_ATTEMPTS attempts"
               docker swarm leave --force
               exit 1
             fi
-          fi
-
-          # Verify swarm status
-          docker node ls
+            
+            echo "Network creation failed, cleaning up and retrying..."
+            docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+            sleep 5
+            ATTEMPT=$((ATTEMPT + 1))
+          done
           
           echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
 
       - name: Verify Network
         run: |
-          if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }}; then
-            echo "::error::Network verification failed"
-            exit 1
-          fi
-          echo "Network configuration:"
-          docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format '{{json .}}'
+          echo "Waiting for network to be fully ready..."
+          TIMEOUT=${{ env.NETWORK_TIMEOUT }}
+          START_TIME=$(date +%s)
+          
+          while true; do
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [ $ELAPSED -gt $TIMEOUT ]; then
+              echo "::error::Network verification timed out after ${TIMEOUT}s"
+              exit 1
+            fi
+            
+            if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format '{{.Id}}' >/dev/null 2>&1; then
+              echo "Network is ready"
+              docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+              break
+            fi
+            
+            echo "Waiting for network... (${ELAPSED}s/$TIMEOUT)"
+            sleep 5
+          done
 
   setup_target_application:
     runs-on: self-hosted
@@ -115,6 +143,8 @@ jobs:
               echo "::error::Failed to join swarm"
               exit 1
             fi
+            # Wait for swarm to stabilize
+            sleep 10
           fi
 
           cd services/vampi
@@ -126,6 +156,29 @@ jobs:
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
 
+          # Verify network availability
+          echo "Verifying network availability..."
+          TIMEOUT=30
+          START_TIME=$(date +%s)
+          
+          while true; do
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [ $ELAPSED -gt $TIMEOUT ]; then
+              echo "::error::Network verification timed out"
+              exit 1
+            fi
+            
+            if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
+              echo "Network is available"
+              break
+            fi
+            
+            echo "Waiting for network... (${ELAPSED}s/$TIMEOUT)"
+            sleep 5
+          done
+
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
             echo "Starting VAmPI (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
@@ -136,10 +189,7 @@ jobs:
                 if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
                   echo "VAmPI is healthy and responding"
                   docker compose ps
-                  # Additional health verification
-                  if docker compose logs | grep -i error; then
-                    echo "::warning::Found errors in logs, but service is responding"
-                  fi
+                  docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
                   exit 0
                 fi
                 echo "Waiting for VAmPI to be ready... ($i/${{ env.HEALTH_CHECK_TIMEOUT }})"
@@ -149,13 +199,14 @@ jobs:
 
             echo "::warning::Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
             docker compose down -v
+            sleep 10
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ] && sleep 5
           done
 
           echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
           echo "Docker Compose Logs:"
           docker compose logs
+          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
           exit 1
 
   prepare_fuzzers:
