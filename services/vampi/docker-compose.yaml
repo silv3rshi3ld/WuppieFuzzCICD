@@ -4,9 +4,11 @@ services:
   build: ./
   container_name: vampi-secure
   ports:
-   - 5001:5000
+   - ${PORT:-5001}:5000
   environment:
    - vulnerable=0
+  networks:
+   - ${DOCKER_NETWORK_NAME:-vampi_network}
   healthcheck:
     test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
     interval: 10s
@@ -18,12 +20,19 @@ services:
   build: ./
   container_name: vampi-vulnerable
   ports:
-   - 5002:5000
+   - ${PORT:-5002}:5000
   environment:
    - vulnerable=1
+  networks:
+   - ${DOCKER_NETWORK_NAME:-vampi_network}
   healthcheck:
     test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
     interval: 10s
     timeout: 5s
     retries: 3
     start_period: 5s
+
+networks:
+  vampi_network:
+    name: ${DOCKER_NETWORK_NAME:-vampi_network}
+    external: ${DOCKER_NETWORK_EXTERNAL:-false}

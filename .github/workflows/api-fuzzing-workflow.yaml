@@ -53,6 +53,10 @@ jobs:
         shell: bash
 
       - name: Create Docker Network
+        run: docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+        shell: bash
+
+      - name: Create Docker Network
         run: |
           if ! sudo docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
             for i in {1..3}; do
@@ -268,17 +272,17 @@ jobs:
           case "${{ matrix.fuzzer }}" in
             "restler")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5012 COMPOSE_PROJECT_NAME=vampi_restler docker compose up -d vampi-vulnerable
+              PORT=5012 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI RESTler instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5012/health >/dev/null; then
+                if curl -s http://localhost:5012/ >/dev/null; then
                   echo "VAmPI RESTler instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_restler-vampi-vulnerable
+                  docker logs vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -292,37 +296,41 @@ jobs:
               
             "wuppiefuzz")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5022 COMPOSE_PROJECT_NAME=vampi_wuppiefuzz docker compose up -d vampi-vulnerable
+              PORT=5022 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI WuppieFuzz instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5022/health >/dev/null; then
+                if curl -s http://localhost:5022/ >/dev/null; then
                   echo "VAmPI WuppieFuzz instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_wuppiefuzz-vampi-vulnerable
+                  docker logs vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
                 sleep 2
               done
+              
+              # Start WuppieFuzz with its own docker compose
+              cd ${{ env.BASE_DIR }}/services/wuppiefuzz
+              VAMPI_WUPPIEFUZZ_URL=http://vampi-vulnerable:5000 docker compose -f docker-compose.wuppie.yml up --build
               ;;
               
             "evomaster")
               cd ${{ env.BASE_DIR }}/services/vampi
-              PORT=5032 COMPOSE_PROJECT_NAME=vampi_evomaster docker compose up -d vampi-vulnerable
+              PORT=5032 DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }} DOCKER_NETWORK_EXTERNAL=true docker compose up -d vampi-vulnerable
               
               echo "Waiting for VAmPI EvoMaster instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5032/health >/dev/null; then
+                if curl -s http://localhost:5032/ >/dev/null; then
                   echo "VAmPI EvoMaster instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi_evomaster-vampi-vulnerable
+                  docker logs vampi-vulnerable
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
