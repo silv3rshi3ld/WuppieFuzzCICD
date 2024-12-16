@@ -15,7 +15,6 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5022
   VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
-  # List of fuzzers to run
   FUZZERS: restler wuppiefuzz evomaster
   MAX_STARTUP_RETRIES: 3
   HEALTH_CHECK_TIMEOUT: 30
@@ -34,28 +33,22 @@ jobs:
             pid=$(lsof -ti :$port) || true
             if [ -n "$pid" ]; then
               echo "Killing process using port $port"
-              kill -9 $pid
+              kill -9 $pid || echo "Failed to kill process on port $port"
             fi
           done
 
-          # Cleanup Docker resources
+          # Cleanup Docker containers
           if docker ps -q | grep -q .; then
-            docker ps -q | xargs docker stop
+            docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
           fi
-
           if docker ps -aq | grep -q .; then
-            docker ps -aq | xargs docker rm
+            docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
 
+          # Cleanup Docker network
           if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             if ! docker network rm "${{ env.DOCKER_NETWORK_NAME }}"; then
-              echo "::warning::Failed to remove Docker network '${{ env.DOCKER_NETWORK_NAME }}'."
-            fi
-          fi
-
-          if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
-            if ! docker swarm leave --force; then
-              echo "::warning::Failed to leave Docker Swarm."
+              echo "Failed to remove network ${{ env.DOCKER_NETWORK_NAME }}, it might be in use"
             fi
           fi
 
@@ -138,18 +131,19 @@ jobs:
             pid=$(lsof -ti :$port) || true
             if [ -n "$pid" ]; then
               echo "Killing process using port $port"
-              kill -9 $pid
+              kill -9 $pid || echo "Failed to kill process on port $port"
             fi
           done
 
           # Cleanup Docker resources
           if docker ps -q | grep -q .; then
-            docker ps -q | xargs docker stop
+            docker ps -q | xargs docker stop || echo "Failed to stop some containers"
           fi
           if docker ps -aq | grep -q .; then
-            docker ps -aq | xargs docker rm
+            docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
 
+          # Leave any existing swarm
           if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
             docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
           fi
@@ -221,7 +215,7 @@ jobs:
           pid=$(lsof -ti :$VAMPI_PORT) || true
           if [ -n "$pid" ]; then
             echo "Killing process using port $VAMPI_PORT"
-            kill -9 $pid
+            kill -9 $pid || echo "Failed to kill process on port $VAMPI_PORT"
           fi
 
           docker compose down -v || echo "::warning::Failed to run docker compose down."
@@ -269,12 +263,12 @@ jobs:
           if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
             echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
             docker compose logs || true
-            exit 1
+            # Not exiting here ensures other fuzzers continue
           fi
 
   prepare_fuzzers:
-    runs-on: self-hosted
     needs: [initialize_swarm]
+    runs-on: self-hosted
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
@@ -311,9 +305,9 @@ jobs:
           retention-days: 1
 
   prepare_openapi_specs:
-    runs-on: self-hosted
     needs: [setup_target_application]
-    if: always() && !contains(needs.*.result, 'failure')
+    runs-on: self-hosted
+    if: always()
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -352,8 +346,8 @@ jobs:
           retention-days: 1
 
   run_fuzzing:
-    runs-on: self-hosted
     needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
+    runs-on: self-hosted
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
@@ -421,8 +415,9 @@ jobs:
           retention-days: 1
 
   summarize_results:
-    runs-on: self-hosted
     needs: run_fuzzing
+    runs-on: self-hosted
+    if: always()
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -458,7 +453,6 @@ jobs:
           ls -la all_results/evomaster-results || echo "No EvoMaster results found."
 
       - name: Final Cleanup
-        if: always()
         run: |
           echo "Pruning Docker containers..."
           docker container prune -f || echo "Failed to prune Docker containers."
