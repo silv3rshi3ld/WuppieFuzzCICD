@@ -106,17 +106,27 @@ jobs:
             "wuppiefuzz")
               cd services/vampi || exit 1
               echo "Starting VAmPI for WuppieFuzz on port 5022"
+              
+              # Clean up any existing container first
+              docker rm -f vampi-vulnerable-5022 || true
+              
+              # Start the container with debug output
               PORT=5022 docker compose up -d vampi-vulnerable
+              
+              # Show container status
+              echo "Container status:"
+              docker ps -a
               
               echo "Waiting for VAmPI WuppieFuzz instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5022/ >/dev/null; then
+                if curl -s -f http://localhost:5022/; then
                   echo "VAmPI WuppieFuzz instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
+                  docker logs vampi-vulnerable-5022
+                  docker ps -a
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
@@ -127,17 +137,27 @@ jobs:
             "evomaster")
               cd services/vampi || exit 1
               echo "Starting VAmPI for EvoMaster on port 5032"
+              
+              # Clean up any existing container first
+              docker rm -f vampi-vulnerable-5032 || true
+              
+              # Start the container with debug output
               PORT=5032 docker compose up -d vampi-vulnerable
+              
+              # Show container status
+              echo "Container status:"
+              docker ps -a
               
               echo "Waiting for VAmPI EvoMaster instance..."
               for i in {1..30}; do
-                if curl -s http://localhost:5032/ >/dev/null; then
+                if curl -s -f http://localhost:5032/; then
                   echo "VAmPI EvoMaster instance is ready!"
                   break
                 fi
                 if [ $i -eq 30 ]; then
                   echo "VAmPI failed to start. Container logs:"
-                  docker logs vampi-vulnerable
+                  docker logs vampi-vulnerable-5032
+                  docker ps -a
                   exit 1
                 fi
                 echo "Waiting for VAmPI to be ready (attempt $i/30)..."
