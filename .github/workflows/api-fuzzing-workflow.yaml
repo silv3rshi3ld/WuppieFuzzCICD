@@ -144,53 +144,61 @@ jobs:
 
       - name: Start VAmPI Container
         run: |
-          cd services/vampi || exit 1
+          cd services/vampi
           
-          # Set port based on fuzzer
-          case "${{ matrix.fuzzer }}" in
-            "restler")     PORT=${{ env.VAMPI_RESTLER_PORT }} ;;
-            "wuppiefuzz") PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }} ;;
-            "evomaster")  PORT=${{ env.VAMPI_EVOMASTER_PORT }} ;;
-          esac
+          # Cleanup any existing containers
+          echo "Cleaning up existing containers..."
+          docker compose down -v
           
-          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port $PORT"
-          
-          # Check if port is already in use
-          if netstat -tuln | grep ":$PORT"; then
-            echo "Port $PORT is already in use!"
-            docker ps -a | grep $PORT
-            exit 1
-          fi
-          
-          # Clean up any existing container
-          docker rm -f vampi-vulnerable-$PORT || true
-          
-          # Start container
-          PORT=$PORT docker compose up -d vampi-vulnerable
-          
-          # Verify container status
-          echo "Container status:"
-          docker ps -a
-          echo "Network status:"
-          docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
-          
-          # Wait for container to be ready
-          echo "Waiting for VAmPI instance..."
+          # Wait for network to be ready
+          echo "Waiting for network to be ready..."
           for i in {1..30}; do
-            if curl -s -f -m 5 http://localhost:$PORT/; then
-              echo "VAmPI instance is ready!"
+            if docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
+              echo "Network ${{ env.DOCKER_NETWORK_NAME }} is ready"
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "VAmPI failed to start. Debug info:"
-              docker logs vampi-vulnerable-$PORT
-              docker ps -a
-              docker network inspect ${{ env.DOCKER_NETWORK_NAME }}
+              echo "Network ${{ env.DOCKER_NETWORK_NAME }} not ready after 30 seconds"
               exit 1
             fi
-            echo "Waiting for VAmPI to be ready (attempt $i/30)..."
-            sleep 2
+            echo "Waiting for network... attempt $i/30"
+            sleep 1
           done
+          
+          # Start container with retry logic
+          echo "Starting VAmPI for ${{ matrix.fuzzer }} on port ${{ env.VAMPI_PORT }}"
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if PORT=${{ env.VAMPI_PORT }} docker compose up -d; then
+              echo "Container started successfully"
+              
+              # Wait for container to be ready
+              for i in {1..30}; do
+                if curl -s http://localhost:${{ env.VAMPI_PORT }}/api/v1/docs > /dev/null; then
+                  echo "VAmPI is up and running"
+                  docker compose ps
+                  exit 0
+                fi
+                echo "Waiting for VAmPI to be ready... attempt $i/30"
+                sleep 1
+              done
+              
+              echo "VAmPI failed to become ready"
+              docker compose logs
+              docker compose down -v
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Failed to start container, attempt $RETRY_COUNT of $MAX_RETRIES"
+            sleep 5
+          done
+          
+          echo "Failed to start container after $MAX_RETRIES attempts"
+          exit 1
+        env:
+          VAMPI_PORT: ${{ matrix.fuzzer == 'restler' && env.VAMPI_RESTLER_PORT || matrix.fuzzer == 'wuppiefuzz' && env.VAMPI_WUPPIEFUZZ_PORT || env.VAMPI_EVOMASTER_PORT }}
         shell: bash
 
   prepare_fuzzers:
@@ -275,8 +283,9 @@ jobs:
           retention-days: 1
 
   prepare_openapi_specs:
-    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
-    needs: initialize_environment
+    runs-on: self-hosted
+    needs: [setup_target_application]
+    if: always() && !contains(needs.*.result, 'failure')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -306,7 +315,7 @@ jobs:
         shell: bash
 
   run_fuzzing:
-    runs-on: ${{ needs.initialize_environment.outputs.runner-label }}
+    runs-on: self-hosted
     needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
     strategy:
       matrix:
