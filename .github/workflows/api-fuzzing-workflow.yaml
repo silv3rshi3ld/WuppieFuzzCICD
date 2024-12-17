@@ -91,23 +91,33 @@ jobs:
           fi
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
+          
+          echo "Checking if swarm is already initialized..."
+          if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
+            echo "Swarm is already initialized, skipping initialization."
+            IP=$(docker info --format '{{.Swarm.ListenAddr}}' | cut -d':' -f1)
+            WORKER_TOKEN=$(docker swarm join-token worker -q)
+            echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
+            echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
+            echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
+          else
+            # Force leave any existing swarm. If not in a swarm, this will error, but we can ignore it.
+            echo "Forcing leave from any existing swarm (if present)..."
+            docker swarm leave --force || echo "Not currently in a swarm, continuing..."
 
-          # Force leave any existing swarm. If not in a swarm, this will error, but we can ignore it.
-          echo "Forcing leave from any existing swarm (if present)..."
-          docker swarm leave --force || echo "Not currently in a swarm, continuing..."
+            # Now initialize a new swarm
+            echo "Initializing new swarm..."
+            if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
+              echo "::error::Failed to initialize swarm."
+              exit 1
+            fi
 
-          # Now initialize a new swarm
-          echo "Initializing new swarm..."
-          if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
-            echo "::error::Failed to initialize swarm."
-            exit 1
+            WORKER_TOKEN=$(docker swarm join-token worker -q)
+
+            echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
+            echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
+            echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
           fi
-
-          WORKER_TOKEN=$(docker swarm join-token worker -q)
-
-          echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
-          echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
-          echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
 
       - name: Setup Overlay Network
         id: setup_network
@@ -199,28 +209,28 @@ jobs:
             echo "This is the manager node, skipping join."
           else
             echo "Joining swarm as worker..."
-            if ! docker swarm join --driver overlay --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
+            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
               echo "::error::Failed to join swarm"
               exit 1
             fi
             echo "Successfully joined swarm"
 
-            echo "Waiting for network propagation..."
-            sleep 30 # Add a 30 second sleep before checking for the network
+          #   echo "Waiting for network propagation..."
+          #   sleep 30 # Add a 30 second sleep before checking for the network
 
-            for i in $(seq 1 30); do
-              if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-                echo "Network is available on this node."
-                docker network inspect ${{ env.DOCKER_NETWORK_NAME }} > /dev/null 2>&1 && break
-              fi
-              if [ $i -eq 30 ]; then
-                echo "::error::Network never became available"
-                exit 1
-              fi
-              echo "Waiting for network... attempt $i/30"
-              sleep 2
-            done
-          fi
+          #   for i in $(seq 1 30); do
+          #     if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+          #       echo "Network is available on this node."
+          #       docker network inspect ${{ env.DOCKER_NETWORK_NAME }} > /dev/null 2>&1 && break
+          #     fi
+          #     if [ $i -eq 30 ]; then
+          #       echo "::error::Network never became available"
+          #       exit 1
+          #     fi
+          #     echo "Waiting for network... attempt $i/30"
+          #     sleep 2
+          #   done
+          # fi
 
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
