@@ -27,8 +27,7 @@ jobs:
       - name: Cleanup Previous Setup
         run: |
           echo "Cleaning up previous setup..."
-
-          # Kill any processes using our ports
+          # Kill any processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
             pid=$(lsof -ti :$port) || true
             if [ -n "$pid" ]; then
@@ -71,16 +70,16 @@ jobs:
           echo "Runner Labels: ${{ runner.labels }}"
 
       - name: Verify Runner for Swarm Initialization
-        if: ${{ runner.name == 'michiel-wf-runner' }}
-        run: echo "Runner is michiel-wf-runner - proceeding with swarm initialization."
+        if: ${{ runner.name == 'TNO' }}
+        run: echo "Runner is TNO - proceeding with swarm initialization."
 
       - name: Skip Swarm Initialization on Non-Manager Runners
-        if: ${{ runner.name != 'michiel-wf-runner' }}
-        run: echo "Runner is not michiel-wf-runner - skipping swarm initialization."
+        if: ${{ runner.name != 'TNO' }}
+        run: echo "Runner is not TNO - skipping swarm initialization."
 
       - name: Setup Swarm Manager
         id: setup_swarm
-        if: ${{ runner.name == 'michiel-wf-runner' }}
+        if: ${{ runner.name == 'TNO' }}
         run: |
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
@@ -118,7 +117,7 @@ jobs:
 
       - name: Setup Overlay Network
         id: setup_network
-        if: ${{ runner.name == 'michiel-wf-runner' }}
+        if: ${{ runner.name == 'TNO' }}
         run: |
           echo "Creating overlay network..."
           NETWORK_ID=$(docker network create \
@@ -152,16 +151,22 @@ jobs:
         fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
+      - name: Debug Runner Information
+        run: |
+          echo "Runner Name: ${{ runner.name }}"
+          echo "Hostname: $(hostname)"
+          echo "Runner Labels: ${{ runner.labels }}"
+
       - name: Verify Runner for Swarm Joining
-        if: ${{ runner.name == 'michiel-wf-runner2' }}
-        run: echo "Runner is michiel-wf-runner2 - proceeding with swarm joining."
+        if: ${{ runner.name == 'TNO2' }}
+        run: echo "Runner is TNO2 - proceeding with swarm joining."
 
       - name: Skip Swarm Joining on Non-Worker Runners
-        if: ${{ runner.name != 'michiel-wf-runner2' }}
-        run: echo "Runner is not michiel-wf-runner2 - skipping swarm joining."
+        if: ${{ runner.name != 'TNO2' }}
+        run: echo "Runner is not TNO2 - skipping swarm joining."
 
       - name: Cleanup Worker Before Joining
-        if: ${{ runner.name == 'michiel-wf-runner2' }}
+        if: ${{ runner.name == 'TNO2' }}
         run: |
           # Kill processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
@@ -188,13 +193,13 @@ jobs:
           sleep 5
 
       - name: Join Swarm
-        if: ${{ runner.name == 'michiel-wf-runner2' }}
+        if: ${{ runner.name == 'TNO2' }}
         shell: bash
         run: |
           HOSTNAME=$(hostname)
           echo "Current Hostname: $HOSTNAME"
           echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
-          echo "Manager IP: ${{ secrets.MANAGER_IP }}"  # Use MANAGER_IP directly
+          echo "Manager IP: ${{ secrets.MANAGER_IP }}"
 
           if [ "$HOSTNAME" == "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
             echo "This is the manager node, skipping join."
@@ -332,7 +337,7 @@ jobs:
         run: |
           echo "Setting up EvoMaster..."
           cd "${{ github.workspace }}/services/evomaster"
-          ls -la  # Debug: list files to verify we're in the right place
+          ls -la  # Debug: list files
           docker compose -f docker-compose.evomaster.yml build --no-cache evomaster
           mkdir -p evomaster_results
 
