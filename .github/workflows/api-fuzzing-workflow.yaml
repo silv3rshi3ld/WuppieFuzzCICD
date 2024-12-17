@@ -123,39 +123,78 @@ jobs:
         id: setup_network
         if: ${{ runner.name == 'TNO' && steps.setup_swarm.outputs.swarm-initialized == 'true' }}
         run: |
-          echo "Waiting for swarm to stabilize..."
-          sleep 5
-
-          echo "Creating overlay network..."
-          # Check if network already exists
+          echo "Setting up overlay network..."
+          
+          # Check if network exists and remove if it does
           if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            echo "Network already exists, getting network ID..."
-            NETWORK_ID=$(docker network inspect ${{ env.DOCKER_NETWORK_NAME }} -f '{{.Id}}')
-          else
-            echo "Creating new network..."
-            NETWORK_ID=$(docker network create \
-              --driver overlay \
-              --attachable \
-              --subnet 10.0.1.0/24 \
-              --opt encrypted \
-              --opt com.docker.network.driver.mtu=1450 \
-              ${{ env.DOCKER_NETWORK_NAME }})
+            echo "Removing existing network..."
+            docker network rm "${{ env.DOCKER_NETWORK_NAME }}" || true
+            sleep 5
           fi
 
+          # Create new overlay network
+          echo "Creating new overlay network..."
+          NETWORK_ID=$(docker network create \
+            --driver overlay \
+            --attachable \
+            --scope swarm \
+            --subnet 10.0.1.0/24 \
+            --opt encrypted \
+            ${{ env.DOCKER_NETWORK_NAME }})
+
           if [ -z "$NETWORK_ID" ]; then
-            echo "::error::Failed to create or get network"
+            echo "::error::Failed to create network"
             exit 1
           fi
 
           echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
           
-          # Verify network is available
-          if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }} > /dev/null 2>&1; then
-            echo "::error::Network '${{ env.DOCKER_NETWORK_NAME }}' not available after creation."
+          # Verify network is properly created
+          for i in $(seq 1 30); do
+            if docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" 2>/dev/null | grep -q "\"Driver\": \"overlay\""; then
+              echo "Network is ready and properly configured"
+              docker network inspect "${{ env.DOCKER_NETWORK_NAME }}"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::Network not ready after 30 attempts"
+              exit 1
+            fi
+            echo "Waiting for network... attempt $i/30"
+            sleep 2
+          done
+
+      - name: Verify Swarm network
+        run: |
+          # Check if we're in swarm mode
+          if ! docker info | grep -q "Swarm: active"; then
+            echo "::error::Not in swarm mode"
             exit 1
           fi
 
-          echo "Overlay network '${{ env.DOCKER_NETWORK_NAME }}' is ready."
+          # Check if network exists in swarm
+          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "Creating overlay network in swarm mode: ${{ env.DOCKER_NETWORK_NAME }}"
+            docker network create --driver overlay --attachable --scope swarm ${{ env.DOCKER_NETWORK_NAME }} || {
+              echo "::error::Failed to create swarm network"
+              exit 1
+            }
+          fi
+
+          # Verify network is properly created in swarm
+          for i in $(seq 1 30); do
+            if docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" 2>/dev/null | grep -q "\"Driver\": \"overlay\""; then
+              echo "Swarm network is ready"
+              docker network inspect "${{ env.DOCKER_NETWORK_NAME }}"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::Swarm network not ready after 30 attempts"
+              exit 1
+            fi
+            echo "Waiting for swarm network... attempt $i/30"
+            sleep 2
+          done
 
   join_swarm:
     needs: initialize_swarm
@@ -264,32 +303,42 @@ jobs:
           docker compose down -v || echo "::warning::Failed to run docker compose down."
           sleep 5
 
-          echo "Verifying network availability..."
-          for i in $(seq 1 30); do
-            if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-              echo "Network is available"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "::error::Network not available after 30 attempts"
-              exit 1
-            fi
-            echo "Waiting for network... attempt $i/30"
-            sleep 2
-          done
-
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
+
+          # Verify we're in swarm mode and network exists
+          if ! docker info | grep -q "Swarm: active"; then
+            echo "::error::Not in swarm mode"
+            exit 1
+          fi
+
+          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "::error::Required overlay network not found"
+            exit 1
+          fi
 
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
             echo "Starting VAmPI (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
             
             if docker compose up -d; then
+              # Wait for services to be running in swarm
+              for i in $(seq 1 30); do
+                RUNNING_COUNT=$(docker compose ps --format json | grep -c "running" || echo "0")
+                EXPECTED_COUNT=2  # We expect 2 services: vampi-secure and vampi-vulnerable
+                if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
+                  echo "All services are running in swarm"
+                  docker compose ps
+                  break
+                fi
+                echo "Waiting for services to start in swarm... ($i/30) - Running: $RUNNING_COUNT/2"
+                sleep 2
+              done
+
+              # Check application health
               for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
                 if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
                   echo "VAmPI is healthy and responding"
-                  docker compose ps
                   break 2
                 fi
                 echo "Waiting for VAmPI to be ready... ($i/${{ env.HEALTH_CHECK_TIMEOUT }})"
@@ -306,7 +355,8 @@ jobs:
           if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
             echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
             docker compose logs || true
-            # Not exiting here ensures other fuzzers continue
+            docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" || true
+            exit 1
           fi
 
   prepare_fuzzers:
