@@ -2,7 +2,7 @@ services:
   evomaster:
     build:
       context: .
-      dockerfile: Dockerfile.evomaster
+      dockerfile: dockerfile.evomaster
     container_name: evomaster
     environment:
       SPEC_PATH: "/specs/openapi3.yml"
