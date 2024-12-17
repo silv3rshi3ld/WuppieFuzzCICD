@@ -62,6 +62,7 @@ jobs:
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
       network-id: ${{ steps.setup_network.outputs.network-id }}
       manager-hostname: ${{ steps.setup_swarm.outputs.manager-hostname }}
+      swarm-initialized: ${{ steps.setup_swarm.outputs.swarm-initialized }}
     steps:
       - name: Debug Runner Information
         run: |
@@ -79,7 +80,7 @@ jobs:
 
       - name: Setup Swarm Manager
         id: setup_swarm
-        if: ${{ steps.get_hostname.outputs.hostname == 'TNO' }}
+        if: ${{ runner.name == 'TNO' }}
         run: |
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
@@ -98,14 +99,9 @@ jobs:
 
           if [ "$LOCAL_NODE_STATE" = "active" ] && [ "$CONTROL_AVAILABLE" = "true" ]; then
             echo "Swarm is already initialized and this node is a manager, skipping initialization."
-            # Now it's safe to read ListenAddr since we're sure it's a manager.
             IP=$(docker info --format '{{.Swarm.ListenAddr}}' | cut -d':' -f1)
             WORKER_TOKEN=$(docker swarm join-token worker -q)
-            echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
-            echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
-            echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
           else
-            # Node is not a manager or swarm isn't properly initialized as manager
             echo "Node is not a manager or swarm not initialized as manager. Re-initializing swarm..."
             docker swarm leave --force || echo "Not currently in a swarm, continuing..."
 
@@ -114,41 +110,52 @@ jobs:
               echo "::error::Failed to initialize swarm."
               exit 1
             fi
-
             WORKER_TOKEN=$(docker swarm join-token worker -q)
-
-            echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
-            echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
-            echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
           fi
+
+          # Set outputs regardless of initialization path
+          echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
+          echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
+          echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
+          echo "swarm-initialized=true" >> $GITHUB_OUTPUT
 
       - name: Setup Overlay Network
         id: setup_network
-        if: ${{ runner.name == 'TNO' }}
+        if: ${{ runner.name == 'TNO' && steps.setup_swarm.outputs.swarm-initialized == 'true' }}
         run: |
+          echo "Waiting for swarm to stabilize..."
+          sleep 5
+
           echo "Creating overlay network..."
-          NETWORK_ID=$(docker network create \
-            --driver overlay \
-            --attachable \
-            --subnet 10.0.1.0/24 \
-            --opt encrypted \
-            --opt com.docker.network.driver.mtu=1450 \
-            ${{ env.DOCKER_NETWORK_NAME }})
+          # Check if network already exists
+          if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "Network already exists, getting network ID..."
+            NETWORK_ID=$(docker network inspect ${{ env.DOCKER_NETWORK_NAME }} -f '{{.Id}}')
+          else
+            echo "Creating new network..."
+            NETWORK_ID=$(docker network create \
+              --driver overlay \
+              --attachable \
+              --subnet 10.0.1.0/24 \
+              --opt encrypted \
+              --opt com.docker.network.driver.mtu=1450 \
+              ${{ env.DOCKER_NETWORK_NAME }})
+          fi
 
           if [ -z "$NETWORK_ID" ]; then
-            echo "::error::Failed to create network"
+            echo "::error::Failed to create or get network"
             exit 1
           fi
 
           echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
-          sleep 10
-
+          
+          # Verify network is available
           if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }} > /dev/null 2>&1; then
             echo "::error::Network '${{ env.DOCKER_NETWORK_NAME }}' not available after creation."
             exit 1
           fi
 
-          echo "Overlay network '${{ env.DOCKER_NETWORK_NAME }}' created successfully."
+          echo "Overlay network '${{ env.DOCKER_NETWORK_NAME }}' is ready."
 
   join_swarm:
     needs: initialize_swarm
@@ -186,7 +193,7 @@ jobs:
 
           # Cleanup Docker resources
           if docker ps -q | grep -q .; then
-            docker ps -q | xargs docker stop || echo "Failed to stop some containers"
+            docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
           fi
           if docker ps -aq | grep -q .; then
             docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
