@@ -79,7 +79,7 @@ jobs:
 
       - name: Setup Swarm Manager
         id: setup_swarm
-        if: ${{ runner.name == 'TNO' }}
+        if: ${{ steps.get_hostname.outputs.hostname == 'TNO' }}
         run: |
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
@@ -91,21 +91,24 @@ jobs:
           fi
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
-          
+
           echo "Checking if swarm is already initialized..."
-          if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
-            echo "Swarm is already initialized, skipping initialization."
+          LOCAL_NODE_STATE=$(docker info --format '{{.Swarm.LocalNodeState}}')
+          CONTROL_AVAILABLE=$(docker info --format '{{.Swarm.ControlAvailable}}')
+
+          if [ "$LOCAL_NODE_STATE" = "active" ] && [ "$CONTROL_AVAILABLE" = "true" ]; then
+            echo "Swarm is already initialized and this node is a manager, skipping initialization."
+            # Now it's safe to read ListenAddr since we're sure it's a manager.
             IP=$(docker info --format '{{.Swarm.ListenAddr}}' | cut -d':' -f1)
             WORKER_TOKEN=$(docker swarm join-token worker -q)
             echo "swarm-manager-ip=$IP" >> $GITHUB_OUTPUT
             echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
             echo "manager-hostname=$HOSTNAME" >> $GITHUB_OUTPUT
           else
-            # Force leave any existing swarm. If not in a swarm, this will error, but we can ignore it.
-            echo "Forcing leave from any existing swarm (if present)..."
+            # Node is not a manager or swarm isn't properly initialized as manager
+            echo "Node is not a manager or swarm not initialized as manager. Re-initializing swarm..."
             docker swarm leave --force || echo "Not currently in a swarm, continuing..."
 
-            # Now initialize a new swarm
             echo "Initializing new swarm..."
             if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
               echo "::error::Failed to initialize swarm."
