@@ -28,7 +28,6 @@ jobs:
         run: |
           echo "Cleaning up previous setup..."
 
-          # Kill any processes using our ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
             pid=$(lsof -ti :$port) || true
             if [ -n "$pid" ]; then
@@ -37,7 +36,6 @@ jobs:
             fi
           done
 
-          # Cleanup Docker containers
           if docker ps -q | grep -q .; then
             docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
           fi
@@ -45,7 +43,6 @@ jobs:
             docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
 
-          # Cleanup Docker network
           if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             if ! docker network rm "${{ env.DOCKER_NETWORK_NAME }}"; then
               echo "Failed to remove network ${{ env.DOCKER_NETWORK_NAME }}, it might be in use"
@@ -64,23 +61,33 @@ jobs:
       network-id: ${{ steps.setup_network.outputs.network-id }}
       manager-hostname: ${{ steps.setup_swarm.outputs.manager-hostname }}
     steps:
+      - name: Verify Runner for Swarm Initialization
+        if: ${{ runner.name == 'TNO' }}
+        run: echo "Runner is TNO - proceeding with swarm initialization."
+
+      - name: Skip Swarm Initialization on Non-Manager Runners
+        if: ${{ runner.name != 'TNO' }}
+        run: echo "Runner is not TNO - skipping swarm initialization."
+
       - name: Setup Swarm Manager
         id: setup_swarm
+        if: ${{ runner.name == 'TNO' }}
         run: |
           HOSTNAME=$(hostname)
           echo "Hostname: $HOSTNAME"
 
-          IP=$(hostname -I | awk '{print $1}')
+          IP="${{ secrets.MANAGER_IP }}"
           if [ -z "$IP" ]; then
-            echo "::error::Failed to retrieve manager IP."
+            echo "::error::MANAGER_IP secret is not set."
             exit 1
           fi
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
 
-          if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
-            echo "::error::Failed to initialize swarm"
-            exit 1
+          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
+            docker swarm init --advertise-addr $IP --listen-addr $IP:2377
+          else
+            echo "Swarm already initialized."
           fi
 
           WORKER_TOKEN=$(docker swarm join-token worker -q)
@@ -91,6 +98,7 @@ jobs:
 
       - name: Setup Overlay Network
         id: setup_network
+        if: ${{ runner.name == 'TNO' }}
         run: |
           echo "Creating overlay network..."
           NETWORK_ID=$(docker network create \
@@ -124,9 +132,17 @@ jobs:
         fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
+      - name: Verify Runner for Swarm Joining
+        if: ${{ runner.name == 'TNO2' }}
+        run: echo "Runner is TNO2 - proceeding with swarm joining."
+
+      - name: Skip Swarm Joining on Non-Worker Runners
+        if: ${{ runner.name != 'TNO2' }}
+        run: echo "Runner is not TNO2 - skipping swarm joining."
+
       - name: Cleanup Worker Before Joining
+        if: ${{ runner.name == 'TNO2' }}
         run: |
-          # Kill processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
             pid=$(lsof -ti :$port) || true
             if [ -n "$pid" ]; then
@@ -135,7 +151,6 @@ jobs:
             fi
           done
 
-          # Cleanup Docker resources
           if docker ps -q | grep -q .; then
             docker ps -q | xargs docker stop || echo "Failed to stop some containers"
           fi
@@ -143,7 +158,6 @@ jobs:
             docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
 
-          # Leave any existing swarm
           if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
             docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
           fi
@@ -151,16 +165,19 @@ jobs:
           sleep 5
 
       - name: Join Swarm
+        if: ${{ runner.name == 'TNO2' }}
         shell: bash
         run: |
           HOSTNAME=$(hostname)
           echo "Current Hostname: $HOSTNAME"
           echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
-          echo "Manager IP: ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}"
+          echo "Manager IP: ${{ secrets.MANAGER_IP }}"
 
-          if [ "$HOSTNAME" != "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
+          if [ "$HOSTNAME" == "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
+            echo "This is the manager node, skipping join."
+          else
             echo "Joining swarm as worker..."
-            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}:2377; then
+            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
               echo "::error::Failed to join swarm"
               exit 1
             fi
@@ -179,8 +196,6 @@ jobs:
               echo "Waiting for network... attempt $i/30"
               sleep 2
             done
-          else
-            echo "This is the manager node, skipping join"
           fi
 
   setup_target_application:
@@ -263,7 +278,6 @@ jobs:
           if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
             echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
             docker compose logs || true
-            # Not exiting here ensures other fuzzers continue
           fi
 
   prepare_fuzzers:
@@ -289,16 +303,12 @@ jobs:
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
-
       - name: Setup EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
           echo "Setting up EvoMaster..."
-          cd "${{ github.workspace }}"
-          cd services/evomaster
-          ls -la  # Debug: list files to verify we're in the right place
+          cd "${{ github.workspace }}/services/evomaster"
+          ls -la
           docker compose -f docker-compose.evomaster.yml build --no-cache evomaster
           mkdir -p evomaster_results
 
