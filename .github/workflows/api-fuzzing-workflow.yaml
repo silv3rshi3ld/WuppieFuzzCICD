@@ -92,18 +92,23 @@ jobs:
           echo "Using Manager IP: $IP"
           echo "Manager Hostname: $HOSTNAME"
 
-          # Check if Swarm is active and node is a manager
+          # If the node is already in a swarm but not a manager, leave that swarm
           if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
             CURRENT_ROLE=$(docker node ls | grep $(hostname) | awk '{print $3}')
             if [ "$CURRENT_ROLE" != "Leader" ]; then
-              echo "::error::This node is part of a swarm but is not a manager."
-              exit 1
+              echo "::warning::Node is currently part of a swarm but is not a manager."
+              echo "Leaving the existing swarm..."
+              docker swarm leave --force
+              sleep 5
             else
               echo "Swarm already initialized and node is a manager."
             fi
-          else
-            docker swarm init --advertise-addr $IP --listen-addr $IP:2377
-            if [ $? -ne 0 ]; then
+          fi
+
+          # If still not part of a swarm, initialize it
+          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
+            echo "Initializing new swarm..."
+            if ! docker swarm init --advertise-addr $IP --listen-addr $IP:2377; then
               echo "::error::Failed to initialize swarm."
               exit 1
             fi
