@@ -214,23 +214,7 @@ jobs:
               exit 1
             fi
             echo "Successfully joined swarm"
-
-          #   echo "Waiting for network propagation..."
-          #   sleep 30 # Add a 30 second sleep before checking for the network
-
-          #   for i in $(seq 1 30); do
-          #     if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-          #       echo "Network is available on this node."
-          #       docker network inspect ${{ env.DOCKER_NETWORK_NAME }} > /dev/null 2>&1 && break
-          #     fi
-          #     if [ $i -eq 30 ]; then
-          #       echo "::error::Network never became available"
-          #       exit 1
-          #     fi
-          #     echo "Waiting for network... attempt $i/30"
-          #     sleep 2
-          #   done
-          # fi
+          fi
 
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
