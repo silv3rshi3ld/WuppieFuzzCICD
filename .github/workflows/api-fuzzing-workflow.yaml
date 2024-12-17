@@ -199,7 +199,7 @@ jobs:
             echo "This is the manager node, skipping join."
           else
             echo "Joining swarm as worker..."
-            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
+            if ! docker swarm join --driver overlay --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
               echo "::error::Failed to join swarm"
               exit 1
             fi
