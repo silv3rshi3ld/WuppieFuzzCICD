@@ -336,7 +336,7 @@ jobs:
           mkdir -p evomaster_results
 
       - name: Upload Fuzzer Artifacts
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: fuzzer-${{ matrix.fuzzer }}-artifacts
           path: tools
@@ -374,7 +374,7 @@ jobs:
           done
 
       - name: Upload OpenAPI Specs
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: openapi-specs
           path: |
@@ -395,13 +395,13 @@ jobs:
         uses: actions/checkout@v4.0.0
 
       - name: Download Fuzzer Artifacts
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v4
         with:
           name: fuzzer-${{ matrix.fuzzer }}-artifacts
           path: tools
 
       - name: Download OpenAPI Specs
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v4
         with:
           name: openapi-specs
           path: openapi_specs
@@ -424,14 +424,53 @@ jobs:
         if: matrix.fuzzer == 'restler'
         run: |
           echo "Running RESTler..."
-          # RESTler execution steps here
-
+          
+          mkdir -p ${{ github.workspace }}/workspace
+          mkdir -p ${{ github.workspace }}/workspace/output
+          
+          cp -r ${{ github.workspace }}/restler/restler_config ${{ github.workspace }}/workspace/
+          cp ${{ github.workspace }}/restler/docker-compose-restler.yml ${{ github.workspace }}/workspace/
+          cp ${{ github.workspace }}/restler/Dockerfile.restler ${{ github.workspace }}/workspace/
+          cp ${{ github.workspace }}/services/vampi/openapi_specs/openapi3.yml ${{ github.workspace }}/workspace/openapi3.yml
+          echo "Files in workspace:"
+          ls -la ${{ github.workspace }}/workspace/
+          
+          cd ${{ github.workspace }}/workspace
+          docker-compose -f docker-compose-restler.yml up --build
+          
       - name: Run WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
           echo "Running WuppieFuzz..."
-          # WuppieFuzz execution steps here
+          
+          mkdir -p ${{ github.workspace }}/wuppiefuzz_workspace
 
+          uses: actions/download-artifact@v4
+          with:
+            name: wuppiefuzz-binary
+            path: ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz
+
+          uses: actions/download-artifact@v4
+          with:
+            name: vampi-api
+            path: ${{ github.workspace }}/wuppiefuzz_workspace/VAmPI-master
+
+          run: chmod +x ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
+
+          cd ${{ github.workspace }}/wuppiefuzz_workspace
+          echo "Current directory structure:"
+          ls -R
+          mkdir reports
+          ./wuppiefuzz/wuppiefuzz output-corpus \
+            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
+            corpus_directory
+          ./wuppiefuzz/wuppiefuzz fuzz \
+            --report=true \
+            --log-level=info \
+            --initial-corpus=corpus_directory \
+            --timeout=60 \
+            VAmPI-master/openapi_specs/openapi3.yml
+            
       - name: Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
@@ -444,7 +483,7 @@ jobs:
             -e TIME_BUDGET="600"
 
       - name: Upload Fuzzing Results
-        uses: actions/upload-artifact@v3.1.2
+        uses: actions/upload-artifact@v4
         with:
           name: fuzzing-results-${{ matrix.fuzzer }}
           path: |
@@ -461,25 +500,22 @@ jobs:
         uses: actions/checkout@v4.0.0
 
       - name: Download RESTler Results
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v4
         with:
           name: fuzzing-results-restler
           path: all_results/restler-results
-          if-no-files-found: warn
 
       - name: Download WuppieFuzz Results
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v4
         with:
           name: fuzzing-results-wuppiefuzz
           path: all_results/wuppiefuzz-results
-          if-no-files-found: warn
 
       - name: Download EvoMaster Results
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v4
         with:
           name: fuzzing-results-evomaster
           path: all_results/evomaster-results
-          if-no-files-found: warn
 
       - name: List Downloaded Artifacts
         run: |
