@@ -24,6 +24,8 @@ jobs:
   cleanup:
     runs-on: self-hosted
     steps:
+      - name: Leave Docker Swarm
+        run: docker swarm leave --force || echo "Not part of any swarm"
       - name: Cleanup Previous Setup
         run: |
           echo "Cleaning up previous setup..."
@@ -77,6 +79,10 @@ jobs:
       - name: Skip Swarm Initialization on Non-Manager Runners
         if: ${{ runner.name != 'TNO' }}
         run: echo "Runner is not TNO - skipping swarm initialization."
+
+      - name: Initialize Docker Swarm
+        run: |
+          docker swarm init || echo "Swarm already initialized"
 
       - name: Setup Swarm Manager
         id: setup_swarm
