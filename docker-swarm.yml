@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  manager:
+    image: docker:dind
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - manager-certs:/certs
+      - manager-data:/var/lib/docker
+    ports:
+      - "2377:2377"
+      - "7946:7946"
+      - "4789:4789/udp"
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+volumes:
+  manager-certs:
+  manager-data:
