@@ -162,7 +162,7 @@ jobs:
               docker network inspect "${{ env.DOCKER_NETWORK_NAME }}"
               break
             fi
-            if [ $i -eq ${{ env.NETWORK_TIMEOUT }} ]; then
+            if [ $i -eq ${{ env.NETWORK_TIMEOUT }}]; then
               echo "::error::Network not ready after ${{ env.NETWORK_TIMEOUT }} attempts"
               exit 1
             fi
@@ -259,6 +259,38 @@ jobs:
               docker node update --label-add type=fuzzer $(hostname)
             fi
           fi
+
+      - name: Verify Node Joined Swarm on Worker
+        if: ${{ runner.name == 'TNO2' }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker info | grep -q "Swarm: active"; then
+              echo "Node has successfully joined the swarm."
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::Node did not join the swarm after 30 attempts"
+              exit 1
+            fi
+            echo "Waiting for node to join swarm... attempt $i/30"
+            sleep 2
+          done
+
+      - name: Verify Worker Node Joined Swarm on Manager
+        if: ${{ runner.name == 'TNO1' }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker node ls | grep -q 'michiel-wf-runner2'; then
+              echo "Worker node has appeared in the swarm."
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::Worker node did not appear in the swarm after 30 attempts"
+              exit 1
+            fi
+            echo "Waiting for worker node to appear in swarm... attempt $i/30"
+            sleep 2
+          done
 
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
