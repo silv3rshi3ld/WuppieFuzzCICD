@@ -150,49 +150,17 @@ jobs:
           echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
           
           # Verify network is properly created
-          for i in $(seq 1 30); do
+          for i in $(seq 1 ${{ env.NETWORK_TIMEOUT }}); do
             if docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" 2>/dev/null | grep -q "\"Driver\": \"overlay\""; then
               echo "Network is ready and properly configured"
               docker network inspect "${{ env.DOCKER_NETWORK_NAME }}"
               break
             fi
-            if [ $i -eq 30 ]; then
-              echo "::error::Network not ready after 30 attempts"
+            if [ $i -eq ${{ env.NETWORK_TIMEOUT }} ]; then
+              echo "::error::Network not ready after ${{ env.NETWORK_TIMEOUT }} attempts"
               exit 1
             fi
-            echo "Waiting for network... attempt $i/30"
-            sleep 2
-          done
-
-      - name: Verify Swarm network
-        run: |
-          # Check if we're in swarm mode
-          if ! docker info | grep -q "Swarm: active"; then
-            echo "::error::Not in swarm mode"
-            exit 1
-          fi
-
-          # Check if network exists in swarm
-          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            echo "Creating overlay network in swarm mode: ${{ env.DOCKER_NETWORK_NAME }}"
-            docker network create --driver overlay --attachable --scope swarm ${{ env.DOCKER_NETWORK_NAME }} || {
-              echo "::error::Failed to create swarm network"
-              exit 1
-            }
-          fi
-
-          # Verify network is properly created in swarm
-          for i in $(seq 1 30); do
-            if docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" 2>/dev/null | grep -q "\"Driver\": \"overlay\""; then
-              echo "Swarm network is ready"
-              docker network inspect "${{ env.DOCKER_NETWORK_NAME }}"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "::error::Swarm network not ready after 30 attempts"
-              exit 1
-            fi
-            echo "Waiting for swarm network... attempt $i/30"
+            echo "Waiting for network... attempt $i/${{ env.NETWORK_TIMEOUT }}"
             sleep 2
           done
 
@@ -263,6 +231,27 @@ jobs:
               exit 1
             fi
             echo "Successfully joined swarm"
+
+            # Verify node joined successfully
+            echo "Verifying node joined successfully..."
+            for i in $(seq 1 30); do
+              if docker node ls 2>/dev/null | grep -q "$(hostname)"; then
+                echo "Node successfully joined and visible in swarm"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "::error::Node failed to appear in swarm after joining"
+                exit 1
+              fi
+              echo "Waiting for node to appear in swarm... attempt $i/30"
+              sleep 2
+            done
+
+            # Add node labels
+            echo "Adding node labels..."
+            if docker node ls --filter role=worker | grep -q "$(hostname)"; then
+              docker node update --label-add type=fuzzer $(hostname)
+            fi
           fi
 
   setup_target_application:
@@ -273,6 +262,22 @@ jobs:
         fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
+      - name: Wait for swarm stability
+        run: |
+          echo "Waiting for swarm to stabilize..."
+          for i in $(seq 1 30); do
+            if docker node ls --format '{{.Status}}' | grep -v "Ready"; then
+              sleep 2
+            else
+              echo "All nodes are ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::Swarm failed to stabilize after 30 attempts"
+              exit 1
+            fi
+          done
+
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
@@ -493,7 +498,7 @@ jobs:
           
           cd ${{ github.workspace }}/workspace
           docker-compose -f docker-compose-restler.yml up --build
-          
+
       - name: Run WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
@@ -526,7 +531,7 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             VAmPI-master/openapi_specs/openapi3.yml
-            
+
       - name: Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
