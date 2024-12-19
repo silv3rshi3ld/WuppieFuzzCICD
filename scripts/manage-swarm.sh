@@ -3,6 +3,7 @@
 # Get the current number of runners from the environment
 CURRENT_RUNNERS=$1
 SWARM_STATE_FILE=".swarm-state"
+GITHUB_OUTPUT=$2
 
 # Function to initialize swarm
 initialize_swarm() {
@@ -13,6 +14,8 @@ initialize_swarm() {
         docker swarm init --advertise-addr $MANAGER_IP
         echo $CURRENT_RUNNERS > $SWARM_STATE_FILE
         echo "Swarm initialized successfully"
+    else
+        echo "Reusing existing swarm"
     fi
 }
 
@@ -45,8 +48,10 @@ if ! check_swarm_state; then
         tear_down_swarm
     fi
     initialize_swarm
+    echo "swarm-initialized=true" >> $GITHUB_OUTPUT
 else
     echo "Swarm configuration is up to date"
+    echo "swarm-initialized=false" >> $GITHUB_OUTPUT
 fi
 
 # Verify swarm status

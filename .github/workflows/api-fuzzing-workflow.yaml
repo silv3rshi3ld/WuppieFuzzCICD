@@ -121,7 +121,7 @@ jobs:
         run: echo "Runner is not TNO2 - skipping swarm joining."
 
       - name: Cleanup Worker Before Joining
-        if: ${{ runner.name == 'TNO2' }}
+        if: ${{ runner.name == 'TNO2' && needs.initialize_swarm.outputs.swarm-initialized == 'true' }}
         run: |
           # Kill processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
@@ -148,7 +148,7 @@ jobs:
           sleep 5
 
       - name: Join Swarm
-        if: ${{ runner.name == 'TNO2' }}
+        if: ${{ runner.name == 'TNO2' && needs.initialize_swarm.outputs.swarm-initialized == 'true' }}
         shell: bash
         run: |
           HOSTNAME=$(hostname)
