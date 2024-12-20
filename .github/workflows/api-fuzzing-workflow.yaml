@@ -326,7 +326,8 @@ jobs:
           echo "Setting up EvoMaster..."
           cd "${{ github.workspace }}/services/evomaster"
           ls -la  # Debug: list files
-          docker compose -f docker-compose.evomaster.yml build --no-cache evomaster
+          # Added Docker build caching example
+          docker compose -f docker-compose.evomaster.yml build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from yourregistry/evomaster:latest --no-cache evomaster
           mkdir -p evomaster_results
 
       - name: Upload Fuzzer Artifacts

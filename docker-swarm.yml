@@ -18,6 +18,95 @@ services:
         constraints:
           - node.role == manager
 
+  vampi-vulnerable:
+    image: vampi-vulnerable-image
+    build:
+      context: ./services/vampi
+      target: vulnerable
+    container_name: vampi-vulnerable
+    ports:
+      - "5002:5000"
+    environment:
+      - vulnerable=1
+    networks:
+      - swarm_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: vip
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  wuppiefuzz:
+    image: wuppiefuzz-image
+    build:
+      context: ./services/wuppiefuzz
+      dockerfile: Dockerfile.wuppiefuzz
+    container_name: wuppiefuzz
+    environment:
+      VAMPI_WUPPIEFUZZ_URL: http://vampi-vulnerable:5000
+    volumes:
+      - wuppiefuzz_reports:/wuppiefuzz/reports
+      - openapi_spec:/workspace/openapi3.yml:ro
+    networks:
+      - swarm_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  restler:
+    image: restler-image
+    build:
+      context: ./services/restler
+      dockerfile: Dockerfile.restler
+    container_name: restler
+    environment:
+      RESTLER_TELEMETRY_OPTOUT: "1"
+      RUN_FUZZ_LEAN: "true"
+      FUZZ_LEAN_TIME_BUDGET: "0.05"
+      RUN_FUZZ: "true"
+      FUZZ_TIME_BUDGET: "0.25"
+      TARGET_IP: vampi-vulnerable
+      TARGET_PORT: 5000
+    volumes:
+      - restler_output:/workspace/output
+      - openapi_spec:/workspace/openapi3.yml:ro
+    networks:
+      - swarm_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  evomaster:
+    image: evomaster-image
+    build:
+      context: ./services/evomaster
+      dockerfile: Dockerfile.evomaster
+    container_name: evomaster
+    environment:
+      SPEC_PATH: "/specs/openapi3.yml"
+      OUTPUT_DIR: "/evomaster/results"
+      TARGET_URL: "http://vampi-vulnerable:5000"
+      TIME_BUDGET: "3600"
+    volumes:
+      - evomaster_results:/evomaster/results
+      - openapi_spec:/specs/openapi3.yml:ro
+    networks:
+      - swarm_network
+
 volumes:
   manager-certs:
   manager-data:
+  wuppiefuzz_reports:
+  restler_output:
+  evomaster_results:
+  openapi_spec:
+
+networks:
+  swarm_network:
+    driver: overlay
