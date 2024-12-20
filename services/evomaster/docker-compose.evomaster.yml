@@ -2,19 +2,27 @@ services:
   evomaster:
     build:
       context: .
-      dockerfile: dockerfile.evomaster
+      dockerfile: Dockerfile.evomaster
     container_name: evomaster
     environment:
       SPEC_PATH: "/specs/openapi3.yml"
       OUTPUT_DIR: "/evomaster/results"
-      TARGET_URL: "http://vampi-vulnerable-evomaster:5000"
+      TARGET_URL: "http://vampi-vulnerable:${VAMPI_PORT:-5032}"
       TIME_BUDGET: "3600"
     volumes:
-      - ./openapi_evomaster.yml:/specs/openapi3.yml:ro
-      - ./evomaster_results:/evomaster/results
+      - type: bind
+        source: ${OPENAPI_SPEC_PATH:-./openapi_evomaster.yml}
+        target: /specs/openapi3.yml
+        read_only: true
+      - type: volume
+        source: evomaster_results
+        target: /evomaster/results
     networks:
       - cicd_network
 
 networks:
   cicd_network:
     external: true
+
+volumes:
+  evomaster_results:
