@@ -174,24 +174,44 @@ jobs:
             echo "This is the manager node, skipping join."
           else
             echo "Joining swarm as worker..."
-            if ! docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
+            
+            # Ensure Docker daemon is running with proper network settings
+            sudo systemctl stop docker || true
+            sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
+            sudo systemctl daemon-reload
+            sudo systemctl start docker
+            
+            # Wait for Docker to be ready
+            echo "Waiting for Docker to be ready..."
+            timeout 30s bash -c 'until docker info &>/dev/null; do sleep 1; done'
+            
+            # Verify connectivity to manager
+            echo "Verifying connectivity to manager..."
+            if ! timeout 5s bash -c "</dev/tcp/${{ secrets.MANAGER_IP }}/2377"; then
+              echo "::error::Cannot connect to manager port 2377"
+              exit 1
+            fi
+            
+            # Try joining with increased timeout
+            if ! timeout 30s docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
               echo "::error::Failed to join swarm"
+              docker swarm leave --force || true
               exit 1
             fi
             echo "Successfully joined swarm"
 
-            # Verify node joined successfully
+            # Verify node joined successfully with increased timeout
             echo "Verifying node joined successfully..."
-            for i in $(seq 1 30); do
+            for i in $(seq 1 60); do
               if docker node ls 2>/dev/null | grep -q "$(hostname)"; then
                 echo "Node successfully joined and visible in swarm"
                 break
               fi
-              if [ $i -eq 30 ]; then
+              if [ $i -eq 60 ]; then
                 echo "::error::Node failed to appear in swarm after joining"
                 exit 1
               fi
-              echo "Waiting for node to appear in swarm... attempt $i/30"
+              echo "Waiting for node to appear in swarm... attempt $i/60"
               sleep 2
             done
 
