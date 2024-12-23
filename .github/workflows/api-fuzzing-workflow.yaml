@@ -195,6 +195,20 @@ jobs:
         fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
+      - name: Initialize Swarm
+        env:
+          MANAGER_IP: ${{ secrets.MANAGER_IP }}
+        run: |
+          # Always leave any existing swarm first
+          docker swarm leave --force 2>/dev/null || true
+          
+          # Initialize new swarm
+          if [ -n "$MANAGER_IP" ]; then
+              docker swarm init --advertise-addr "$MANAGER_IP"
+          else
+              docker swarm init
+          fi
+
       - name: Wait for swarm stability
         run: |
           echo "Waiting for swarm to stabilize..."
