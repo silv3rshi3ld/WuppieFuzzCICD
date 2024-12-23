@@ -95,8 +95,22 @@ jobs:
         id: setup_network
         if: ${{ runner.name == 'TNO' }}
         run: |
-          NETWORK_ID=$(docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }} || echo "")
-          echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
+          # Check if network exists first
+          if ! docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "Creating overlay network ${{ env.DOCKER_NETWORK_NAME }}"
+            NETWORK_ID=$(docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }})
+            echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
+          else
+            echo "Network ${{ env.DOCKER_NETWORK_NAME }} already exists"
+            NETWORK_ID=$(docker network ls --filter name=${{ env.DOCKER_NETWORK_NAME }} --format "{{.ID}}")
+            echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
+          fi
+          
+          # Verify network was created/exists and is overlay type
+          if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format "{{.Driver}}" | grep -q "overlay"; then
+            echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
+            exit 1
+          fi
 
   join_swarm:
     needs: initialize_swarm
@@ -195,35 +209,22 @@ jobs:
         fuzzer: [restler, wuppiefuzz, evomaster]
       fail-fast: false
     steps:
-      - name: Initialize Swarm
-        env:
-          MANAGER_IP: ${{ secrets.MANAGER_IP }}
+      - name: Verify Swarm and Network
         run: |
-          # Always leave any existing swarm first
-          docker swarm leave --force 2>/dev/null || true
-          
-          # Initialize new swarm
-          if [ -n "$MANAGER_IP" ]; then
-              docker swarm init --advertise-addr "$MANAGER_IP"
-          else
-              docker swarm init
+          # Verify swarm mode is active
+          if ! docker info | grep -q "Swarm: active"; then
+            echo "::error::Not in swarm mode - swarm initialization may have failed"
+            exit 1
           fi
 
-      - name: Wait for swarm stability
-        run: |
-          echo "Waiting for swarm to stabilize..."
-          for i in $(seq 1 30); do
-            if docker node ls --format '{{.Status}}' | grep -v "Ready"; then
-              sleep 2
-            else
-              echo "All nodes are ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "::error::Swarm failed to stabilize after 30 attempts"
-              exit 1
-            fi
-          done
+          # Verify network exists and is overlay type
+          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "::error::Required overlay network ${{ env.DOCKER_NETWORK_NAME }} not found"
+            docker network ls
+            exit 1
+          fi
+
+          echo "Swarm mode and network verified successfully"
 
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -252,38 +253,30 @@ jobs:
             kill -9 $pid || echo "Failed to kill process on port $VAMPI_PORT"
           fi
 
-          docker compose down -v || echo "::warning::Failed to run docker compose down."
+          # Remove any existing stack
+          docker stack rm vampi-${{ matrix.fuzzer }} || true
           sleep 5
 
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
 
-          # Verify we're in swarm mode and network exists
-          if ! docker info | grep -q "Swarm: active"; then
-            echo "::error::Not in swarm mode"
-            exit 1
-          fi
-
-          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            echo "::error::Required overlay network not found"
-            exit 1
-          fi
-
+          # Deploy stack using docker stack deploy
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
-            echo "Starting VAmPI (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
+            echo "Starting VAmPI Stack (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
             
-            if docker compose up -d; then
-              # Wait for services to be running in swarm
+            # Deploy the stack
+            if docker stack deploy -c docker-compose.yaml vampi-${{ matrix.fuzzer }}; then
+              # Wait for services to be running
               for i in $(seq 1 30); do
-                RUNNING_COUNT=$(docker compose ps --format json | grep -c "running" || echo "0")
+                RUNNING_COUNT=$(docker stack services vampi-${{ matrix.fuzzer }} --format "{{.Replicas}}" | grep -c "1/1" || echo "0")
                 EXPECTED_COUNT=2  # We expect 2 services: vampi-secure and vampi-vulnerable
                 if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
                   echo "All services are running in swarm"
-                  docker compose ps
+                  docker stack services vampi-${{ matrix.fuzzer }}
                   break
                 fi
-                echo "Waiting for services to start in swarm... ($i/30) - Running: $RUNNING_COUNT/2"
+                echo "Waiting for services to start... ($i/30) - Running: $RUNNING_COUNT/2"
                 sleep 2
               done
 
@@ -299,14 +292,16 @@ jobs:
             fi
 
             echo "::warning::Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
-            docker compose down -v
+            docker stack rm vampi-${{ matrix.fuzzer }}
             sleep 10
             RETRY_COUNT=$((RETRY_COUNT + 1))
           done
 
           if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
             echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
-            docker compose logs || true
+            docker stack services vampi-${{ matrix.fuzzer }} || true
+            docker service logs vampi-${{ matrix.fuzzer }}_vampi-secure || true
+            docker service logs vampi-${{ matrix.fuzzer }}_vampi-vulnerable || true
             docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" || true
             exit 1
           fi

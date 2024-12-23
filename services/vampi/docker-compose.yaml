@@ -3,7 +3,6 @@ services:
     build:
       context: ./
       target: secure
-    container_name: vampi-secure-${PORT:-5001}
     ports:
       - "${PORT:-5001}:5000"
     environment:
@@ -30,7 +29,6 @@ services:
     build:
       context: ./
       target: vulnerable
-    container_name: vampi-vulnerable-${PORT:-5002}
     ports:
       - "${PORT:-5002}:5000"
     environment:
