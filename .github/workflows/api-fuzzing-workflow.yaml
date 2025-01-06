@@ -21,6 +21,7 @@ env:
   NETWORK_TIMEOUT: 60
 
 jobs:
+  # 1. Initial cleanup
   cleanup:
     runs-on: self-hosted
     steps:
@@ -50,6 +51,8 @@ jobs:
           fi
           echo "Cleanup completed."
           sleep 5
+
+  # 2. Initialize Swarm infrastructure
   initialize_swarm:
     needs: cleanup
     runs-on: self-hosted
@@ -74,7 +77,7 @@ jobs:
         run: chmod +x ./scripts/manage-swarm.sh
 
       - name: Manage Swarm State
-        if: ${{ runner.name == 'TNO' }}
+        if: contains(github.runner.labels, 'swarm-manager')
         env:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
@@ -86,9 +89,10 @@ jobs:
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
           echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
           echo "swarm-initialized=true" >> $GITHUB_OUTPUT
+
       - name: Setup Docker Network
         id: setup_network
-        if: ${{ runner.name == 'TNO' }}
+        if: contains(github.runner.labels, 'swarm-manager')
         run: |
           # Check if network exists first
           if ! docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
@@ -106,6 +110,8 @@ jobs:
             echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
             exit 1
           fi
+
+  # 3. Join workers to Swarm
   join_swarm:
     needs: initialize_swarm
     runs-on: self-hosted
@@ -116,19 +122,19 @@ jobs:
     steps:
       - name: Debug Runner Information
         run: |
-          echo "Runner Name: ${{ runner.name }}"
+          echo "Runner Labels: ${{ join(github.runner.labels, ', ') }}"
           echo "Hostname: $(hostname)"
-          echo "Runner Labels: ${{ runner.labels }}"
+
       - name: Verify Runner for Swarm Joining
-        if: ${{ runner.name == 'TNO2' }}
-        run: echo "Runner is TNO2 - proceeding with swarm joining."
+        if: contains(github.runner.labels, 'swarm-worker')
+        run: echo "Runner has swarm-worker label - proceeding with swarm joining."
 
       - name: Skip Swarm Joining on Non-Worker Runners
-        if: ${{ runner.name != 'TNO2' }}
-        run: echo "Runner is not TNO2 - skipping swarm joining."
+        if: "!contains(github.runner.labels, 'swarm-worker')"
+        run: echo "Runner does not have swarm-worker label - skipping swarm joining."
 
       - name: Cleanup Worker Before Joining
-        if: ${{ runner.name == 'TNO2' && needs.initialize_swarm.outputs.swarm-initialized == 'true' }}
+        if: contains(github.runner.labels, 'swarm-worker') && needs.initialize_swarm.outputs.swarm-initialized == 'true'
         run: |
           # Kill processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
@@ -150,8 +156,9 @@ jobs:
             docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
           fi
           sleep 5
+
       - name: Join Swarm
-        if: ${{ runner.name == 'TNO2' && needs.initialize_swarm.outputs.swarm-initialized == 'true' }}
+        if: contains(github.runner.labels, 'swarm-worker') && needs.initialize_swarm.outputs.swarm-initialized == 'true'
         shell: bash
         run: |
           HOSTNAME=$(hostname)
@@ -206,10 +213,12 @@ jobs:
             if docker node ls --filter role=worker | grep -q "$(hostname)"; then
               docker node update --label-add type=fuzzer $(hostname)
             fi
+
+  # 4. Verify Swarm setup
   verify_swarm:
     needs: [initialize_swarm, join_swarm]
     runs-on: self-hosted
-    if: ${{ runner.name == 'TNO' }}
+    if: contains(github.runner.labels, 'swarm-manager')
     steps:
       - name: Verify Swarm and Network
         run: |
@@ -234,8 +243,31 @@ jobs:
           fi
           
           echo "Swarm configuration verified successfully"
+
+  # 5. Prepare OpenAPI specs (can run in parallel with image building)
+  prepare_specs:
+    needs: verify_swarm
+    runs-on: self-hosted
+    if: contains(github.runner.labels, 'swarm-manager')
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.0.0
+
+      - name: Copy OpenAPI Specs to Volumes
+        run: |
+          # Create temporary directory
+          mkdir -p specs_temp
+          cp services/vampi/openapi_specs/openapi3.yml specs_temp/
+          
+          # Copy specs to volumes
+          docker run --rm \
+            -v $(pwd)/specs_temp:/source \
+            -v openapi_spec:/dest \
+            alpine cp /source/openapi3.yml /dest/
+
+  # 6. Build and push images (can run in parallel with specs preparation)
   build_and_push_images:
-    needs: [initialize_swarm]
+    needs: verify_swarm
     runs-on: self-hosted
     strategy:
       matrix:
@@ -292,10 +324,11 @@ jobs:
             --push \
             .
 
+  # 7. Deploy stack (after both specs and images are ready)
   deploy_stack:
-    needs: [build_and_push_images, initialize_swarm]
+    needs: [prepare_specs, build_and_push_images]
     runs-on: self-hosted
-    if: ${{ runner.name == 'TNO' }}
+    if: contains(github.runner.labels, 'swarm-manager')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -343,30 +376,11 @@ jobs:
           docker stack services fuzzing-stack || true
           exit 1
 
-  prepare_specs:
-    needs: [deploy_stack]
-    runs-on: self-hosted
-    if: ${{ runner.name == 'TNO' }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
-
-      - name: Copy OpenAPI Specs to Volumes
-        run: |
-          # Create temporary directory
-          mkdir -p specs_temp
-          cp services/vampi/openapi_specs/openapi3.yml specs_temp/
-          
-          # Copy specs to volumes
-          docker run --rm \
-            -v $(pwd)/specs_temp:/source \
-            -v openapi_spec:/dest \
-            alpine cp /source/openapi3.yml /dest/
-
+  # 8. Run fuzzing tests
   run_fuzzing:
-    needs: [deploy_stack]
+    needs: deploy_stack
     runs-on: self-hosted
-    if: ${{ runner.name == 'TNO' }}
+    if: contains(github.runner.labels, 'swarm-manager')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -469,15 +483,8 @@ jobs:
           name: fuzzing-results
           path: fuzzing_results
           retention-days: 7
-      - name: Upload Fuzzing Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-results-${{ matrix.fuzzer }}
-          path: |
-            tools/**/results
-            tools/**/output
-          retention-days: 1
 
+  # 9. Summarize results
   summarize_results:
     needs: run_fuzzing
     runs-on: self-hosted
@@ -486,32 +493,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
-      - name: Download RESTler Results
+      - name: Download Results
         uses: actions/download-artifact@v4
         with:
-          name: fuzzing-results-restler
-          path: all_results/restler-results
+          name: fuzzing-results
+          path: all_results
 
-      - name: Download WuppieFuzz Results
-        uses: actions/download-artifact@v4
-        with:
-          name: fuzzing-results-wuppiefuzz
-          path: all_results/wuppiefuzz-results
-
-      - name: Download EvoMaster Results
-        uses: actions/download-artifact@v4
-        with:
-          name: fuzzing-results-evomaster
-          path: all_results/evomaster-results
-
-      - name: List Downloaded Artifacts
+      - name: List Results
         run: |
-          echo "Listing RESTler Results:"
-          ls -la all_results/restler-results || echo "No RESTler results found."
-          echo "Listing WuppieFuzz Results:"
-          ls -la all_results/wuppiefuzz-results || echo "No WuppieFuzz results found."
-          echo "Listing EvoMaster Results:"
-          ls -la all_results/evomaster-results || echo "No EvoMaster results found."
+          echo "Listing Results:"
+          ls -la all_results || echo "No results found."
+
       - name: Final Cleanup
         run: |
           echo "Pruning Docker containers..."
