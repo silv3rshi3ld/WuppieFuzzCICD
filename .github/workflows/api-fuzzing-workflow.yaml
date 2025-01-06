@@ -56,6 +56,7 @@ jobs:
   initialize_swarm:
     needs: cleanup
     runs-on: self-hosted
+    if: contains(github.runner.labels, 'swarm-manager')
     outputs:
       swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
@@ -77,7 +78,7 @@ jobs:
         run: chmod +x ./scripts/manage-swarm.sh
 
       - name: Manage Swarm State
-        if: contains(github.runner.labels, 'swarm-manager')
+        id: setup_swarm
         env:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
@@ -92,7 +93,6 @@ jobs:
 
       - name: Setup Docker Network
         id: setup_network
-        if: contains(github.runner.labels, 'swarm-manager')
         run: |
           # Check if network exists first
           if ! docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
@@ -115,26 +115,15 @@ jobs:
   join_swarm:
     needs: initialize_swarm
     runs-on: self-hosted
-    strategy:
-      matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
-      fail-fast: false
+    if: contains(github.runner.labels, 'swarm-worker')
     steps:
       - name: Debug Runner Information
         run: |
           echo "Runner Labels: ${{ join(github.runner.labels, ', ') }}"
           echo "Hostname: $(hostname)"
 
-      - name: Verify Runner for Swarm Joining
-        if: contains(github.runner.labels, 'swarm-worker')
-        run: echo "Runner has swarm-worker label - proceeding with swarm joining."
-
-      - name: Skip Swarm Joining on Non-Worker Runners
-        if: "!contains(github.runner.labels, 'swarm-worker')"
-        run: echo "Runner does not have swarm-worker label - skipping swarm joining."
-
       - name: Cleanup Worker Before Joining
-        if: contains(github.runner.labels, 'swarm-worker') && needs.initialize_swarm.outputs.swarm-initialized == 'true'
+        if: needs.initialize_swarm.outputs.swarm-initialized == 'true'
         run: |
           # Kill processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
@@ -158,7 +147,7 @@ jobs:
           sleep 5
 
       - name: Join Swarm
-        if: contains(github.runner.labels, 'swarm-worker') && needs.initialize_swarm.outputs.swarm-initialized == 'true'
+        if: needs.initialize_swarm.outputs.swarm-initialized == 'true'
         shell: bash
         run: |
           HOSTNAME=$(hostname)
@@ -269,6 +258,7 @@ jobs:
   build_and_push_images:
     needs: verify_swarm
     runs-on: self-hosted
+    if: contains(github.runner.labels, 'swarm-manager')
     strategy:
       matrix:
         service: [vampi-vulnerable, wuppiefuzz, restler, evomaster]
