@@ -1,3 +1,5 @@
+# API Fuzzing Pipeline with Docker Swarm
+
 name: API Fuzzing Pipeline
 
 on:
@@ -56,7 +58,6 @@ jobs:
   initialize_swarm:
     needs: cleanup
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
     outputs:
       swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
@@ -85,7 +86,7 @@ jobs:
           ./scripts/manage-swarm.sh ${{ env.TOTAL_RUNNERS }}
           
           # Set outputs for other jobs
-          echo "swarm-manager-ip=${{ secrets.MANAGER_IP }}" >> $GITHUB_OUTPUT
+          echo "swarm-manager-ip=$MANAGER_IP" >> $GITHUB_OUTPUT
           WORKER_TOKEN=$(docker swarm join-token worker -q)
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
           echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
@@ -115,99 +116,49 @@ jobs:
   join_swarm:
     needs: initialize_swarm
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-worker')
+    strategy:
+      matrix:
+        fuzzer: [restler, wuppiefuzz, evomaster]
     steps:
-      - name: Debug Runner Information
+      - name: Debug Runner Info
         run: |
-          echo "Runner Labels: ${{ join(github.runner.labels, ', ') }}"
+          echo "Runner Name: ${{ runner.name }}"
           echo "Hostname: $(hostname)"
+          echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
 
-      - name: Cleanup Worker Before Joining
-        if: needs.initialize_swarm.outputs.swarm-initialized == 'true'
+      - name: Join Swarm
+        if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name != needs.initialize_swarm.outputs.manager-hostname
         run: |
-          # Kill processes using known ports
-          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
-            pid=$(lsof -ti :$port) || true
-            if [ -n "$pid" ]; then
-              echo "Killing process using port $port"
-              kill -9 $pid || echo "Failed to kill process on port $port"
-            fi
-          done
-          # Cleanup Docker resources
-          if docker ps -q | grep -q .; then
-            docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
-          fi
-          if docker ps -aq | grep -q .; then
-            docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
-          fi
           # Leave any existing swarm
           if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
             docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
           fi
-          sleep 5
-
-      - name: Join Swarm
-        if: needs.initialize_swarm.outputs.swarm-initialized == 'true'
-        shell: bash
-        run: |
-          HOSTNAME=$(hostname)
-          echo "Current Hostname: $HOSTNAME"
-          echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
-          echo "Manager IP: ${{ secrets.MANAGER_IP }}"
-          if [ "$HOSTNAME" == "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
-            echo "This is the manager node, skipping join."
-          else
-            echo "Joining swarm as worker..."
-            
-            # Ensure Docker daemon is running with proper network settings
-            sudo systemctl stop docker || true
-            sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
-            sudo systemctl daemon-reload
-            sudo systemctl start docker
-            
-            # Wait for Docker to be ready
-            echo "Waiting for Docker to be ready..."
-            timeout 30s bash -c 'until docker info &>/dev/null; do sleep 1; done'
-            
-            # Verify connectivity to manager
-            echo "Verifying connectivity to manager..."
-            if ! timeout 5s bash -c "</dev/tcp/${{ secrets.MANAGER_IP }}/2377"; then
-              echo "::error::Cannot connect to manager port 2377"
-              exit 1
-            fi
-            
-            # Try joining with increased timeout
-            if ! timeout 30s docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ secrets.MANAGER_IP }}:2377; then
-              echo "::error::Failed to join swarm"
-              docker swarm leave --force || true
-              exit 1
-            fi
-            echo "Successfully joined swarm"
-            # Verify node joined successfully with increased timeout
-            echo "Verifying node joined successfully..."
-            for i in $(seq 1 60); do
-              if docker node ls 2>/dev/null | grep -q "$(hostname)"; then
-                echo "Node successfully joined and visible in swarm"
-                break
-              fi
-              if [ $i -eq 60 ]; then
-                echo "::error::Node failed to appear in swarm after joining"
-                exit 1
-              fi
-              echo "Waiting for node to appear in swarm... attempt $i/60"
-              sleep 2
-            done
-            # Add node labels
-            echo "Adding node labels..."
-            if docker node ls --filter role=worker | grep -q "$(hostname)"; then
-              docker node update --label-add type=fuzzer $(hostname)
-            fi
+          
+          # Configure Docker daemon
+          sudo systemctl stop docker || true
+          sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
+          sudo systemctl daemon-reload
+          sudo systemctl start docker
+          
+          # Wait for Docker to be ready
+          timeout 30s bash -c 'until docker info &>/dev/null; do sleep 1; done'
+          
+          # Join swarm
+          if ! timeout 30s docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} ${{ needs.initialize_swarm.outputs.swarm-manager-ip }}:2377; then
+            echo "::error::Failed to join swarm"
+            exit 1
+          fi
+          
+          # Add node label
+          if docker node ls --filter role=worker | grep -q "$(hostname)"; then
+            docker node update --label-add type=fuzzer --label-add fuzzer=${{ matrix.fuzzer }} $(hostname)
+          fi
 
   # 4. Verify Swarm setup
   verify_swarm:
     needs: [initialize_swarm, join_swarm]
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
+    if: success()
     steps:
       - name: Verify Swarm and Network
         run: |
@@ -224,20 +175,16 @@ jobs:
             exit 1
           fi
           
-          # Verify node labels
-          if ! docker node ls --format "{{.Hostname}} {{.Labels}}" | grep -q "type=fuzzer"; then
-            echo "::error::Worker nodes not properly labeled"
-            docker node ls
-            exit 1
-          fi
+          # List nodes and their roles
+          echo "Swarm Nodes:"
+          docker node ls
           
           echo "Swarm configuration verified successfully"
 
-  # 5. Prepare OpenAPI specs (can run in parallel with image building)
+  # 5. Prepare OpenAPI specs
   prepare_specs:
     needs: verify_swarm
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -254,11 +201,10 @@ jobs:
             -v openapi_spec:/dest \
             alpine cp /source/openapi3.yml /dest/
 
-  # 6. Build and push images (can run in parallel with specs preparation)
+  # 6. Build and push images
   build_and_push_images:
     needs: verify_swarm
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
     strategy:
       matrix:
         service: [vampi-vulnerable, wuppiefuzz, restler, evomaster]
@@ -270,62 +216,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push VAmPI
-        if: matrix.service == 'vampi-vulnerable'
+      - name: Build and Push Image
         run: |
-          cd services/vampi
+          cd services/${{ matrix.service == 'vampi-vulnerable' && 'vampi' || matrix.service }}
           docker buildx build \
             --platform linux/amd64 \
-            --target vulnerable \
-            --tag ${REGISTRY:-localhost}/vampi-vulnerable:${TAG:-latest} \
+            ${{ matrix.service == 'vampi-vulnerable' && '--target vulnerable' || '' }} \
+            --file ${{ matrix.service != 'vampi-vulnerable' && format('Dockerfile.{0}', matrix.service) || 'Dockerfile' }} \
+            --tag ${REGISTRY:-localhost}/${{ matrix.service }}:${TAG:-latest} \
             --push \
             .
 
-      - name: Build and Push WuppieFuzz
-        if: matrix.service == 'wuppiefuzz'
-        run: |
-          cd services/wuppiefuzz
-          docker buildx build \
-            --platform linux/amd64 \
-            --file Dockerfile.wuppiefuzz \
-            --tag ${REGISTRY:-localhost}/wuppiefuzz:${TAG:-latest} \
-            --push \
-            .
-
-      - name: Build and Push RESTler
-        if: matrix.service == 'restler'
-        run: |
-          cd services/restler
-          docker buildx build \
-            --platform linux/amd64 \
-            --file Dockerfile.restler \
-            --tag ${REGISTRY:-localhost}/restler:${TAG:-latest} \
-            --push \
-            .
-
-      - name: Build and Push EvoMaster
-        if: matrix.service == 'evomaster'
-        run: |
-          cd services/evomaster
-          docker buildx build \
-            --platform linux/amd64 \
-            --file Dockerfile.evomaster \
-            --tag ${REGISTRY:-localhost}/evomaster:${TAG:-latest} \
-            --push \
-            .
-
-  # 7. Deploy stack (after both specs and images are ready)
+  # 7. Deploy stack
   deploy_stack:
     needs: [prepare_specs, build_and_push_images]
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
       - name: Deploy Stack
         run: |
-          # Set environment variables for stack deployment
           export REGISTRY=${REGISTRY:-localhost}
           export TAG=${TAG:-latest}
           
@@ -366,33 +277,15 @@ jobs:
           docker stack services fuzzing-stack || true
           exit 1
 
-  # 8. Run fuzzing tests
+  # 8. Run fuzzing
   run_fuzzing:
     needs: deploy_stack
     runs-on: self-hosted
-    if: contains(github.runner.labels, 'swarm-manager')
+    strategy:
+      matrix:
+        fuzzer: [restler, wuppiefuzz, evomaster]
+      fail-fast: false
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
-
-      - name: Wait for Services
-        run: |
-          echo "Waiting for all services to be healthy..."
-          for i in $(seq 1 60); do
-            UNHEALTHY_COUNT=$(docker stack services fuzzing-stack --format "{{.Name}} {{.Replicas}}" | grep -v "1/1" | wc -l)
-            if [ "$UNHEALTHY_COUNT" -eq 0 ]; then
-              echo "All services are healthy"
-              break
-            fi
-            if [ $i -eq 60 ]; then
-              echo "::error::Services failed to become healthy"
-              docker stack services fuzzing-stack
-              exit 1
-            fi
-            echo "Waiting for services to be healthy... ($i/60)"
-            sleep 5
-          done
-
       - name: Run Fuzzing Tests
         run: |
           # Wait for VAmPI to be ready
@@ -431,12 +324,10 @@ jobs:
             fi
             
             # Check for completed fuzzing
-            COMPLETED_COUNT=$(docker service logs fuzzing-stack_wuppiefuzz 2>&1 | grep -c "Fuzzing completed" || true)
-            RESTLER_COMPLETED=$(docker service logs fuzzing-stack_restler 2>&1 | grep -c "RESTler done" || true)
-            EVO_COMPLETED=$(docker service logs fuzzing-stack_evomaster 2>&1 | grep -c "EvoMaster done" || true)
+            COMPLETED_COUNT=$(docker service logs fuzzing-stack_${{ matrix.fuzzer }} 2>&1 | grep -c "Fuzzing completed" || true)
             
-            if [ $COMPLETED_COUNT -gt 0 ] && [ $RESTLER_COMPLETED -gt 0 ] && [ $EVO_COMPLETED -gt 0 ]; then
-              echo "All fuzzing completed successfully"
+            if [ $COMPLETED_COUNT -gt 0 ]; then
+              echo "Fuzzing completed successfully"
               break
             fi
             
@@ -446,32 +337,19 @@ jobs:
 
       - name: Collect Results
         run: |
-          echo "Collecting fuzzing results..."
-          
-          # Create results directory
-          mkdir -p fuzzing_results
+          mkdir -p fuzzing_results/${{ matrix.fuzzer }}
           
           # Copy results from volumes
           docker run --rm \
-            -v wuppiefuzz_reports:/reports \
-            -v $(pwd)/fuzzing_results:/output \
-            alpine cp -r /reports /output/wuppiefuzz
-            
-          docker run --rm \
-            -v restler_output:/output \
-            -v $(pwd)/fuzzing_results:/dest \
-            alpine cp -r /output /dest/restler
-            
-          docker run --rm \
-            -v evomaster_results:/results \
-            -v $(pwd)/fuzzing_results:/dest \
-            alpine cp -r /results /dest/evomaster
+            -v ${{ matrix.fuzzer }}_output:/results \
+            -v $(pwd)/fuzzing_results/${{ matrix.fuzzer }}:/output \
+            alpine cp -r /results/* /output/
 
       - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: fuzzing-results
-          path: fuzzing_results
+          name: fuzzing-results-${{ matrix.fuzzer }}
+          path: fuzzing_results/${{ matrix.fuzzer }}
           retention-days: 7
 
   # 9. Summarize results
@@ -480,14 +358,12 @@ jobs:
     runs-on: self-hosted
     if: always()
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
-
       - name: Download Results
         uses: actions/download-artifact@v4
         with:
-          name: fuzzing-results
+          pattern: fuzzing-results-*
           path: all_results
+          merge-multiple: true
 
       - name: List Results
         run: |
@@ -496,7 +372,7 @@ jobs:
 
       - name: Final Cleanup
         run: |
-          echo "Pruning Docker containers..."
-          docker container prune -f || echo "Failed to prune Docker containers."
-          echo "Pruning Docker networks..."
-          docker network prune -f || echo "Failed to prune Docker networks."
+          echo "Cleaning up resources..."
+          docker stack rm fuzzing-stack || true
+          docker container prune -f
+          docker network prune -f
