@@ -35,7 +35,6 @@ jobs:
               kill -9 $pid || echo "Failed to kill process on port $port"
             fi
           done
-
           # Cleanup Docker containers
           if docker ps -q | grep -q .; then
             docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
@@ -43,17 +42,14 @@ jobs:
           if docker ps -aq | grep -q .; then
             docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
-
           # Cleanup Docker network
           if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             if ! docker network rm "${{ env.DOCKER_NETWORK_NAME }}"; then
               echo "Failed to remove network ${{ env.DOCKER_NETWORK_NAME }}, it might be in use"
             fi
           fi
-
           echo "Cleanup completed."
           sleep 5
-
   initialize_swarm:
     needs: cleanup
     runs-on: self-hosted
@@ -90,7 +86,6 @@ jobs:
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
           echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
           echo "swarm-initialized=true" >> $GITHUB_OUTPUT
-
       - name: Setup Docker Network
         id: setup_network
         if: ${{ runner.name == 'TNO' }}
@@ -111,7 +106,6 @@ jobs:
             echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
             exit 1
           fi
-
   join_swarm:
     needs: initialize_swarm
     runs-on: self-hosted
@@ -125,7 +119,6 @@ jobs:
           echo "Runner Name: ${{ runner.name }}"
           echo "Hostname: $(hostname)"
           echo "Runner Labels: ${{ runner.labels }}"
-
       - name: Verify Runner for Swarm Joining
         if: ${{ runner.name == 'TNO2' }}
         run: echo "Runner is TNO2 - proceeding with swarm joining."
@@ -145,7 +138,6 @@ jobs:
               kill -9 $pid || echo "Failed to kill process on port $port"
             fi
           done
-
           # Cleanup Docker resources
           if docker ps -q | grep -q .; then
             docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
@@ -153,14 +145,11 @@ jobs:
           if docker ps -aq | grep -q .; then
             docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
-
           # Leave any existing swarm
           if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
             docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
           fi
-
           sleep 5
-
       - name: Join Swarm
         if: ${{ runner.name == 'TNO2' && needs.initialize_swarm.outputs.swarm-initialized == 'true' }}
         shell: bash
@@ -169,7 +158,6 @@ jobs:
           echo "Current Hostname: $HOSTNAME"
           echo "Manager Hostname: ${{ needs.initialize_swarm.outputs.manager-hostname }}"
           echo "Manager IP: ${{ secrets.MANAGER_IP }}"
-
           if [ "$HOSTNAME" == "${{ needs.initialize_swarm.outputs.manager-hostname }}" ]; then
             echo "This is the manager node, skipping join."
           else
@@ -199,7 +187,6 @@ jobs:
               exit 1
             fi
             echo "Successfully joined swarm"
-
             # Verify node joined successfully with increased timeout
             echo "Verifying node joined successfully..."
             for i in $(seq 1 60); do
@@ -214,13 +201,11 @@ jobs:
               echo "Waiting for node to appear in swarm... attempt $i/60"
               sleep 2
             done
-
             # Add node labels
             echo "Adding node labels..."
             if docker node ls --filter role=worker | grep -q "$(hostname)"; then
               docker node update --label-add type=fuzzer $(hostname)
             fi
-
   setup_target_application:
     needs: [initialize_swarm, join_swarm]
     runs-on: self-hosted
@@ -236,16 +221,13 @@ jobs:
             echo "::error::Not in swarm mode - swarm initialization may have failed"
             exit 1
           fi
-
           # Verify network exists and is overlay type
           if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             echo "::error::Required overlay network ${{ env.DOCKER_NETWORK_NAME }} not found"
             docker network ls
             exit 1
           fi
-
           echo "Swarm mode and network verified successfully"
-
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
@@ -262,24 +244,19 @@ jobs:
               echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
               ;;
           esac
-
       - name: Start VAmPI
         run: |
           cd services/vampi
-
           pid=$(lsof -ti :$VAMPI_PORT) || true
           if [ -n "$pid" ]; then
             echo "Killing process using port $VAMPI_PORT"
             kill -9 $pid || echo "Failed to kill process on port $VAMPI_PORT"
           fi
-
           # Remove any existing stack
           docker stack rm vampi-${{ matrix.fuzzer }} || true
           sleep 5
-
           export PORT=$VAMPI_PORT
           export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
-
           # Deploy stack using docker stack deploy
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
@@ -299,7 +276,6 @@ jobs:
                 echo "Waiting for services to start... ($i/30) - Running: $RUNNING_COUNT/2"
                 sleep 2
               done
-
               # Check application health
               for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
                 if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
@@ -310,13 +286,11 @@ jobs:
                 sleep 1
               done
             fi
-
             echo "::warning::Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
             docker stack rm vampi-${{ matrix.fuzzer }}
             sleep 10
             RETRY_COUNT=$((RETRY_COUNT + 1))
           done
-
           if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
             echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
             docker stack services vampi-${{ matrix.fuzzer }} || true
@@ -325,7 +299,6 @@ jobs:
             docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" || true
             exit 1
           fi
-
   prepare_fuzzers:
     needs: [initialize_swarm]
     runs-on: self-hosted
@@ -342,13 +315,11 @@ jobs:
         run: |
           echo "Setting up RESTler..."
           # RESTler setup steps here
-
       - name: Setup WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
           echo "Setting up WuppieFuzz..."
           # WuppieFuzz setup steps here
-
       - name: Setup EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
@@ -357,7 +328,6 @@ jobs:
           ls -la  # Debug: list files
           docker compose -f docker-compose.evomaster.yml build
           mkdir -p evomaster_results
-
       - name: Upload Fuzzer Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -395,7 +365,6 @@ jobs:
             cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml "$OUTPUT_DIR/openapi3.yml"
             sed -i "s|http://localhost:5000|http://localhost:$PORT|g" "$OUTPUT_DIR/openapi3.yml"
           done
-
       - name: Upload OpenAPI Specs
         uses: actions/upload-artifact@v4
         with:
@@ -442,7 +411,6 @@ jobs:
               echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
               ;;
           esac
-
       - name: Run RESTler
         if: matrix.fuzzer == 'restler'
         run: |
@@ -460,26 +428,21 @@ jobs:
           
           cd ${{ github.workspace }}/workspace
           docker-compose -f docker-compose-restler.yml up --build
-
       - name: Run WuppieFuzz
         if: matrix.fuzzer == 'wuppiefuzz'
         run: |
           echo "Running WuppieFuzz..."
           
           mkdir -p ${{ github.workspace }}/wuppiefuzz_workspace
-
           uses: actions/download-artifact@v4
           with:
             name: wuppiefuzz-binary
             path: ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz
-
           uses: actions/download-artifact@v4
           with:
             name: vampi-api
             path: ${{ github.workspace }}/wuppiefuzz_workspace/VAmPI-master
-
           run: chmod +x ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
-
           cd ${{ github.workspace }}/wuppiefuzz_workspace
           echo "Current directory structure:"
           ls -R
@@ -493,7 +456,6 @@ jobs:
             --initial-corpus=corpus_directory \
             --timeout=60 \
             VAmPI-master/openapi_specs/openapi3.yml
-
       - name: Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
         run: |
@@ -504,7 +466,6 @@ jobs:
             -e OUTPUT_DIR="/evomaster/results" \
             -e TARGET_URL="http://vampi-vulnerable-evomaster:${{ env.VAMPI_PORT }}" \
             -e TIME_BUDGET="600"
-
       - name: Upload Fuzzing Results
         uses: actions/upload-artifact@v4
         with:
@@ -548,7 +509,6 @@ jobs:
           ls -la all_results/wuppiefuzz-results || echo "No WuppieFuzz results found."
           echo "Listing EvoMaster Results:"
           ls -la all_results/evomaster-results || echo "No EvoMaster results found."
-
       - name: Final Cleanup
         run: |
           echo "Pruning Docker containers..."
