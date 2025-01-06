@@ -206,13 +206,10 @@ jobs:
             if docker node ls --filter role=worker | grep -q "$(hostname)"; then
               docker node update --label-add type=fuzzer $(hostname)
             fi
-  setup_target_application:
+  verify_swarm:
     needs: [initialize_swarm, join_swarm]
     runs-on: self-hosted
-    strategy:
-      matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
-      fail-fast: false
+    if: ${{ runner.name == 'TNO' }}
     steps:
       - name: Verify Swarm and Network
         run: |
@@ -221,251 +218,257 @@ jobs:
             echo "::error::Not in swarm mode - swarm initialization may have failed"
             exit 1
           fi
+          
           # Verify network exists and is overlay type
           if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             echo "::error::Required overlay network ${{ env.DOCKER_NETWORK_NAME }} not found"
             docker network ls
             exit 1
           fi
-          echo "Swarm mode and network verified successfully"
-      - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
-
-      - name: Set VAMPI_PORT
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
-              ;;
-            "wuppiefuzz")
-              echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
-              ;;
-            "evomaster")
-              echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
-              ;;
-          esac
-      - name: Start VAmPI
-        run: |
-          cd services/vampi
-          pid=$(lsof -ti :$VAMPI_PORT) || true
-          if [ -n "$pid" ]; then
-            echo "Killing process using port $VAMPI_PORT"
-            kill -9 $pid || echo "Failed to kill process on port $VAMPI_PORT"
-          fi
-          # Remove any existing stack
-          docker stack rm vampi-${{ matrix.fuzzer }} || true
-          sleep 5
-          export PORT=$VAMPI_PORT
-          export DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
-          # Deploy stack using docker stack deploy
-          RETRY_COUNT=0
-          while [ $RETRY_COUNT -lt ${{ env.MAX_STARTUP_RETRIES }} ]; do
-            echo "Starting VAmPI Stack (Attempt $((RETRY_COUNT + 1))/${{ env.MAX_STARTUP_RETRIES }})"
-            
-            # Deploy the stack
-            if docker stack deploy -c docker-compose.yaml vampi-${{ matrix.fuzzer }}; then
-              # Wait for services to be running
-              for i in $(seq 1 30); do
-                RUNNING_COUNT=$(docker stack services vampi-${{ matrix.fuzzer }} --format "{{.Replicas}}" | grep -c "1/1" || echo "0")
-                EXPECTED_COUNT=2  # We expect 2 services: vampi-secure and vampi-vulnerable
-                if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
-                  echo "All services are running in swarm"
-                  docker stack services vampi-${{ matrix.fuzzer }}
-                  break
-                fi
-                echo "Waiting for services to start... ($i/30) - Running: $RUNNING_COUNT/2"
-                sleep 2
-              done
-              # Check application health
-              for i in $(seq 1 ${{ env.HEALTH_CHECK_TIMEOUT }}); do
-                if curl -s http://localhost:$VAMPI_PORT/api/v1/docs > /dev/null; then
-                  echo "VAmPI is healthy and responding"
-                  break 2
-                fi
-                echo "Waiting for VAmPI to be ready... ($i/${{ env.HEALTH_CHECK_TIMEOUT }})"
-                sleep 1
-              done
-            fi
-            echo "::warning::Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
-            docker stack rm vampi-${{ matrix.fuzzer }}
-            sleep 10
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-          done
-          if [ $RETRY_COUNT -eq ${{ env.MAX_STARTUP_RETRIES }} ]; then
-            echo "::error::Failed to start VAmPI after ${{ env.MAX_STARTUP_RETRIES }} attempts"
-            docker stack services vampi-${{ matrix.fuzzer }} || true
-            docker service logs vampi-${{ matrix.fuzzer }}_vampi-secure || true
-            docker service logs vampi-${{ matrix.fuzzer }}_vampi-vulnerable || true
-            docker network inspect "${{ env.DOCKER_NETWORK_NAME }}" || true
+          
+          # Verify node labels
+          if ! docker node ls --format "{{.Hostname}} {{.Labels}}" | grep -q "type=fuzzer"; then
+            echo "::error::Worker nodes not properly labeled"
+            docker node ls
             exit 1
           fi
-  prepare_fuzzers:
+          
+          echo "Swarm configuration verified successfully"
+  build_and_push_images:
     needs: [initialize_swarm]
     runs-on: self-hosted
     strategy:
       matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+        service: [vampi-vulnerable, wuppiefuzz, restler, evomaster]
       fail-fast: false
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
-      - name: Setup RESTler
-        if: matrix.fuzzer == 'restler'
-        run: |
-          echo "Setting up RESTler..."
-          # RESTler setup steps here
-      - name: Setup WuppieFuzz
-        if: matrix.fuzzer == 'wuppiefuzz'
-        run: |
-          echo "Setting up WuppieFuzz..."
-          # WuppieFuzz setup steps here
-      - name: Setup EvoMaster
-        if: matrix.fuzzer == 'evomaster'
-        run: |
-          echo "Setting up EvoMaster..."
-          cd "${{ github.workspace }}/services/evomaster"
-          ls -la  # Debug: list files
-          docker compose -f docker-compose.evomaster.yml build
-          mkdir -p evomaster_results
-      - name: Upload Fuzzer Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzer-${{ matrix.fuzzer }}-artifacts
-          path: tools
-          retention-days: 1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-  prepare_openapi_specs:
-    needs: [setup_target_application]
+      - name: Build and Push VAmPI
+        if: matrix.service == 'vampi-vulnerable'
+        run: |
+          cd services/vampi
+          docker buildx build \
+            --platform linux/amd64 \
+            --target vulnerable \
+            --tag ${REGISTRY:-localhost}/vampi-vulnerable:${TAG:-latest} \
+            --push \
+            .
+
+      - name: Build and Push WuppieFuzz
+        if: matrix.service == 'wuppiefuzz'
+        run: |
+          cd services/wuppiefuzz
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.wuppiefuzz \
+            --tag ${REGISTRY:-localhost}/wuppiefuzz:${TAG:-latest} \
+            --push \
+            .
+
+      - name: Build and Push RESTler
+        if: matrix.service == 'restler'
+        run: |
+          cd services/restler
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.restler \
+            --tag ${REGISTRY:-localhost}/restler:${TAG:-latest} \
+            --push \
+            .
+
+      - name: Build and Push EvoMaster
+        if: matrix.service == 'evomaster'
+        run: |
+          cd services/evomaster
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.evomaster \
+            --tag ${REGISTRY:-localhost}/evomaster:${TAG:-latest} \
+            --push \
+            .
+
+  deploy_stack:
+    needs: [build_and_push_images, initialize_swarm]
     runs-on: self-hosted
-    if: always()
+    if: ${{ runner.name == 'TNO' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
-      - name: Generate OpenAPI Specs
+      - name: Deploy Stack
         run: |
-          for fuzzer in restler wuppiefuzz evomaster; do
-            case $fuzzer in
-              restler)
-                PORT=${{ env.VAMPI_RESTLER_PORT }}
-                OUTPUT_DIR="${{ env.BASE_DIR }}/workspace/restler"
-                ;;
-              wuppiefuzz)
-                PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}
-                OUTPUT_DIR="${{ env.BASE_DIR }}/wuppiefuzz_workspace"
-                ;;
-              evomaster)
-                PORT=${{ env.VAMPI_EVOMASTER_PORT }}
-                OUTPUT_DIR="${{ env.BASE_DIR }}/evomaster_workspace"
-                ;;
-            esac
+          # Set environment variables for stack deployment
+          export REGISTRY=${REGISTRY:-localhost}
+          export TAG=${TAG:-latest}
+          
+          # Remove any existing stack
+          docker stack rm fuzzing-stack || true
+          sleep 10
+          
+          # Deploy the new stack
+          RETRY_COUNT=0
+          MAX_RETRIES=3
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Deploying stack (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
             
-            mkdir -p "$OUTPUT_DIR"
-            cp ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml "$OUTPUT_DIR/openapi3.yml"
-            sed -i "s|http://localhost:5000|http://localhost:$PORT|g" "$OUTPUT_DIR/openapi3.yml"
+            if docker stack deploy -c docker-swarm.yml fuzzing-stack; then
+              # Wait for services to be running
+              echo "Waiting for services to start..."
+              for i in $(seq 1 60); do
+                RUNNING_COUNT=$(docker stack services fuzzing-stack --format "{{.Replicas}}" | grep -c "1/1" || echo "0")
+                EXPECTED_COUNT=5  # manager, vampi, wuppiefuzz, restler, evomaster
+                if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
+                  echo "All services are running"
+                  docker stack services fuzzing-stack
+                  exit 0
+                fi
+                echo "Services running: $RUNNING_COUNT/$EXPECTED_COUNT"
+                sleep 2
+              done
+            fi
+            
+            echo "Attempt $((RETRY_COUNT + 1)) failed, cleaning up..."
+            docker stack rm fuzzing-stack || true
+            sleep 10
+            RETRY_COUNT=$((RETRY_COUNT + 1))
           done
-      - name: Upload OpenAPI Specs
-        uses: actions/upload-artifact@v4
-        with:
-          name: openapi-specs
-          path: |
-            ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
-            ${{ env.BASE_DIR }}/wuppiefuzz_workspace/openapi3.yml
-            ${{ env.BASE_DIR }}/evomaster_workspace/openapi3.yml
-          retention-days: 1
+          
+          echo "::error::Failed to deploy stack after $MAX_RETRIES attempts"
+          docker stack services fuzzing-stack || true
+          exit 1
+
+  prepare_specs:
+    needs: [deploy_stack]
+    runs-on: self-hosted
+    if: ${{ runner.name == 'TNO' }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.0.0
+
+      - name: Copy OpenAPI Specs to Volumes
+        run: |
+          # Create temporary directory
+          mkdir -p specs_temp
+          cp services/vampi/openapi_specs/openapi3.yml specs_temp/
+          
+          # Copy specs to volumes
+          docker run --rm \
+            -v $(pwd)/specs_temp:/source \
+            -v openapi_spec:/dest \
+            alpine cp /source/openapi3.yml /dest/
 
   run_fuzzing:
-    needs: [prepare_fuzzers, prepare_openapi_specs, setup_target_application]
+    needs: [deploy_stack]
     runs-on: self-hosted
-    strategy:
-      matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
-      fail-fast: false
+    if: ${{ runner.name == 'TNO' }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
-      - name: Download Fuzzer Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: fuzzer-${{ matrix.fuzzer }}-artifacts
-          path: tools
+      - name: Wait for Services
+        run: |
+          echo "Waiting for all services to be healthy..."
+          for i in $(seq 1 60); do
+            UNHEALTHY_COUNT=$(docker stack services fuzzing-stack --format "{{.Name}} {{.Replicas}}" | grep -v "1/1" | wc -l)
+            if [ "$UNHEALTHY_COUNT" -eq 0 ]; then
+              echo "All services are healthy"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "::error::Services failed to become healthy"
+              docker stack services fuzzing-stack
+              exit 1
+            fi
+            echo "Waiting for services to be healthy... ($i/60)"
+            sleep 5
+          done
 
-      - name: Download OpenAPI Specs
-        uses: actions/download-artifact@v4
-        with:
-          name: openapi-specs
-          path: openapi_specs
+      - name: Run Fuzzing Tests
+        run: |
+          # Wait for VAmPI to be ready
+          echo "Waiting for VAmPI to be ready..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:5002/api/v1/docs > /dev/null; then
+              echo "VAmPI is ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "::error::VAmPI failed to become ready"
+              exit 1
+            fi
+            echo "Waiting for VAmPI... ($i/30)"
+            sleep 2
+          done
 
-      - name: Set VAMPI_PORT
-        run: |
-          case "${{ matrix.fuzzer }}" in
-            "restler")
-              echo "VAMPI_PORT=${{ env.VAMPI_RESTLER_PORT }}" >> $GITHUB_ENV
-              ;;
-            "wuppiefuzz")
-              echo "VAMPI_PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }}" >> $GITHUB_ENV
-              ;;
-            "evomaster")
-              echo "VAMPI_PORT=${{ env.VAMPI_EVOMASTER_PORT }}" >> $GITHUB_ENV
-              ;;
-          esac
-      - name: Run RESTler
-        if: matrix.fuzzer == 'restler'
-        run: |
-          echo "Running RESTler..."
+          # Monitor fuzzing services
+          echo "Monitoring fuzzing services..."
+          TIMEOUT=3600  # 1 hour timeout
+          START_TIME=$(date +%s)
           
-          mkdir -p ${{ github.workspace }}/workspace
-          mkdir -p ${{ github.workspace }}/workspace/output
-          
-          cp -r ${{ github.workspace }}/restler/restler_config ${{ github.workspace }}/workspace/
-          cp ${{ github.workspace }}/restler/docker-compose-restler.yml ${{ github.workspace }}/workspace/
-          cp ${{ github.workspace }}/restler/Dockerfile.restler ${{ github.workspace }}/workspace/
-          cp ${{ github.workspace }}/services/vampi/openapi_specs/openapi3.yml ${{ github.workspace }}/workspace/openapi3.yml
-          echo "Files in workspace:"
-          ls -la ${{ github.workspace }}/workspace/
-          
-          cd ${{ github.workspace }}/workspace
-          docker-compose -f docker-compose-restler.yml up --build
-      - name: Run WuppieFuzz
-        if: matrix.fuzzer == 'wuppiefuzz'
+          while true; do
+            CURRENT_TIME=$(date +%s)
+            ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
+            
+            if [ $ELAPSED_TIME -gt $TIMEOUT ]; then
+              echo "Fuzzing timeout reached"
+              break
+            fi
+            
+            # Check service status
+            if ! docker stack services fuzzing-stack --format "{{.Name}} {{.Replicas}}"; then
+              echo "::error::Failed to get service status"
+              exit 1
+            fi
+            
+            # Check for completed fuzzing
+            COMPLETED_COUNT=$(docker service logs fuzzing-stack_wuppiefuzz 2>&1 | grep -c "Fuzzing completed" || true)
+            RESTLER_COMPLETED=$(docker service logs fuzzing-stack_restler 2>&1 | grep -c "RESTler done" || true)
+            EVO_COMPLETED=$(docker service logs fuzzing-stack_evomaster 2>&1 | grep -c "EvoMaster done" || true)
+            
+            if [ $COMPLETED_COUNT -gt 0 ] && [ $RESTLER_COMPLETED -gt 0 ] && [ $EVO_COMPLETED -gt 0 ]; then
+              echo "All fuzzing completed successfully"
+              break
+            fi
+            
+            echo "Fuzzing in progress... (${ELAPSED_TIME}s elapsed)"
+            sleep 30
+          done
+
+      - name: Collect Results
         run: |
-          echo "Running WuppieFuzz..."
+          echo "Collecting fuzzing results..."
           
-          mkdir -p ${{ github.workspace }}/wuppiefuzz_workspace
-          uses: actions/download-artifact@v4
-          with:
-            name: wuppiefuzz-binary
-            path: ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz
-          uses: actions/download-artifact@v4
-          with:
-            name: vampi-api
-            path: ${{ github.workspace }}/wuppiefuzz_workspace/VAmPI-master
-          run: chmod +x ${{ github.workspace }}/wuppiefuzz_workspace/wuppiefuzz/wuppiefuzz
-          cd ${{ github.workspace }}/wuppiefuzz_workspace
-          echo "Current directory structure:"
-          ls -R
-          mkdir reports
-          ./wuppiefuzz/wuppiefuzz output-corpus \
-            --openapi-spec=VAmPI-master/openapi_specs/openapi3.yml \
-            corpus_directory
-          ./wuppiefuzz/wuppiefuzz fuzz \
-            --report=true \
-            --log-level=info \
-            --initial-corpus=corpus_directory \
-            --timeout=60 \
-            VAmPI-master/openapi_specs/openapi3.yml
-      - name: Run EvoMaster
-        if: matrix.fuzzer == 'evomaster'
-        run: |
-          echo "Running EvoMaster..."
-          cd "${{ github.workspace }}/services/evomaster"
-          docker compose -f docker-compose.evomaster.yml run --rm evomaster \
-            -e SPEC_PATH="/specs/openapi3.yml" \
-            -e OUTPUT_DIR="/evomaster/results" \
-            -e TARGET_URL="http://vampi-vulnerable-evomaster:${{ env.VAMPI_PORT }}" \
-            -e TIME_BUDGET="600"
+          # Create results directory
+          mkdir -p fuzzing_results
+          
+          # Copy results from volumes
+          docker run --rm \
+            -v wuppiefuzz_reports:/reports \
+            -v $(pwd)/fuzzing_results:/output \
+            alpine cp -r /reports /output/wuppiefuzz
+            
+          docker run --rm \
+            -v restler_output:/output \
+            -v $(pwd)/fuzzing_results:/dest \
+            alpine cp -r /output /dest/restler
+            
+          docker run --rm \
+            -v evomaster_results:/results \
+            -v $(pwd)/fuzzing_results:/dest \
+            alpine cp -r /results /dest/evomaster
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzzing-results
+          path: fuzzing_results
+          retention-days: 7
       - name: Upload Fuzzing Results
         uses: actions/upload-artifact@v4
         with:

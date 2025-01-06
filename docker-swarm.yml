@@ -17,13 +17,22 @@ services:
       placement:
         constraints:
           - node.role == manager
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   vampi-vulnerable:
-    image: vampi-vulnerable-image
-    build:
-      context: ./services/vampi
-      target: vulnerable
-    container_name: vampi-vulnerable
+    image: ${REGISTRY:-localhost}/vampi-vulnerable:${TAG:-latest}
     ports:
       - "5002:5000"
     environment:
@@ -34,16 +43,33 @@ services:
       mode: replicated
       replicas: 1
       endpoint_mode: vip
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
       restart_policy:
         condition: on-failure
         max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   wuppiefuzz:
-    image: wuppiefuzz-image
-    build:
-      context: ./services/wuppiefuzz
-      dockerfile: Dockerfile.wuppiefuzz
-    container_name: wuppiefuzz
+    image: ${REGISTRY:-localhost}/wuppiefuzz:${TAG:-latest}
     environment:
       VAMPI_WUPPIEFUZZ_URL: http://vampi-vulnerable:5000
     volumes:
@@ -54,15 +80,29 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
       restart_policy:
         condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+    depends_on:
+      - vampi-vulnerable
 
   restler:
-    image: restler-image
-    build:
-      context: ./services/restler
-      dockerfile: Dockerfile.restler
-    container_name: restler
+    image: ${REGISTRY:-localhost}/restler:${TAG:-latest}
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
       RUN_FUZZ_LEAN: "true"
@@ -79,15 +119,29 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
       restart_policy:
         condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+    depends_on:
+      - vampi-vulnerable
 
   evomaster:
-    image: evomaster-image
-    build:
-      context: ./services/evomaster
-      dockerfile: Dockerfile.evomaster
-    container_name: evomaster
+    image: ${REGISTRY:-localhost}/evomaster:${TAG:-latest}
     environment:
       SPEC_PATH: "/specs/openapi3.yml"
       OUTPUT_DIR: "/evomaster/results"
@@ -98,15 +152,55 @@ services:
       - openapi_spec:/specs/openapi3.yml:ro
     networks:
       - swarm_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+    depends_on:
+      - vampi-vulnerable
 
 volumes:
   manager-certs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /certs
   manager-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/docker
   wuppiefuzz_reports:
+    driver: local
   restler_output:
+    driver: local
   evomaster_results:
+    driver: local
   openapi_spec:
+    driver: local
 
 networks:
   swarm_network:
     driver: overlay
+    driver_opts:
+      encrypted: "true"
+    attachable: true
