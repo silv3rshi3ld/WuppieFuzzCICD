@@ -131,11 +131,6 @@ jobs:
         env:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
-          # Leave any existing swarm
-          if docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
-            docker swarm leave --force || echo "::warning::Failed to leave previous swarm."
-          fi
-          
           # Configure Docker daemon
           sudo systemctl stop docker || true
           sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
