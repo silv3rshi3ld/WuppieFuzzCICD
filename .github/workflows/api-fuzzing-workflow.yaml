@@ -40,10 +40,10 @@ jobs:
           done
           # Cleanup Docker containers
           if docker ps -q | grep -q .; then
-            docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
+            docker ps -q | xargs docker stop -f || echo "Failed to stop some running containers"
           fi
           if docker ps -aq | grep -q .; then
-            docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
+            docker ps -aq | xargs docker rm -f || echo "Failed to remove some containers"
           fi
           # Cleanup Docker network
           if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
@@ -234,9 +234,9 @@ jobs:
 
       - name: Start Local Registry
         run: |
-          # Stop any existing registry
-          docker stop registry || true
-          docker rm registry || true
+          # Stop any existing registry with force
+          docker stop registry -f || true
+          docker rm registry -f || true
           
           # Start new registry
           docker run -d \
