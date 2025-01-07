@@ -39,15 +39,15 @@ jobs:
             fi
           done
           # Cleanup Docker containers
-          if sudo docker ps -q | grep -q .; then
-            sudo docker ps -q | xargs sudo docker stop || echo "Failed to stop some running containers"
+          if docker ps -q | grep -q .; then
+            docker ps -q | xargs docker stop || echo "Failed to stop some running containers"
           fi
-          if sudo docker ps -aq | grep -q .; then
-            sudo docker ps -aq | xargs sudo docker rm || echo "Failed to remove some containers"
+          if docker ps -aq | grep -q .; then
+            docker ps -aq | xargs docker rm || echo "Failed to remove some containers"
           fi
           # Cleanup Docker network
-          if sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            if ! sudo docker network rm "${{ env.DOCKER_NETWORK_NAME }}"; then
+          if docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            if ! docker network rm "${{ env.DOCKER_NETWORK_NAME }}"; then
               echo "Failed to remove network ${{ env.DOCKER_NETWORK_NAME }}, it might be in use"
             fi
           fi
@@ -87,7 +87,7 @@ jobs:
           
           # Set outputs for other jobs
           echo "swarm-manager-ip=$MANAGER_IP" >> $GITHUB_OUTPUT
-          WORKER_TOKEN=$(sudo docker swarm join-token worker -q)
+          WORKER_TOKEN=$(docker swarm join-token worker -q)
           echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
           echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
           echo "swarm-initialized=true" >> $GITHUB_OUTPUT
@@ -96,18 +96,18 @@ jobs:
         id: setup_network
         run: |
           # Check if network exists first
-          if ! sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+          if ! docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             echo "Creating overlay network ${{ env.DOCKER_NETWORK_NAME }}"
-            NETWORK_ID=$(sudo docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }})
+            NETWORK_ID=$(docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }})
             echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
           else
             echo "Network ${{ env.DOCKER_NETWORK_NAME }} already exists"
-            NETWORK_ID=$(sudo docker network ls --filter name=${{ env.DOCKER_NETWORK_NAME }} --format "{{.ID}}")
+            NETWORK_ID=$(docker network ls --filter name=${{ env.DOCKER_NETWORK_NAME }} --format "{{.ID}}")
             echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
           fi
           
           # Verify network was created/exists and is overlay type
-          if ! sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format "{{.Driver}}" | grep -q "overlay"; then
+          if ! docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format "{{.Driver}}" | grep -q "overlay"; then
             echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
             exit 1
           fi
@@ -129,7 +129,7 @@ jobs:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
           # Check if already in swarm
-          if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
+          if docker info 2>/dev/null | grep -q "Swarm: active"; then
             echo "Node is already part of a swarm"
             exit 0
           fi
@@ -141,7 +141,7 @@ jobs:
           sudo systemctl start docker
           
           # Wait for Docker to be ready
-          timeout 30s bash -c 'until sudo docker info &>/dev/null; do sleep 1; done'
+          timeout 30s bash -c 'until docker info &>/dev/null; do sleep 1; done'
           
           # Verify manager IP
           echo "Attempting to join swarm at $MANAGER_IP:2377"
@@ -151,7 +151,7 @@ jobs:
           fi
           
           # Join swarm
-          if ! timeout 30s sudo docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} $MANAGER_IP:2377; then
+          if ! timeout 30s docker swarm join --token ${{ needs.initialize_swarm.outputs.swarm-worker-token }} $MANAGER_IP:2377; then
             echo "::error::Failed to join swarm"
             exit 1
           fi
@@ -160,7 +160,7 @@ jobs:
         if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name == needs.initialize_swarm.outputs.manager-hostname
         run: |
           # Get all worker nodes
-          WORKER_NODES=($(sudo docker node ls --format '{{.Hostname}}' --filter role=worker))
+          WORKER_NODES=($(docker node ls --format '{{.Hostname}}' --filter role=worker))
           FUZZERS=(restler wuppiefuzz evomaster)
           
           # Label each worker with a different fuzzer
@@ -169,7 +169,7 @@ jobs:
               WORKER="${WORKER_NODES[$i]}"
               FUZZER="${FUZZERS[$i]}"
               echo "Labeling worker node $WORKER for fuzzer $FUZZER"
-              sudo docker node update --label-add type=fuzzer --label-add fuzzer=$FUZZER "$WORKER"
+              docker node update --label-add type=fuzzer --label-add fuzzer=$FUZZER "$WORKER"
             fi
           done
 
@@ -182,21 +182,21 @@ jobs:
       - name: Verify Swarm and Network
         run: |
           # Verify swarm mode is active
-          if ! sudo docker info | grep -q "Swarm: active"; then
+          if ! docker info | grep -q "Swarm: active"; then
             echo "::error::Not in swarm mode - swarm initialization may have failed"
             exit 1
           fi
           
           # Verify network exists and is overlay type
-          if ! sudo docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+          if ! docker network ls --filter driver=overlay | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             echo "::error::Required overlay network ${{ env.DOCKER_NETWORK_NAME }} not found"
-            sudo docker network ls
+            docker network ls
             exit 1
           fi
           
           # List nodes and their roles
           echo "Swarm Nodes:"
-          sudo docker node ls
+          docker node ls
           
           echo "Swarm configuration verified successfully"
 
@@ -215,7 +215,7 @@ jobs:
           cp services/vampi/openapi_specs/openapi3.yml specs_temp/
           
           # Copy specs to volumes
-          sudo docker run --rm \
+          docker run --rm \
             -v $(pwd)/specs_temp:/source \
             -v openapi_spec:/dest \
             alpine cp /source/openapi3.yml /dest/
@@ -234,12 +234,14 @@ jobs:
 
       - name: Start Local Registry
         run: |
-          # Stop any existing registry with elevated privileges
-          sudo docker stop registry || true
-          sudo docker rm registry || true
+          # Check if registry container exists and remove it
+          if docker ps -a --format '{{.Names}}' | grep -q '^registry$'; then
+            docker stop registry || true
+            docker rm registry || true
+          fi
           
-          # Start new registry with elevated privileges
-          sudo docker run -d \
+          # Start new registry
+          docker run -d \
             --name registry \
             --restart=always \
             -p 5000:5000 \
