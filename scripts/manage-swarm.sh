@@ -113,6 +113,57 @@ setup_network() {
     return 0
 }
 
+# Function to create docker compose file
+create_compose_file() {
+    cat > docker-compose.vampi.yml <<EOF
+version: '3.8'
+
+services:
+  vampi-restler:
+    image: localhost:5000/vampi-vulnerable-restler:latest
+    environment:
+      - vulnerable=1
+    ports:
+      - "5012:5000"
+    networks:
+      - cicd_network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.fuzzer == restler
+  
+  vampi-wuppiefuzz:
+    image: localhost:5000/vampi-vulnerable-wuppiefuzz:latest
+    environment:
+      - vulnerable=1
+    ports:
+      - "5022:5000"
+    networks:
+      - cicd_network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.fuzzer == wuppiefuzz
+  
+  vampi-evomaster:
+    image: localhost:5000/vampi-vulnerable-evomaster:latest
+    environment:
+      - vulnerable=1
+    ports:
+      - "5032:5000"
+    networks:
+      - cicd_network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.fuzzer == evomaster
+
+networks:
+  cicd_network:
+    external: true
+EOF
+}
+
 # Function to deploy the Docker stack
 deploy_stack() {
     echo "Deploying Docker stack with stack name: $STACK_NAME"
@@ -123,11 +174,14 @@ deploy_stack() {
         echo "Network setup failed"
         return 1
     fi
+
+    # Create docker compose file
+    create_compose_file
     
     while [ $retry_count -lt $MAX_RETRIES ]; do
         echo "Deploying stack (attempt $((retry_count + 1))/$MAX_RETRIES)..."
         
-        if sudo docker stack deploy -c docker-swarm.yml "$STACK_NAME"; then
+        if sudo docker stack deploy -c docker-compose.vampi.yml "$STACK_NAME"; then
             echo "Stack deployed successfully"
             return 0
         fi
