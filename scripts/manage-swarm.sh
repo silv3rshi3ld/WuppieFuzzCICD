@@ -89,10 +89,40 @@ verify_swarm() {
     return 0
 }
 
+# Function to setup network
+setup_network() {
+    echo "Setting up Docker network..."
+    # Check if network exists first
+    if ! sudo docker network ls | grep -q "cicd_network"; then
+        echo "Creating overlay network cicd_network"
+        if ! sudo docker network create --driver overlay --attachable cicd_network; then
+            echo "Failed to create network"
+            return 1
+        fi
+    else
+        echo "Network cicd_network already exists"
+    fi
+    
+    # Verify network is overlay type
+    if ! sudo docker network inspect cicd_network --format "{{.Driver}}" | grep -q "overlay"; then
+        echo "Network cicd_network is not an overlay network"
+        return 1
+    fi
+    
+    echo "Network setup successful"
+    return 0
+}
+
 # Function to deploy the Docker stack
 deploy_stack() {
     echo "Deploying Docker stack with stack name: $STACK_NAME"
     local retry_count=0
+    
+    # Setup network first
+    if ! setup_network; then
+        echo "Network setup failed"
+        return 1
+    fi
     
     while [ $retry_count -lt $MAX_RETRIES ]; do
         echo "Deploying stack (attempt $((retry_count + 1))/$MAX_RETRIES)..."
