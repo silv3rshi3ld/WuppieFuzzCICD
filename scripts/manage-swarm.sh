@@ -97,7 +97,7 @@ deploy_stack() {
     while [ $retry_count -lt $MAX_RETRIES ]; do
         echo "Deploying stack (attempt $((retry_count + 1))/$MAX_RETRIES)..."
         
-        if sudo docker stack deploy -c docker-compose.vampi.override.yml "$STACK_NAME"; then
+        if sudo docker stack deploy -c docker-swarm.yml "$STACK_NAME"; then
             echo "Stack deployed successfully"
             return 0
         fi
