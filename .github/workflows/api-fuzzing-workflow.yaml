@@ -124,14 +124,18 @@ jobs:
         env:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
-          ./scripts/manage-swarm.sh ${{ env.TOTAL_RUNNERS }}
-          
-          # Set outputs for other jobs
-          echo "swarm-manager-ip=$MANAGER_IP" >> $GITHUB_OUTPUT
-          WORKER_TOKEN=$(sudo docker swarm join-token worker -q)
-          echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
-          echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
-          echo "swarm-initialized=true" >> $GITHUB_OUTPUT
+          # Run manage-swarm.sh and capture its exit status
+          if ./scripts/manage-swarm.sh ${{ env.TOTAL_RUNNERS }}; then
+            # Only set outputs if swarm initialization succeeded
+            echo "swarm-manager-ip=$MANAGER_IP" >> $GITHUB_OUTPUT
+            WORKER_TOKEN=$(sudo docker swarm join-token worker -q) || exit 1
+            echo "swarm-worker-token=$WORKER_TOKEN" >> $GITHUB_OUTPUT
+            echo "manager-hostname=$(hostname)" >> $GITHUB_OUTPUT
+            echo "swarm-initialized=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Swarm initialization failed"
+            exit 1
+          fi
       - name: Setup Docker Network
         id: setup_network
         run: |
