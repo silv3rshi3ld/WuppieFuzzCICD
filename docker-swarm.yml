@@ -1,206 +1,45 @@
 version: '3.8'
-
 services:
-  manager:
-    image: docker:dind
-    privileged: true
-    environment:
-      - DOCKER_TLS_CERTDIR=/certs
-    volumes:
-      - manager-certs:/certs
-      - manager-data:/var/lib/docker
-    ports:
-      - "2377:2377"
-      - "7946:7946"
-      - "4789:4789/udp"
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
-      resources:
-        limits:
-          cpus: '0.75'
-          memory: 1G
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-    healthcheck:
-      test: ["CMD", "docker", "info"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  vampi-vulnerable:
-    image: ${REGISTRY:-localhost}/vampi-vulnerable:${TAG:-latest}
-    ports:
-      - "5002:5000"
+  vampi-restler:
+    image: localhost:5000/vampi-vulnerable-restler:latest
     environment:
       - vulnerable=1
+    ports:
+      - "5012:5000"
     networks:
-      - swarm_network
+      - cicd_network
     deploy:
-      mode: replicated
-      replicas: 1
-      endpoint_mode: vip
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-        order: stop-first
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
       placement:
         constraints:
-          - node.role == worker
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/docs"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+          - node.labels.fuzzer == restler
 
-  wuppiefuzz:
-    image: ${REGISTRY:-localhost}/wuppiefuzz:${TAG:-latest}
+  vampi-wuppiefuzz:
+    image: localhost:5000/vampi-vulnerable-wuppiefuzz:latest
     environment:
-      VAMPI_WUPPIEFUZZ_URL: http://vampi-vulnerable:5000
-    volumes:
-      - wuppiefuzz_reports:/wuppiefuzz/reports
-      - openapi_spec:/workspace/openapi3.yml:ro
+      - vulnerable=1
+    ports:
+      - "5022:5000"
     networks:
-      - swarm_network
+      - cicd_network
     deploy:
-      mode: replicated
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-        order: stop-first
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
       placement:
         constraints:
-          - node.role == worker
-    depends_on:
-      - vampi-vulnerable
+          - node.labels.fuzzer == wuppiefuzz
 
-  restler:
-    image: ${REGISTRY:-localhost}/restler:${TAG:-latest}
+  vampi-evomaster:
+    image: localhost:5000/vampi-vulnerable-evomaster:latest
     environment:
-      RESTLER_TELEMETRY_OPTOUT: "1"
-      RUN_FUZZ_LEAN: "true"
-      FUZZ_LEAN_TIME_BUDGET: "0.05"
-      RUN_FUZZ: "true"
-      FUZZ_TIME_BUDGET: "0.25"
-      TARGET_IP: vampi-vulnerable
-      TARGET_PORT: 5000
-    volumes:
-      - restler_output:/workspace/output
-      - openapi_spec:/workspace/openapi3.yml:ro
+      - vulnerable=1
+    ports:
+      - "5032:5000"
     networks:
-      - swarm_network
+      - cicd_network
     deploy:
-      mode: replicated
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-        order: stop-first
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
       placement:
         constraints:
-          - node.role == worker
-    depends_on:
-      - vampi-vulnerable
-
-  evomaster:
-    image: ${REGISTRY:-localhost}/evomaster:${TAG:-latest}
-    environment:
-      SPEC_PATH: "/specs/openapi3.yml"
-      OUTPUT_DIR: "/evomaster/results"
-      TARGET_URL: "http://vampi-vulnerable:5000"
-      TIME_BUDGET: "3600"
-    volumes:
-      - evomaster_results:/evomaster/results
-      - openapi_spec:/specs/openapi3.yml:ro
-    networks:
-      - swarm_network
-    deploy:
-      mode: replicated
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      rollback_config:
-        parallelism: 1
-        delay: 10s
-        order: stop-first
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-      placement:
-        constraints:
-          - node.role == worker
-    depends_on:
-      - vampi-vulnerable
-
-volumes:
-  manager-certs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /certs
-  manager-data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/docker
-  wuppiefuzz_reports:
-    driver: local
-  restler_output:
-    driver: local
-  evomaster_results:
-    driver: local
-  openapi_spec:
-    driver: local
+          - node.labels.fuzzer == evomaster
 
 networks:
-  swarm_network:
-    driver: overlay
-    driver_opts:
-      encrypted: "true"
-    attachable: true
+  cicd_network:
+    external: true
+    name: cicd_network
