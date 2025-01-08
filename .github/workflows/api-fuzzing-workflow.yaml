@@ -53,13 +53,11 @@ jobs:
             echo "Not in swarm mode, skipping stack removal"
           fi
           
-          # Check and remove registry container if it exists
-          if sudo docker ps -a --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
-            echo "Removing registry container..."
+          # Stop registry container if running, but preserve its data
+          if sudo docker ps --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
+            echo "Stopping registry container..."
             sudo docker stop registry || true
-            sudo docker rm -f registry || true
-          else
-            echo "Registry container not found, skipping removal"
+            sudo docker rm registry || true
           fi
           
           # Cleanup running containers
@@ -269,16 +267,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
 
-      - name: Start Local Registry
+      - name: Setup Local Registry
         run: |
-          # Remove any existing registry container
-          sudo docker rm -f registry || true
-          
-          # Start registry without auto-restart
-          sudo docker run -d \
-            --name registry \
-            -p 5000:5000 \
-            registry:2
+          # Check if registry exists and is running
+          if ! sudo docker ps --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
+            echo "Starting new registry container..."
+            sudo docker run -d \
+              --name registry \
+              --restart=always \
+              -v registry_data:/var/lib/registry \
+              -p 5000:5000 \
+              registry:2
+          else
+            echo "Registry container already running"
+          fi
           
           # Wait for registry to be ready
           for i in $(seq 1 30); do
@@ -298,52 +300,100 @@ jobs:
         with:
           driver-opts: |
             network=host
-      - name: Build and Push Image
+      - name: Calculate Image Hash
+        id: hash
         run: |
           # Set registry address
           REGISTRY=localhost:5000
           
-          # Determine service directory and Dockerfile
+          # Determine service directory
+          SERVICE_DIR=services/${{ matrix.service == 'vampi-vulnerable' && 'vampi' || matrix.service }}
+          
+          # Calculate hash of all files that affect the build
+          if [ "${{ matrix.service }}" = "wuppiefuzz" ]; then
+            # For WuppieFuzz, include the remote repo in hash calculation
+            REMOTE_HASH=$(git ls-remote https://github.com/TNO-S3/WuppieFuzz.git HEAD | cut -f1)
+            echo "WuppieFuzz remote hash: $REMOTE_HASH"
+            HASH=$(echo "$REMOTE_HASH" | sha256sum | cut -d' ' -f1)
+          else
+            # For other services, hash the local files
+            HASH=$(find $SERVICE_DIR -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1)
+          fi
+          
+          echo "CONTENT_HASH=$HASH" >> $GITHUB_ENV
+          echo "content_hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Check Existing Image
+        id: check_image
+        run: |
+          REGISTRY=localhost:5000
+          SERVICE=${{ matrix.service }}
+          HASH=${{ steps.hash.outputs.content_hash }}
+          
+          if [ "$SERVICE" = "vampi-vulnerable" ]; then
+            for FUZZER in restler wuppiefuzz evomaster; do
+              # Check if image with this hash exists
+              if curl -s "http://localhost:5000/v2/vampi-vulnerable-$FUZZER/tags/list" | grep -q "\"$HASH\""; then
+                echo "Image vampi-vulnerable-$FUZZER:$HASH already exists"
+                echo "VAMPI_${FUZZER}_TAG=$HASH" >> $GITHUB_ENV
+              else
+                echo "Need to build vampi-vulnerable-$FUZZER:$HASH"
+                echo "BUILD_VAMPI_${FUZZER}=true" >> $GITHUB_ENV
+              fi
+            done
+          else
+            # Check if image with this hash exists
+            if curl -s "http://localhost:5000/v2/$SERVICE/tags/list" | grep -q "\"$HASH\""; then
+              echo "Image $SERVICE:$HASH already exists"
+              echo "BUILD_NEEDED=false" >> $GITHUB_ENV
+            else
+              echo "Need to build $SERVICE:$HASH"
+              echo "BUILD_NEEDED=true" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: Build and Push Image
+        run: |
+          REGISTRY=localhost:5000
           SERVICE_DIR=services/${{ matrix.service == 'vampi-vulnerable' && 'vampi' || matrix.service }}
           DOCKERFILE=${{ matrix.service != 'vampi-vulnerable' && format('Dockerfile.{0}', matrix.service) || 'Dockerfile' }}
+          HASH=${{ steps.hash.outputs.content_hash }}
           
-          # For WuppieFuzz, ensure source code is available
-          if [ "${{ matrix.service }}" = "wuppiefuzz" ]; then
+          # For WuppieFuzz, ensure source code is available if needed
+          if [ "${{ matrix.service }}" = "wuppiefuzz" ] && [ "$BUILD_NEEDED" = "true" ]; then
             echo "Preparing WuppieFuzz build context..."
             git clone https://github.com/TNO-S3/WuppieFuzz.git temp_wuppiefuzz
             cp -r temp_wuppiefuzz/* $SERVICE_DIR/
             rm -rf temp_wuppiefuzz
           fi
           
-          # Build and push
           cd $SERVICE_DIR
           
           # Special handling for VAmPI instances
           if [ "${{ matrix.service }}" = "vampi-vulnerable" ]; then
-          # Build VAmPI instances for each fuzzer with unique names
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          for FUZZER in restler wuppiefuzz evomaster; do
-            echo "Building VAmPI for $FUZZER"
-            IMAGE_TAG="run-${GITHUB_RUN_ID}-${TIMESTAMP}-${FUZZER}"
-            
+            for FUZZER in restler wuppiefuzz evomaster; do
+              BUILD_VAR="BUILD_VAMPI_${FUZZER}"
+              if [ "${!BUILD_VAR}" = "true" ]; then
+                echo "Building VAmPI for $FUZZER"
+                sudo docker buildx build \
+                  --platform linux/amd64 \
+                  --file $DOCKERFILE \
+                  --build-arg vulnerable=1 \
+                  --tag $REGISTRY/vampi-vulnerable-$FUZZER:$HASH \
+                  --network host \
+                  --push \
+                  .
+                
+                echo "VAMPI_${FUZZER}_TAG=$HASH" >> $GITHUB_ENV
+              fi
+            done
+          elif [ "$BUILD_NEEDED" = "true" ]; then
+            # Build other services only if needed
             sudo docker buildx build \
               --platform linux/amd64 \
               --file $DOCKERFILE \
-              --build-arg vulnerable=1 \
-              --tag $REGISTRY/vampi-vulnerable-$FUZZER:$IMAGE_TAG \
-              --network host \
-              --push \
-              .
-            
-            # Store the image tag for this fuzzer in environment
-            echo "VAMPI_${FUZZER}_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          done
-          else
-            # Build other services normally
-            sudo docker buildx build \
-              --platform linux/amd64 \
-              --file $DOCKERFILE \
-              --tag $REGISTRY/${{ matrix.service }}:${TAG:-latest} \
+              --tag $REGISTRY/${{ matrix.service }}:$HASH \
+              --tag $REGISTRY/${{ matrix.service }}:latest \
               --network host \
               --push \
               .
