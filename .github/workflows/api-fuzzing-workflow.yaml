@@ -411,9 +411,10 @@ jobs:
           export REGISTRY=localhost:5000
           export TAG=${TAG:-latest}
           
-          # Create docker-compose override for VAmPI instances
-          cat > docker-compose.vampi.override.yml <<EOF
+          # Create docker-compose file for VAmPI instances
+          cat > docker-compose.vampi.yml <<EOF
           version: '3.8'
+          
           services:
             vampi-restler:
               image: $REGISTRY/vampi-vulnerable-restler:${VAMPI_restler_TAG}
@@ -453,6 +454,10 @@ jobs:
                 placement:
                   constraints:
                     - node.labels.fuzzer == evomaster
+          
+          networks:
+            cicd_network:
+              external: true
           EOF
           
           # Ensure old stack is removed
@@ -473,7 +478,7 @@ jobs:
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Deploying stack (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
             
-            if sudo docker stack deploy -c docker-compose.vampi.override.yml fuzzing-stack; then
+            if sudo docker stack deploy -c docker-compose.vampi.yml fuzzing-stack; then
               # Wait for network to stabilize
               sleep 10
               # Wait for services to be running
