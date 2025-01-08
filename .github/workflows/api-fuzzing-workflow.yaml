@@ -30,6 +30,7 @@ jobs:
       - name: Cleanup Previous Setup
         run: |
           echo "Cleaning up previous setup..."
+          
           # Kill any processes using known ports
           for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
             pid=$(lsof -ti :$port) || true
@@ -39,30 +40,56 @@ jobs:
             fi
           done
           
-          # Remove any existing stack first
-          sudo docker stack rm fuzzing-stack || true
-          sleep 10
-          
-          # Stop and remove registry container with force
-          sudo docker stop registry || true
-          sudo docker rm -f registry || true
-          
-          # Force cleanup all other Docker containers and images
-          if sudo docker ps -q | grep -q .; then
-            sudo docker ps -q | xargs -r sudo docker stop -t 0 || true
-            sudo docker ps -aq | xargs -r sudo docker rm -f || true
+          # Check if we're in swarm mode before attempting stack removal
+          if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
+            echo "Removing existing stack..."
+            sudo docker stack rm fuzzing-stack || true
+            # Wait for stack to be fully removed
+            while sudo docker stack ls | grep -q "fuzzing-stack"; do
+              echo "Waiting for stack removal..."
+              sleep 5
+            done
+          else
+            echo "Not in swarm mode, skipping stack removal"
           fi
           
-          # Remove all local images related to vampi and fuzzers
-          sudo docker images "localhost:5000/vampi-vulnerable-*" --format "{{.ID}}" | xargs -r sudo docker rmi -f
-          sudo docker images "localhost:5000/*" --format "{{.ID}}" | xargs -r sudo docker rmi -f
+          # Check and remove registry container if it exists
+          if sudo docker ps -a --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
+            echo "Removing registry container..."
+            sudo docker stop registry || true
+            sudo docker rm -f registry || true
+          else
+            echo "Registry container not found, skipping removal"
+          fi
           
-          # Cleanup Docker network (after containers are removed)
+          # Cleanup running containers
+          if sudo docker ps -q | grep -q .; then
+            echo "Stopping running containers..."
+            sudo docker ps -q | xargs -r sudo docker stop -t 0 || true
+            echo "Removing containers..."
+            sudo docker ps -aq | xargs -r sudo docker rm -f || true
+          else
+            echo "No running containers to clean up"
+          fi
+          
+          # Remove vampi and fuzzer images if they exist
+          if sudo docker images "localhost:5000/vampi-vulnerable-*" --format "{{.ID}}" | grep -q .; then
+            echo "Removing vampi images..."
+            sudo docker images "localhost:5000/vampi-vulnerable-*" --format "{{.ID}}" | xargs -r sudo docker rmi -f
+          fi
+          if sudo docker images "localhost:5000/*" --format "{{.ID}}" | grep -q .; then
+            echo "Removing fuzzer images..."
+            sudo docker images "localhost:5000/*" --format "{{.ID}}" | xargs -r sudo docker rmi -f
+          fi
+          
+          # Cleanup Docker network if it exists
           if sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
+            echo "Removing Docker network..."
             sudo docker network rm "${{ env.DOCKER_NETWORK_NAME }}" || true
           fi
           
           # Prune unused resources
+          echo "Pruning unused Docker resources..."
           sudo docker container prune -f
           sudo docker network prune -f
           
