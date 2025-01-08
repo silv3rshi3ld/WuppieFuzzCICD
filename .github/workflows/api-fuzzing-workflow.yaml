@@ -31,94 +31,44 @@ jobs:
         run: |
           echo "Cleaning up previous setup..."
           
-          # Kill any processes using known ports
-          for port in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
-            pid=$(sudo lsof -ti :$port) || true
-            if [ -n "$pid" ]; then
-              echo "Killing process using port $port"
-              sudo kill -9 $pid || echo "Failed to kill process on port $port"
+          # Remove stack if in swarm mode (with timeout)
+          timeout 30s bash -c '
+            if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
+              echo "Removing existing stack..."
+              sudo docker stack rm fuzzing-stack || true
+              while sudo docker stack ls 2>/dev/null | grep -q "fuzzing-stack"; do
+                echo "Waiting for stack removal..."
+                sleep 2
+              done
             fi
-          done
+          ' || echo "Stack removal timed out, continuing..."
           
-          # Function to wait for container removal
-          wait_for_container_removal() {
-            local container_name=$1
-            local max_attempts=30
-            local attempt=1
-            
-            while sudo docker ps -a --format '{{.Names}}' | grep -q "^$container_name$"; do
-              if [ $attempt -ge $max_attempts ]; then
-                echo "Failed to confirm removal of $container_name after $max_attempts attempts"
-                return 1
-              fi
-              echo "Waiting for $container_name to be removed... (attempt $attempt/$max_attempts)"
-              sleep 2
-              ((attempt++))
-            done
-            return 0
-          }
-          
-          # Check if we're in swarm mode before attempting stack removal
-          if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
-            echo "Removing existing stack..."
-            sudo docker stack rm fuzzing-stack || true
-            # Wait for stack to be fully removed
-            while sudo docker stack ls | grep -q "fuzzing-stack"; do
-              echo "Waiting for stack removal..."
-              sleep 5
-            done
-          else
-            echo "Not in swarm mode, skipping stack removal"
-          fi
-          
-          # Stop and remove registry container with proper error handling
+          # Stop and remove registry container
           if sudo docker ps -a --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
-            echo "Stopping registry container..."
-            # Force stop the registry
-            sudo docker stop registry -t 0 || true
-            sleep 2
-            # Force remove the registry
+            echo "Removing registry container..."
             sudo docker rm -f registry || true
-            # Wait for container to be fully removed
-            wait_for_container_removal "registry"
           fi
           
-          # Cleanup all running containers
-          echo "Stopping all running containers..."
-          running_containers=$(sudo docker ps -q)
-          if [ -n "$running_containers" ]; then
-            echo "Force stopping containers..."
-            sudo docker stop -t 0 $running_containers || true
-            sleep 2
-            echo "Force removing containers..."
-            sudo docker rm -f $running_containers || true
-          else
-            echo "No running containers to clean up"
-          fi
+          # Remove related containers and images
+          echo "Cleaning up containers and images..."
           
-          # Remove all images with proper error handling
-          echo "Removing all related images..."
-          # List all image IDs first
-          image_ids=$(sudo docker images --format "{{.ID}}" "localhost:5000/*")
-          if [ -n "$image_ids" ]; then
-            echo "Force removing images..."
-            echo "$image_ids" | xargs -r sudo docker rmi -f || true
-          else
-            echo "No images to remove"
-          fi
+          # Remove fuzzing-related containers
+          sudo docker ps -a --filter "name=fuzzing" --format '{{.ID}}' | xargs -r sudo docker rm -f || true
           
-          # Cleanup Docker network if it exists
+          # Remove related images (only localhost:5000 images)
+          sudo docker images "localhost:5000/*" --format "{{.ID}}" | xargs -r sudo docker rmi -f || true
+          
+          # Remove network if exists
           if sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
             echo "Removing Docker network..."
             sudo docker network rm "${{ env.DOCKER_NETWORK_NAME }}" || true
           fi
           
-          # Aggressive pruning of unused resources
-          echo "Pruning unused Docker resources..."
-          sudo docker system prune -af --volumes
+          # Light pruning of dangling resources only
+          echo "Pruning dangling resources..."
+          sudo docker system prune -f
           
           echo "Cleanup completed."
-          sleep 5
   # 2. Initialize Swarm infrastructure
   initialize_swarm:
     needs: cleanup
