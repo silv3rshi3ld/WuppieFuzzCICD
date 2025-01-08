@@ -324,18 +324,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver-opts: |
-            network=host
-          buildkitd-flags: --debug
-
-      - name: Set up Build Cache
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ steps.hash.outputs.content_hash }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-${{ matrix.service }}-
-            ${{ runner.os }}-buildx-
+          driver: docker
+          install: true
+          platforms: linux/amd64
       - name: Calculate Image Hash
         id: hash
         run: |
@@ -411,39 +402,28 @@ jobs:
               BUILD_VAR="BUILD_VAMPI_${FUZZER}"
               if [ "${!BUILD_VAR}" = "true" ]; then
                 echo "Building VAmPI for $FUZZER"
-                sudo docker buildx build \
-                  --platform linux/amd64 \
+                sudo docker build \
                   --file $DOCKERFILE \
                   --build-arg vulnerable=1 \
-                  --build-arg BUILDKIT_INLINE_CACHE=1 \
-                  --cache-from type=local,src=/tmp/.buildx-cache \
-                  --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
                   --tag $REGISTRY/vampi-vulnerable-$FUZZER:$HASH \
                   --network host \
-                  --push \
-                  .
+                  . && \
+                sudo docker push $REGISTRY/vampi-vulnerable-$FUZZER:$HASH
                 
                 echo "VAMPI_${FUZZER}_TAG=$HASH" >> $GITHUB_ENV
               fi
             done
           elif [ "$BUILD_NEEDED" = "true" ]; then
             # Build other services only if needed
-            sudo docker buildx build \
-              --platform linux/amd64 \
+            sudo docker build \
               --file $DOCKERFILE \
-              --build-arg BUILDKIT_INLINE_CACHE=1 \
-              --cache-from type=local,src=/tmp/.buildx-cache \
-              --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --tag $REGISTRY/${{ matrix.service }}:$HASH \
               --tag $REGISTRY/${{ matrix.service }}:latest \
               --network host \
-              --push \
-              .
+              . && \
+            sudo docker push $REGISTRY/${{ matrix.service }}:$HASH && \
+            sudo docker push $REGISTRY/${{ matrix.service }}:latest
           fi
-
-          # Move cache
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
   # 7. Deploy stack
   deploy_stack:
     needs: [prepare_specs, build_and_push_images]
