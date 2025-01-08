@@ -165,7 +165,26 @@ if ! deploy_stack; then
     exit 1
 fi
 
-# Show stack tasks
+# Show stack services and verify all are created
+echo "Verifying stack services..."
+EXPECTED_SERVICES=("vampi-evomaster" "vampi-restler" "vampi-wuppiefuzz")
+MISSING_SERVICES=()
+
+for service in "${EXPECTED_SERVICES[@]}"; do
+    if ! sudo docker service ls --filter name="${STACK_NAME}_${service}" | grep -q "${STACK_NAME}_${service}"; then
+        MISSING_SERVICES+=("$service")
+    fi
+done
+
+if [ ${#MISSING_SERVICES[@]} -ne 0 ]; then
+    echo "Error: The following services are missing:"
+    printf '%s\n' "${MISSING_SERVICES[@]}"
+    echo "Current services:"
+    sudo docker service ls
+    exit 1
+fi
+
+echo "All expected services are created"
 echo "Current stack tasks:"
 sudo docker stack ps "$STACK_NAME" || true
 

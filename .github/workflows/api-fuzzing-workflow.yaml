@@ -271,10 +271,12 @@ jobs:
 
       - name: Start Local Registry
         run: |
-          # Start registry with elevated privileges
+          # Remove any existing registry container
+          sudo docker rm -f registry || true
+          
+          # Start registry without auto-restart
           sudo docker run -d \
             --name registry \
-            --restart=always \
             -p 5000:5000 \
             registry:2
           
@@ -403,6 +405,17 @@ jobs:
                     - node.labels.fuzzer == evomaster
           EOF
           
+          # Ensure old stack is removed
+          if sudo docker stack ls | grep -q "fuzzing-stack"; then
+            echo "Removing existing stack..."
+            sudo docker stack rm fuzzing-stack
+            # Wait for stack removal
+            while sudo docker stack ls | grep -q "fuzzing-stack"; do
+              echo "Waiting for stack removal..."
+              sleep 5
+            done
+          fi
+
           # Deploy stack
           RETRY_COUNT=0
           MAX_RETRIES=3
@@ -411,6 +424,8 @@ jobs:
             echo "Deploying stack (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
             
             if sudo docker stack deploy -c docker-compose.vampi.override.yml fuzzing-stack; then
+              # Wait for network to stabilize
+              sleep 10
               # Wait for services to be running
               echo "Waiting for services to start..."
               for i in $(seq 1 60); do

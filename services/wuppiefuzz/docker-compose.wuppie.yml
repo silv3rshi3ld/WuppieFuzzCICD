@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.wuppiefuzz
-    container_name: wuppiefuzz
+    # Removed fixed container_name to avoid conflicts
     environment:
       VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
     volumes:
