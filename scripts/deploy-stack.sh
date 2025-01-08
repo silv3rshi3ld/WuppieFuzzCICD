@@ -20,15 +20,23 @@ MAX_RETRIES=3
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   echo "Deploying stack (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
   
+  # Ensure node has required labels
+  NODE_ID=$(sudo docker node ls --format "{{.ID}}" | head -n1)
+  for FUZZER in restler wuppiefuzz evomaster; do
+    if ! sudo docker node inspect "$NODE_ID" --format '{{.Spec.Labels.fuzzer}}' | grep -q "$FUZZER"; then
+      sudo docker node update --label-add fuzzer=$FUZZER "$NODE_ID"
+    fi
+  done
+
   if sudo docker stack deploy -c services/vampi/docker-compose.vampi.yml fuzzing-stack; then
     # Wait for network to stabilize
-    sleep 10
+    sleep 15
     # Wait for services to be running
     echo "Waiting for services to start..."
     for i in $(seq 1 60); do
-      RUNNING_COUNT=$(sudo docker stack services fuzzing-stack --format "{{.Replicas}}" | grep -c "1/1" || echo "0")
+      RUNNING_COUNT=$(sudo docker stack services fuzzing-stack --format "{{.Replicas}}" | grep -c "1/1" 2>/dev/null || echo 0)
       EXPECTED_COUNT=3  # One VAmPI instance per fuzzer
-      if [ "$RUNNING_COUNT" -eq "$EXPECTED_COUNT" ]; then
+      if [ $RUNNING_COUNT -eq $EXPECTED_COUNT ]; then
         echo "All services are running"
         sudo docker stack services fuzzing-stack
         exit 0

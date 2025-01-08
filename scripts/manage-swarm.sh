@@ -68,7 +68,14 @@ initialize_swarm() {
     fi
     
     echo "$CURRENT_RUNNERS" > "$SWARM_STATE_FILE"
-    echo "Swarm initialized successfully"
+    
+    # Add required fuzzer labels to the node
+    NODE_ID=$(sudo docker node ls --format "{{.ID}}" | head -n1)
+    sudo docker node update --label-add fuzzer=restler "$NODE_ID"
+    sudo docker node update --label-add fuzzer=wuppiefuzz "$NODE_ID"
+    sudo docker node update --label-add fuzzer=evomaster "$NODE_ID"
+    
+    echo "Swarm initialized successfully with fuzzer labels"
     return 0
 }
 
