@@ -300,6 +300,16 @@ jobs:
         with:
           driver-opts: |
             network=host
+          buildkitd-flags: --debug
+
+      - name: Set up Build Cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ matrix.service }}-${{ steps.hash.outputs.content_hash }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.service }}-
+            ${{ runner.os }}-buildx-
       - name: Calculate Image Hash
         id: hash
         run: |
@@ -379,6 +389,9 @@ jobs:
                   --platform linux/amd64 \
                   --file $DOCKERFILE \
                   --build-arg vulnerable=1 \
+                  --build-arg BUILDKIT_INLINE_CACHE=1 \
+                  --cache-from type=local,src=/tmp/.buildx-cache \
+                  --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
                   --tag $REGISTRY/vampi-vulnerable-$FUZZER:$HASH \
                   --network host \
                   --push \
@@ -392,12 +405,19 @@ jobs:
             sudo docker buildx build \
               --platform linux/amd64 \
               --file $DOCKERFILE \
+              --build-arg BUILDKIT_INLINE_CACHE=1 \
+              --cache-from type=local,src=/tmp/.buildx-cache \
+              --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
               --tag $REGISTRY/${{ matrix.service }}:$HASH \
               --tag $REGISTRY/${{ matrix.service }}:latest \
               --network host \
               --push \
               .
           fi
+
+          # Move cache
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
   # 7. Deploy stack
   deploy_stack:
     needs: [prepare_specs, build_and_push_images]
