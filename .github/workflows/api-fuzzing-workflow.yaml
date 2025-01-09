@@ -25,7 +25,7 @@ env:
 jobs:
   # 1. Initial cleanup
   cleanup:
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - name: Cleanup Previous Setup
         run: |
@@ -72,7 +72,7 @@ jobs:
   # 2. Initialize Swarm infrastructure
   initialize_swarm:
     needs: cleanup
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     outputs:
       swarm-manager-ip: ${{ steps.setup_swarm.outputs.swarm-manager-ip }}
       swarm-worker-token: ${{ steps.setup_swarm.outputs.swarm-worker-token }}
@@ -132,7 +132,11 @@ jobs:
   # 3. Configure Swarm Workers
   configure_workers:
     needs: initialize_swarm
-    runs-on: self-hosted
+    runs-on: [self-hosted, worker-runner]
+    strategy:
+      matrix:
+        worker_id: [0, 1, 2] # Supports up to 3 workers, can be expanded as needed
+      fail-fast: false
     steps:
       - name: Debug Runner Info
         run: |
@@ -189,7 +193,7 @@ jobs:
   # 4. Verify Swarm setup
   verify_swarm:
     needs: [initialize_swarm, configure_workers]
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     if: success()
     steps:
       - name: Verify Swarm and Network
@@ -215,7 +219,7 @@ jobs:
   # 5. Prepare OpenAPI specs
   prepare_specs:
     needs: verify_swarm
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -234,7 +238,7 @@ jobs:
   # 6. Build and push images
   build_and_push_images:
     needs: verify_swarm
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     strategy:
       matrix:
         service: [vampi-vulnerable, wuppiefuzz, restler, evomaster]
@@ -377,7 +381,7 @@ jobs:
   # 7. Deploy stack
   deploy_stack:
     needs: [prepare_specs, build_and_push_images]
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
@@ -392,7 +396,7 @@ jobs:
   # 8. Run fuzzing
   run_fuzzing:
     needs: deploy_stack
-    runs-on: self-hosted
+    runs-on: [self-hosted, worker-runner]
     strategy:
       matrix:
         fuzzer: [restler, wuppiefuzz, evomaster]
@@ -477,7 +481,7 @@ jobs:
   # 9. Summarize results
   summarize_results:
     needs: run_fuzzing
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     if: always()
     steps:
       - name: Download Results
