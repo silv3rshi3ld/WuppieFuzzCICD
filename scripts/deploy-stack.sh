@@ -20,14 +20,6 @@ MAX_RETRIES=3
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   echo "Deploying stack (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
   
-  # Ensure node has required labels
-  NODE_ID=$(sudo docker node ls --format "{{.ID}}" | head -n1)
-  for FUZZER in restler wuppiefuzz evomaster; do
-    if ! sudo docker node inspect "$NODE_ID" --format '{{.Spec.Labels.fuzzer}}' | grep -q "$FUZZER"; then
-      sudo docker node update --label-add fuzzer=$FUZZER "$NODE_ID"
-    fi
-  done
-
   # Verify Docker registry is running
   echo "Verifying local registry..."
   if ! curl -s http://localhost:5000/v2/_catalog > /dev/null; then
@@ -56,22 +48,6 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   
   # Images will be verified by Docker Swarm during deployment
   echo "Images will be verified during deployment..."
-  
-  # Ensure /var/lib/docker permissions are correct on all nodes
-  echo "Setting up /var/lib/docker permissions..."
-  for NODE in $(sudo docker node ls --format "{{.Hostname}}"); do
-    if [ "$NODE" = "$(hostname)" ]; then
-      # Local node
-      sudo mkdir -p /var/lib/docker
-      sudo chmod 711 /var/lib/docker
-      sudo chown root:root /var/lib/docker
-    else
-      # Remote nodes - using ssh if available
-      if ssh -q "$NODE" exit 2>/dev/null; then
-        ssh "$NODE" "sudo mkdir -p /var/lib/docker && sudo chmod 711 /var/lib/docker && sudo chown root:root /var/lib/docker" || true
-      fi
-    fi
-  done
   
   # Verify network exists and is ready
   if ! sudo docker network ls | grep -q "cicd_network"; then

@@ -9,14 +9,9 @@ services:
     networks:
       - cicd_network
     deploy:
-      placement:
-        constraints:
-          - node.labels.fuzzer == restler
       restart_policy:
         condition: on-failure
         max_attempts: 3
-    volumes:
-      - /var/lib/docker:/var/lib/docker:rw
 
   vampi-wuppiefuzz:
     image: localhost:5000/vampi-vulnerable-wuppiefuzz:latest
@@ -27,14 +22,9 @@ services:
     networks:
       - cicd_network
     deploy:
-      placement:
-        constraints:
-          - node.labels.fuzzer == wuppiefuzz
       restart_policy:
         condition: on-failure
         max_attempts: 3
-    volumes:
-      - /var/lib/docker:/var/lib/docker:rw
 
   vampi-evomaster:
     image: localhost:5000/vampi-vulnerable-evomaster:latest
@@ -45,14 +35,9 @@ services:
     networks:
       - cicd_network
     deploy:
-      placement:
-        constraints:
-          - node.labels.fuzzer == evomaster
       restart_policy:
         condition: on-failure
         max_attempts: 3
-    volumes:
-      - /var/lib/docker:/var/lib/docker:rw
 
 networks:
   cicd_network:
