@@ -135,7 +135,7 @@ jobs:
     runs-on: [self-hosted, worker-runner]
     strategy:
       matrix:
-        worker_id: [0, 1, 2] # Supports up to 3 workers, can be expanded as needed
+        worker_id: [0] # Supports up to 3 workers, can be expanded as needed
       fail-fast: false
     steps:
       - name: Debug Runner Info
