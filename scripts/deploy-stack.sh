@@ -54,17 +54,8 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     done
   fi
   
-  # Verify required images exist
-  echo "Verifying required images..."
-  for service in vampi-evomaster vampi-restler vampi-wuppiefuzz; do
-    IMAGE="localhost:5000/vampi-vulnerable-${service#vampi-}:latest"
-    if ! sudo docker image inspect "$IMAGE" >/dev/null 2>&1; then
-      echo "Required image not found: $IMAGE"
-      echo "Available images:"
-      sudo docker images
-      exit 1
-    fi
-  done
+  # Images will be verified by Docker Swarm during deployment
+  echo "Images will be verified during deployment..."
   
   # Verify network exists and is ready
   if ! sudo docker network ls | grep -q "cicd_network"; then
@@ -75,7 +66,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   echo "Network status:"
   sudo docker network ls | grep "cicd_network"
   
-  if sudo docker stack deploy -c services/vampi/docker-compose.vampi.yml fuzzing-stack; then
+  if sudo docker stack deploy -c docker-swarm.yml fuzzing-stack; then
     # Wait for network to stabilize
     sleep 15
     # Wait for services to be running

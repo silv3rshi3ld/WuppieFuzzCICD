@@ -25,7 +25,11 @@ env:
 jobs:
   # 1. Initial cleanup
   cleanup:
-    runs-on: [self-hosted, manager-runner]
+    strategy:
+      matrix:
+        runner: [manager-runner, worker-runner]
+      fail-fast: false
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
     steps:
       - name: Cleanup Previous Setup
         run: |
@@ -239,6 +243,10 @@ jobs:
   build_and_push_images:
     needs: verify_swarm
     runs-on: [self-hosted, manager-runner]
+    outputs:
+      vampi-restler-hash: ${{ steps.set_outputs.outputs.vampi-restler-hash }}
+      vampi-wuppiefuzz-hash: ${{ steps.set_outputs.outputs.vampi-wuppiefuzz-hash }}
+      vampi-evomaster-hash: ${{ steps.set_outputs.outputs.vampi-evomaster-hash }}
     strategy:
       matrix:
         service: [vampi-vulnerable, wuppiefuzz, restler, evomaster]
@@ -378,6 +386,15 @@ jobs:
             sudo docker push $REGISTRY/${{ matrix.service }}:$HASH && \
             sudo docker push $REGISTRY/${{ matrix.service }}:latest
           fi
+
+      - name: Set Job Outputs
+        id: set_outputs
+        if: matrix.service == 'vampi-vulnerable'
+        run: |
+          echo "vampi-restler-hash=${{ env.VAMPI_restler_TAG }}" >> $GITHUB_OUTPUT
+          echo "vampi-wuppiefuzz-hash=${{ env.VAMPI_wuppiefuzz_TAG }}" >> $GITHUB_OUTPUT
+          echo "vampi-evomaster-hash=${{ env.VAMPI_evomaster_TAG }}" >> $GITHUB_OUTPUT
+
   # 7. Deploy stack
   deploy_stack:
     needs: [prepare_specs, build_and_push_images]
@@ -385,6 +402,56 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.0.0
+
+      - name: Create Stack File with Hash Tags
+        run: |
+          cat > docker-swarm.yml << 'EOL'
+          version: '3.8'
+          services:
+            vampi-restler:
+              image: localhost:5000/vampi-vulnerable-restler:${{ needs.build_and_push_images.outputs.vampi-restler-hash }}
+              environment:
+                - vulnerable=1
+              ports:
+                - "5012:5000"
+              networks:
+                - cicd_network
+              deploy:
+                placement:
+                  constraints:
+                    - node.labels.fuzzer == restler
+
+            vampi-wuppiefuzz:
+              image: localhost:5000/vampi-vulnerable-wuppiefuzz:${{ needs.build_and_push_images.outputs.vampi-wuppiefuzz-hash }}
+              environment:
+                - vulnerable=1
+              ports:
+                - "5022:5000"
+              networks:
+                - cicd_network
+              deploy:
+                placement:
+                  constraints:
+                    - node.labels.fuzzer == wuppiefuzz
+
+            vampi-evomaster:
+              image: localhost:5000/vampi-vulnerable-evomaster:${{ needs.build_and_push_images.outputs.vampi-evomaster-hash }}
+              environment:
+                - vulnerable=1
+              ports:
+                - "5032:5000"
+              networks:
+                - cicd_network
+              deploy:
+                placement:
+                  constraints:
+                    - node.labels.fuzzer == evomaster
+
+          networks:
+            cicd_network:
+              external: true
+              name: cicd_network
+          EOL
 
       - name: Deploy Stack
         run: |
