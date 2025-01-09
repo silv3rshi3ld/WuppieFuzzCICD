@@ -157,11 +157,22 @@ jobs:
             echo "Node is already part of a swarm"
             exit 0
           fi
-          # Configure Docker daemon
+          # Configure Docker daemon and permissions
           sudo systemctl stop docker || true
+          
+          # Ensure /var/lib/docker exists with correct permissions
+          sudo mkdir -p /var/lib/docker
+          sudo chmod 711 /var/lib/docker
+          
+          # Configure Docker daemon
           sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
+          
+          # Reload and restart Docker
           sudo systemctl daemon-reload
           sudo systemctl start docker
+          
+          # Verify permissions
+          sudo chmod -R root:root /var/lib/docker
           
           # Wait for Docker to be ready
           timeout 30s bash -c 'until sudo docker info &>/dev/null; do sleep 1; done'
