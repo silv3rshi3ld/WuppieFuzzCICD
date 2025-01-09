@@ -133,6 +133,23 @@ jobs:
             echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
             exit 1
           fi
+
+      - name: Label Worker Nodes
+        if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name == needs.initialize_swarm.outputs.manager-hostname
+        run: |
+          # Get all worker nodes
+          WORKER_NODES=($(sudo docker node ls --format '{{.Hostname}}' --filter role=worker))
+          FUZZERS=(restler wuppiefuzz evomaster)
+          
+          # Label each worker with a different fuzzer
+          for i in "${!WORKER_NODES[@]}"; do
+            if [ $i -lt ${#FUZZERS[@]} ]; then
+              WORKER="${WORKER_NODES[$i]}"
+              FUZZER="${FUZZERS[$i]}"
+              echo "Labeling worker node $WORKER for fuzzer $FUZZER"
+              sudo docker node update --label-add type=fuzzer --label-add fuzzer=$FUZZER "$WORKER"
+            fi
+          done
   # 3. Configure Swarm Workers
   configure_workers:
     needs: initialize_swarm
@@ -152,10 +169,10 @@ jobs:
         env:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
-          # Check if already in swarm
+          # Leave current swarm if already in one
           if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
-            echo "Node is already part of a swarm"
-            exit 0
+            echo "Leaving current swarm..."
+            sudo docker swarm leave --force
           fi
           # Configure Docker daemon and permissions
           sudo systemctl stop docker || true
@@ -189,22 +206,6 @@ jobs:
             echo "::error::Failed to join swarm"
             exit 1
           fi
-      - name: Label Workers (Manager Only)
-        if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name == needs.initialize_swarm.outputs.manager-hostname
-        run: |
-          # Get all worker nodes
-          WORKER_NODES=($(sudo docker node ls --format '{{.Hostname}}' --filter role=worker))
-          FUZZERS=(restler wuppiefuzz evomaster)
-          
-          # Label each worker with a different fuzzer
-          for i in "${!WORKER_NODES[@]}"; do
-            if [ $i -lt ${#FUZZERS[@]} ]; then
-              WORKER="${WORKER_NODES[$i]}"
-              FUZZER="${FUZZERS[$i]}"
-              echo "Labeling worker node $WORKER for fuzzer $FUZZER"
-              sudo docker node update --label-add type=fuzzer --label-add fuzzer=$FUZZER "$WORKER"
-            fi
-          done
   # 4. Verify Swarm setup
   verify_swarm:
     needs: [initialize_swarm, configure_workers]
