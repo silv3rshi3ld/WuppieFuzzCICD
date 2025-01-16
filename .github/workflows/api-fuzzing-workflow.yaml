@@ -40,7 +40,7 @@ jobs:
         run: chmod +x ./scripts/*.sh
 
       - name: Cleanup Previous Setup
-        run: ./scripts/cleanup-environment.sh "${{ env.DOCKER_NETWORK_NAME }}"
+        run: sudo ./scripts/cleanup-environment.sh "${{ env.DOCKER_NETWORK_NAME }}"
   # 2. Initialize Swarm infrastructure
   initialize_swarm:
     needs: cleanup
@@ -73,7 +73,7 @@ jobs:
           MANAGER_IP: ${{ secrets.MANAGER_IP }}
         run: |
           # Run manage-swarm.sh and capture its exit status
-          if ./scripts/manage-swarm.sh ${{ env.TOTAL_RUNNERS }}; then
+          if sudo ./scripts/manage-swarm.sh ${{ env.TOTAL_RUNNERS }}; then
             # Only set outputs if swarm initialization succeeded
             echo "swarm-manager-ip=$MANAGER_IP" >> $GITHUB_OUTPUT
             WORKER_TOKEN=$(sudo docker swarm join-token worker -q) || exit 1
@@ -86,11 +86,11 @@ jobs:
           fi
       - name: Setup Docker Network
         id: setup_network
-        run: ./scripts/setup-network.sh "${{ env.DOCKER_NETWORK_NAME }}"
+        run: sudo ./scripts/setup-network.sh "${{ env.DOCKER_NETWORK_NAME }}"
 
       - name: Label Worker Nodes
         if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name == needs.initialize_swarm.outputs.manager-hostname
-        run: ./scripts/label-nodes.sh
+        run: sudo ./scripts/label-nodes.sh
   # 3. Configure Swarm Workers
   configure_workers:
     needs: initialize_swarm
@@ -211,7 +211,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Local Registry
-        run: ./scripts/setup-registry.sh
+        run: sudo ./scripts/setup-registry.sh
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -415,7 +415,7 @@ jobs:
               ;;
           esac
           
-          ./scripts/monitor-fuzzing.sh "${{ matrix.fuzzer }}" "$VAMPI_PORT" 3600
+          sudo ./scripts/monitor-fuzzing.sh "${{ matrix.fuzzer }}" "$VAMPI_PORT" 3600
       - name: Collect Results
         run: |
           mkdir -p fuzzing_results/${{ matrix.fuzzer }}
