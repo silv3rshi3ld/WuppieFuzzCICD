@@ -31,48 +31,14 @@ jobs:
       fail-fast: false
     runs-on: [self-hosted, "${{ matrix.runner }}"]
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.0.0
+
+      - name: Make Scripts Executable
+        run: chmod +x ./scripts/*.sh
+
       - name: Cleanup Previous Setup
-        run: |
-          echo "Cleaning up previous setup..."
-          
-          # Remove stack if in swarm mode (with timeout)
-          timeout 30s bash -c '
-            if sudo docker info 2>/dev/null | grep -q "Swarm: active"; then
-              echo "Removing existing stack..."
-              sudo docker stack rm fuzzing-stack || true
-              while sudo docker stack ls 2>/dev/null | grep -q "fuzzing-stack"; do
-                echo "Waiting for stack removal..."
-                sleep 2
-              done
-            fi
-          ' || echo "Stack removal timed out, continuing..."
-          
-          # Stop and remove registry container
-          if sudo docker ps -a --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
-            echo "Removing registry container..."
-            sudo docker rm -f registry || true
-          fi
-          
-          # Remove related containers and images
-          echo "Cleaning up containers and images..."
-          
-          # Remove fuzzing-related containers
-          sudo docker ps -a --filter "name=fuzzing" --format '{{.ID}}' | xargs -r sudo docker rm -f || true
-          
-          # Remove related images (only localhost:5000 images)
-          sudo docker images "localhost:5000/*" --format "{{.ID}}" | xargs -r sudo docker rmi -f || true
-          
-          # Remove network if exists
-          if sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            echo "Removing Docker network..."
-            sudo docker network rm "${{ env.DOCKER_NETWORK_NAME }}" || true
-          fi
-          
-          # Light pruning of dangling resources only
-          echo "Pruning dangling resources..."
-          sudo docker system prune -f
-          
-          echo "Cleanup completed."
+        run: ./scripts/cleanup-environment.sh "${{ env.DOCKER_NETWORK_NAME }}"
   # 2. Initialize Swarm infrastructure
   initialize_swarm:
     needs: cleanup
@@ -116,40 +82,11 @@ jobs:
           fi
       - name: Setup Docker Network
         id: setup_network
-        run: |
-          # Check if network exists first
-          if ! sudo docker network ls | grep -q "${{ env.DOCKER_NETWORK_NAME }}"; then
-            echo "Creating overlay network ${{ env.DOCKER_NETWORK_NAME }}"
-            NETWORK_ID=$(sudo docker network create --driver overlay --attachable ${{ env.DOCKER_NETWORK_NAME }})
-            echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
-          else
-            echo "Network ${{ env.DOCKER_NETWORK_NAME }} already exists"
-            NETWORK_ID=$(sudo docker network ls --filter name=${{ env.DOCKER_NETWORK_NAME }} --format "{{.ID}}")
-            echo "network-id=$NETWORK_ID" >> $GITHUB_OUTPUT
-          fi
-          
-          # Verify network was created/exists and is overlay type
-          if ! sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }} --format "{{.Driver}}" | grep -q "overlay"; then
-            echo "::error::Network ${{ env.DOCKER_NETWORK_NAME }} is not an overlay network"
-            exit 1
-          fi
+        run: ./scripts/setup-network.sh "${{ env.DOCKER_NETWORK_NAME }}"
 
       - name: Label Worker Nodes
         if: needs.initialize_swarm.outputs.swarm-initialized == 'true' && runner.name == needs.initialize_swarm.outputs.manager-hostname
-        run: |
-          # Get all worker nodes
-          WORKER_NODES=($(sudo docker node ls --format '{{.Hostname}}' --filter role=worker))
-          FUZZERS=(restler wuppiefuzz evomaster)
-          
-          # Label each worker with a different fuzzer
-          for i in "${!WORKER_NODES[@]}"; do
-            if [ $i -lt ${#FUZZERS[@]} ]; then
-              WORKER="${WORKER_NODES[$i]}"
-              FUZZER="${FUZZERS[$i]}"
-              echo "Labeling worker node $WORKER for fuzzer $FUZZER"
-              sudo docker node update --label-add type=fuzzer --label-add fuzzer=$FUZZER "$WORKER"
-            fi
-          done
+        run: ./scripts/label-nodes.sh
   # 3. Configure Swarm Workers
   configure_workers:
     needs: initialize_swarm
@@ -180,9 +117,6 @@ jobs:
           # Ensure /var/lib/docker exists with correct permissions
           sudo mkdir -p /var/lib/docker
           sudo chmod 711 /var/lib/docker
-          
-          # Configure Docker daemon
-          sudo sed -i 's/^ExecStart=.*/ExecStart=\/usr\/bin\/dockerd -H fd:\/\/ --containerd=\/run\/containerd\/containerd.sock --iptables=true --ip-masq=true --ip-forward=true/' /lib/systemd/system/docker.service
           
           # Reload and restart Docker
           sudo systemctl daemon-reload
@@ -269,33 +203,7 @@ jobs:
         uses: actions/checkout@v4.0.0
 
       - name: Setup Local Registry
-        run: |
-          # Check if registry exists and is running
-          if ! sudo docker ps --filter "name=registry" --format '{{.Names}}' | grep -q "^registry$"; then
-            echo "Starting new registry container..."
-            sudo docker run -d \
-              --name registry \
-              --restart=always \
-              -v registry_data:/var/lib/registry \
-              -p 5000:5000 \
-              registry:2
-          else
-            echo "Registry container already running"
-          fi
-          
-          # Wait for registry to be ready
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:5000/v2/ > /dev/null; then
-              echo "Registry is ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Registry failed to start"
-              exit 1
-            fi
-            echo "Waiting for registry... ($i/30)"
-            sleep 1
-          done
+        run: ./scripts/setup-registry.sh
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -497,51 +405,7 @@ jobs:
               ;;
           esac
           
-          # Wait for VAmPI to be ready
-          echo "Waiting for VAmPI (${{ matrix.fuzzer }}) to be ready..."
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:$VAMPI_PORT/health > /dev/null; then
-              echo "VAmPI is ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "::error::VAmPI failed to become ready"
-              exit 1
-            fi
-            echo "Waiting for VAmPI... ($i/30)"
-            sleep 2
-          done
-          # Monitor fuzzing services
-          echo "Monitoring fuzzing services..."
-          TIMEOUT=3600  # 1 hour timeout
-          START_TIME=$(date +%s)
-          
-          while true; do
-            CURRENT_TIME=$(date +%s)
-            ELAPSED_TIME=$((CURRENT_TIME - START_TIME))
-            
-            if [ $ELAPSED_TIME -gt $TIMEOUT ]; then
-              echo "Fuzzing timeout reached"
-              break
-            fi
-            
-            # Check service status
-            if ! sudo docker stack services fuzzing-stack --format "{{.Name}} {{.Replicas}}"; then
-              echo "::error::Failed to get service status"
-              exit 1
-            fi
-            
-            # Check for completed fuzzing
-            COMPLETED_COUNT=$(sudo docker service logs fuzzing-stack_${{ matrix.fuzzer }} 2>&1 | grep -c "Fuzzing completed" || true)
-            
-            if [ $COMPLETED_COUNT -gt 0 ]; then
-              echo "Fuzzing completed successfully"
-              break
-            fi
-            
-            echo "Fuzzing in progress... (${ELAPSED_TIME}s elapsed)"
-            sleep 30
-          done
+          ./scripts/monitor-fuzzing.sh "${{ matrix.fuzzer }}" "$VAMPI_PORT" 3600
       - name: Collect Results
         run: |
           mkdir -p fuzzing_results/${{ matrix.fuzzer }}
