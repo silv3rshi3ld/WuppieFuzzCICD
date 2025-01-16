@@ -32,7 +32,9 @@ jobs:
     runs-on: [self-hosted, "${{ matrix.runner }}"]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Make Scripts Executable
         run: chmod +x ./scripts/*.sh
@@ -50,8 +52,10 @@ jobs:
       manager-hostname: ${{ steps.setup_swarm.outputs.manager-hostname }}
       swarm-initialized: ${{ steps.setup_swarm.outputs.swarm-initialized }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Count Active Runners
         id: count_runners
@@ -173,7 +177,9 @@ jobs:
     runs-on: [self-hosted, manager-runner]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Copy OpenAPI Specs to Volumes
         run: |
@@ -200,7 +206,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Local Registry
         run: ./scripts/setup-registry.sh
@@ -322,7 +330,9 @@ jobs:
     runs-on: [self-hosted, manager-runner]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4.0.0
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Create Stack File with Hash Tags
         run: |
