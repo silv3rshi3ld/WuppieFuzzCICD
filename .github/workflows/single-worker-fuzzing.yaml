@@ -2,9 +2,9 @@ name: Single Worker API Fuzzing
 
 on:
   push:
-    branches: [ main ]
+    branches: [ SingleWorker ]
   pull_request:
-    branches: [ main ]
+    branches: [ SingleWorker ]
 
 permissions:
   contents: read
