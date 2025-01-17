@@ -25,7 +25,22 @@ wait_for_deployment() {
     local timeout=300  # 5 minutes timeout
     
     echo "Waiting for deployment $deployment to be ready..."
-    kubectl wait --for=condition=available --timeout=${timeout}s deployment/$deployment -n $namespace
+    
+    # Pre-pull the image to ensure it's available
+    local image=$(kubectl get deployment $deployment -n $namespace -o jsonpath='{.spec.template.spec.containers[0].image}')
+    echo "Pre-pulling image: $image"
+    docker pull $image || echo "Warning: Failed to pre-pull image $image"
+    
+    # Wait for deployment with enhanced logging
+    kubectl wait --for=condition=available --timeout=${timeout}s deployment/$deployment -n $namespace || {
+        echo "Deployment $deployment failed to become ready. Checking pod status..."
+        kubectl get pods -n $namespace -l app=$deployment -o wide
+        echo "Checking pod logs..."
+        kubectl logs -n $namespace -l app=$deployment --tail=50
+        echo "Checking pod events..."
+        kubectl get events -n $namespace --field-selector involvedObject.kind=Pod,involvedObject.name=$deployment
+        return 1
+    }
 }
 
 # Main deployment function
