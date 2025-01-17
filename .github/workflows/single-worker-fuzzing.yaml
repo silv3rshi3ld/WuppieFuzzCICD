@@ -16,7 +16,6 @@ env:
   VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
   FUZZERS: restler wuppiefuzz evomaster
-  HEALTH_CHECK_TIMEOUT: 30
 
 jobs:
   fuzzing:
@@ -100,10 +99,8 @@ jobs:
             -e vulnerable=1 \
             vampi-vulnerable-evomaster:latest
 
-          # Wait for all VAmPI instances to be healthy
-          for PORT in ${{ env.VAMPI_RESTLER_PORT }} ${{ env.VAMPI_WUPPIEFUZZ_PORT }} ${{ env.VAMPI_EVOMASTER_PORT }}; do
-            timeout ${{ env.HEALTH_CHECK_TIMEOUT }} bash -c "until curl -s http://localhost:${PORT}/health > /dev/null; do sleep 1; done"
-          done
+          # Give services time to start up
+          sleep 10
 
       - name: Run Fuzzing Tests
         run: |
