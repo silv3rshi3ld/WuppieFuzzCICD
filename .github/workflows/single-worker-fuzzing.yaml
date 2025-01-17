@@ -26,6 +26,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Check Docker Configuration
+        run: |
+          chmod +x scripts/check-docker.sh
+          ./scripts/check-docker.sh
+
       - name: Cleanup Previous Runs
         run: |
           # Stop and remove any existing containers
