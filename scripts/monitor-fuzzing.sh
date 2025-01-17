@@ -12,7 +12,14 @@ echo "Waiting for VAmPI ($FUZZER) to be ready..."
 for i in $(seq 1 30); do
   if curl -s http://localhost:$VAMPI_PORT/health > /dev/null; then
     echo "VAmPI is ready"
-    break
+    # Initialize the database
+    if curl -s -X GET http://localhost:$VAMPI_PORT/createdb > /dev/null; then
+      echo "Database initialized successfully"
+      break
+    else
+      echo "::error::Failed to initialize database"
+      exit 1
+    fi
   fi
   if [ $i -eq 30 ]; then
     echo "::error::VAmPI failed to become ready"
