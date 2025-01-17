@@ -19,10 +19,6 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
-
-    - name: Set up local registry
-      run: |
-        docker run -d -p 5000:5000 --restart=always --name registry registry:2
         
     - name: Install kubectl
       uses: azure/setup-kubectl@v3
@@ -34,20 +30,22 @@ jobs:
       with:
         driver: docker
         kubernetes-version: stable
+        start: true
         
-    - name: Build and push Vampi images
+    - name: Switch to Minikube Docker env
       run: |
-        # Build and push Restler variant
-        docker build -t localhost:5000/vampi-vulnerable-restler:latest -f services/vampi/Dockerfile services/vampi
-        docker push localhost:5000/vampi-vulnerable-restler:latest
+        eval $(minikube docker-env)
         
-        # Build and push Wuppiefuzz variant
-        docker build -t localhost:5000/vampi-vulnerable-wuppiefuzz:latest -f services/vampi/Dockerfile services/vampi
-        docker push localhost:5000/vampi-vulnerable-wuppiefuzz:latest
+    - name: Build Vampi images
+      run: |
+        # Build Restler variant
+        docker build -t vampi-vulnerable-restler:latest -f services/vampi/Dockerfile services/vampi
         
-        # Build and push Evomaster variant
-        docker build -t localhost:5000/vampi-vulnerable-evomaster:latest -f services/vampi/Dockerfile services/vampi
-        docker push localhost:5000/vampi-vulnerable-evomaster:latest
+        # Build Wuppiefuzz variant
+        docker build -t vampi-vulnerable-wuppiefuzz:latest -f services/vampi/Dockerfile services/vampi
+        
+        # Build Evomaster variant
+        docker build -t vampi-vulnerable-evomaster:latest -f services/vampi/Dockerfile services/vampi
 
     - name: Deploy to Kubernetes
       run: |

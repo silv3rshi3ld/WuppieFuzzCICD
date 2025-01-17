@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: vampi-restler
-        image: localhost:5000/vampi-vulnerable-restler:latest
-        imagePullPolicy: Always
+        image: vampi-vulnerable-restler:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 5000
         env:

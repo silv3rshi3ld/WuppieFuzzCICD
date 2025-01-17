@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: vampi-evomaster
-        image: localhost:5000/vampi-vulnerable-evomaster:latest
-        imagePullPolicy: Always
+        image: vampi-vulnerable-evomaster:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 5000
         env:
@@ -35,14 +35,18 @@ spec:
           httpGet:
             path: /health
             port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /health
             port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 10
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
