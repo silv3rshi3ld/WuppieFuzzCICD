@@ -1,0 +1,134 @@
+name: Kubernetes Fuzzing Workflow
+
+on:
+  push:
+    branches: [ Experiment-kubernetes ]
+  pull_request:
+    branches: [ Experiment-kubernetes ]
+  workflow_dispatch:
+
+jobs:
+  check-cluster:
+    runs-on: ubuntu-latest
+    outputs:
+      cluster-ready: ${{ steps.check.outputs.ready }}
+    
+    steps:
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Set up Minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        driver: docker
+        kubernetes-version: stable
+        
+    - name: Check cluster status
+      id: check
+      run: |
+        if kubectl get namespace fuzzing-system &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-restler &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-wuppiefuzz &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-evomaster &>/dev/null; then
+          echo "ready=true" >> $GITHUB_OUTPUT
+        else
+          echo "ready=false" >> $GITHUB_OUTPUT
+        fi
+
+  deploy:
+    needs: check-cluster
+    if: needs.check-cluster.outputs.cluster-ready == 'false'
+    uses: ./.github/workflows/k8s-deployment-workflow.yaml
+
+  fuzzing:
+    needs: [check-cluster, deploy]
+    if: |
+      always() && 
+      (needs.check-cluster.outputs.cluster-ready == 'true' || 
+       (needs.deploy.result == 'success' && needs.check-cluster.outputs.cluster-ready == 'false'))
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Set up local registry
+      run: |
+        docker run -d -p 5000:5000 --restart=always --name registry registry:2
+        
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Set up Minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        driver: docker
+        kubernetes-version: stable
+        
+    - name: Wait for services
+      run: |
+        echo "Waiting for VAmPI services to be ready..."
+        kubectl wait --for=condition=ready pods -l app=vampi-restler -n fuzzing-system --timeout=300s
+        kubectl wait --for=condition=ready pods -l app=vampi-wuppiefuzz -n fuzzing-system --timeout=300s
+        kubectl wait --for=condition=ready pods -l app=vampi-evomaster -n fuzzing-system --timeout=300s
+        
+    - name: Build fuzzer images
+      run: |
+        # Build and push Restler
+        docker build -t localhost:5000/restler:latest -f services/restler/Dockerfile.restler services/restler
+        docker push localhost:5000/restler:latest
+        
+        # Build and push Wuppiefuzz
+        docker build -t localhost:5000/wuppiefuzz:latest -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz
+        docker push localhost:5000/wuppiefuzz:latest
+        
+        # Build and push Evomaster
+        docker build -t localhost:5000/evomaster:latest -f services/evomaster/Dockerfile.evomaster services/evomaster
+        docker push localhost:5000/evomaster:latest
+
+    - name: Deploy fuzzer jobs
+      run: |
+        kubectl apply -f k8s/fuzzer-jobs.yaml
+        
+    - name: Wait for fuzzer jobs
+      run: |
+        echo "Waiting for fuzzer jobs to complete..."
+        for job in restler-fuzzer wuppiefuzz-fuzzer evomaster-fuzzer; do
+          kubectl wait --for=condition=complete --timeout=1800s job/$job -n fuzzing-system || {
+            echo "Job $job failed or timed out"
+            kubectl describe job/$job -n fuzzing-system
+            exit 1
+          }
+        done
+
+    - name: Monitor fuzzing progress
+      run: |
+        ./scripts/monitor-k8s.sh
+        
+    - name: Collect fuzzing results
+      if: always()
+      run: |
+        mkdir -p fuzzing-results
+        for fuzzer in restler wuppiefuzz evomaster; do
+          kubectl logs -n fuzzing-system job/$fuzzer-fuzzer > fuzzing-results/$fuzzer-results.log || true
+        done
+        
+    - name: Upload fuzzing results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: fuzzing-results
+        path: fuzzing-results/
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        kubectl delete namespace fuzzing-system --ignore-not-found

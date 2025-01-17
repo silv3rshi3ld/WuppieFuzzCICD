@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: restler-fuzzer
+  namespace: fuzzing-system
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: restler
+        image: localhost:5000/restler:latest
+        env:
+        - name: TARGET_API
+          value: "http://vampi-restler:5012"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wuppiefuzz-fuzzer
+  namespace: fuzzing-system
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: wuppiefuzz
+        image: localhost:5000/wuppiefuzz:latest
+        env:
+        - name: TARGET_API
+          value: "http://vampi-wuppiefuzz:5022"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: evomaster-fuzzer
+  namespace: fuzzing-system
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+      - name: evomaster
+        image: localhost:5000/evomaster:latest
+        env:
+        - name: TARGET_API
+          value: "http://vampi-evomaster:5032"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      restartPolicy: Never

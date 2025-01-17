@@ -1,0 +1,95 @@
+name: Kubernetes Deployment Workflow
+
+on:
+  push:
+    branches: [ Experiment-kubernetes ]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      deployment-status: ${{ steps.verify.outputs.status }}
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Set up local registry
+      run: |
+        docker run -d -p 5000:5000 --restart=always --name registry registry:2
+        
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Set up Minikube
+      uses: medyagh/setup-minikube@master
+      with:
+        driver: docker
+        kubernetes-version: stable
+        
+    - name: Build and push Vampi images
+      run: |
+        # Build and push Restler variant
+        docker build -t localhost:5000/vampi-vulnerable-restler:latest -f services/vampi/Dockerfile services/vampi
+        docker push localhost:5000/vampi-vulnerable-restler:latest
+        
+        # Build and push Wuppiefuzz variant
+        docker build -t localhost:5000/vampi-vulnerable-wuppiefuzz:latest -f services/vampi/Dockerfile services/vampi
+        docker push localhost:5000/vampi-vulnerable-wuppiefuzz:latest
+        
+        # Build and push Evomaster variant
+        docker build -t localhost:5000/vampi-vulnerable-evomaster:latest -f services/vampi/Dockerfile services/vampi
+        docker push localhost:5000/vampi-vulnerable-evomaster:latest
+
+    - name: Deploy to Kubernetes
+      run: |
+        # Create namespace
+        kubectl apply -f k8s/namespace.yaml
+        
+        # Apply network policy
+        kubectl apply -f k8s/network-policy.yaml
+        
+        # Deploy services
+        kubectl apply -f k8s/vampi-restler.yaml
+        kubectl apply -f k8s/vampi-wuppiefuzz.yaml
+        kubectl apply -f k8s/vampi-evomaster.yaml
+        
+        # Wait for deployments to be ready
+        kubectl wait --for=condition=available --timeout=300s deployment/vampi-restler -n fuzzing-system
+        kubectl wait --for=condition=available --timeout=300s deployment/vampi-wuppiefuzz -n fuzzing-system
+        kubectl wait --for=condition=available --timeout=300s deployment/vampi-evomaster -n fuzzing-system
+        
+    - name: Verify deployment
+      id: verify
+      run: |
+        echo "Checking deployment status..."
+        kubectl get all -n fuzzing-system
+        
+        echo "Checking service endpoints..."
+        kubectl get services -n fuzzing-system
+        
+        echo "Checking pod logs..."
+        for pod in $(kubectl get pods -n fuzzing-system -o name); do
+          echo "Logs for $pod:"
+          kubectl logs -n fuzzing-system $pod
+        done
+        
+        # Verify all components are ready
+        if kubectl get namespace fuzzing-system &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-restler &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-wuppiefuzz &>/dev/null && \
+           kubectl get pods -n fuzzing-system -l app=vampi-evomaster &>/dev/null && \
+           [[ $(kubectl get pods -n fuzzing-system -o jsonpath='{.items[*].status.phase}' | tr ' ' '\n' | grep -v "Running" | wc -l) -eq 0 ]]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "status=failure" >> $GITHUB_OUTPUT
+          exit 1
+        fi
