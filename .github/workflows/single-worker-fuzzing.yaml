@@ -26,30 +26,53 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Setup Docker Permissions
+        run: |
+          echo "Setting up Docker permissions..."
+          sudo usermod -aG docker $USER
+          sudo systemctl restart docker
+          # Verify docker group membership
+          groups $USER
+        shell: bash
+
       - name: Check Docker Configuration
         run: |
           chmod +x scripts/check-docker.sh
           ./scripts/check-docker.sh
+        shell: bash
 
       - name: Cleanup Previous Runs
         run: |
-          # Stop and remove any existing containers with error handling
-          containers=$(docker ps -aq) || true
-          if [ ! -z "$containers" ]; then
-            docker stop $containers || true
-            docker rm -f $containers || true
-          fi
-          # Remove existing network if it exists
+          echo "Starting Docker cleanup..."
+          
+          echo "Stopping all running containers..."
+          docker ps -q | xargs -r docker stop || true
+          
+          echo "Removing all containers..."
+          docker ps -aq | xargs -r docker rm -f || true
+          
+          echo "Removing existing Docker network..."
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          # Cleanup any leftover volumes
+          
+          echo "Pruning unused Docker volumes..."
           docker volume prune -f || true
+          
+          echo "Pruning unused Docker networks..."
+          docker network prune -f || true
+          
+          echo "Cleanup completed successfully."
+        shell: bash
 
       - name: Create Docker Network
         run: |
+          echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
           docker network create ${{ env.DOCKER_NETWORK_NAME }}
+          echo "Network created successfully."
+        shell: bash
 
       - name: Build VAmPI Images
         run: |
+          echo "Building VAmPI images for each fuzzer..."
           # Build separate VAmPI instances for each fuzzer
           for FUZZER in ${{ env.FUZZERS }}; do
             docker build \
@@ -61,6 +84,7 @@ jobs:
 
       - name: Build Fuzzer Images
         run: |
+          echo "Building fuzzer images..."
           # Build WuppieFuzz
           git clone https://github.com/TNO-S3/WuppieFuzz.git temp_wuppiefuzz
           cp -r temp_wuppiefuzz/* services/wuppiefuzz/
@@ -84,6 +108,7 @@ jobs:
 
       - name: Start VAmPI Containers
         run: |
+          echo "Starting VAmPI containers..."
           # Start VAmPI for RESTler
           docker run -d \
             --name vampi-restler \
@@ -113,6 +138,7 @@ jobs:
 
       - name: Run Fuzzing Tests
         run: |
+          echo "Starting fuzzing tests..."
           # Create volumes for results
           docker volume create restler_output
           docker volume create wuppiefuzz_output
@@ -146,7 +172,9 @@ jobs:
             http://vampi-evomaster:5000 /specs/openapi3.yml
 
       - name: Collect Results
+        if: success()
         run: |
+          echo "Collecting fuzzing results..."
           mkdir -p fuzzing_results
           
           # Copy results from each fuzzer's volume
@@ -168,15 +196,23 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Stop and remove containers with error handling
-          containers=$(docker ps -aq) || true
-          if [ ! -z "$containers" ]; then
-            docker stop $containers || true
-            docker rm -f $containers || true
-          fi
-          # Remove network
+          echo "Starting final cleanup..."
+          
+          echo "Stopping and removing all containers..."
+          docker ps -q | xargs -r docker stop || true
+          docker ps -aq | xargs -r docker rm -f || true
+          
+          echo "Removing Docker network..."
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          # Remove volumes with error handling
+          
+          echo "Removing fuzzer output volumes..."
           for volume in restler_output wuppiefuzz_output evomaster_output; do
+            echo "Removing volume: $volume"
             docker volume rm $volume || true
           done
+          
+          echo "Pruning unused Docker resources..."
+          docker system prune -f || true
+          
+          echo "Cleanup completed."
+        shell: bash
