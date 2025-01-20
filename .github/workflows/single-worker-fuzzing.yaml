@@ -33,12 +33,16 @@ jobs:
 
       - name: Cleanup Previous Runs
         run: |
-          # Stop and remove any existing containers
-          docker ps -aq | xargs -r docker rm -f
+          # Stop and remove any existing containers with error handling
+          containers=$(docker ps -aq) || true
+          if [ ! -z "$containers" ]; then
+            docker stop $containers || true
+            docker rm -f $containers || true
+          fi
           # Remove existing network if it exists
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           # Cleanup any leftover volumes
-          docker volume prune -f
+          docker volume prune -f || true
 
       - name: Create Docker Network
         run: |
@@ -119,9 +123,9 @@ jobs:
             --name restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v restler_output:/results \
-            -v ${{ github.workspace }}/services/vampi/openapi_specs:/specs \
+            -v ${{ github.workspace }}/services/vampi/openapi_specs:/workspace \
             restler:latest \
-            http://vampi-restler:5000 /specs/openapi3.yml
+            http://vampi-restler:5000 /workspace/openapi3.yml
 
           # Run WuppieFuzz
           docker run --rm \
@@ -164,9 +168,15 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Stop and remove containers
-          docker ps -aq | xargs -r docker rm -f
+          # Stop and remove containers with error handling
+          containers=$(docker ps -aq) || true
+          if [ ! -z "$containers" ]; then
+            docker stop $containers || true
+            docker rm -f $containers || true
+          fi
           # Remove network
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          # Remove volumes
-          docker volume rm restler_output wuppiefuzz_output evomaster_output || true
+          # Remove volumes with error handling
+          for volume in restler_output wuppiefuzz_output evomaster_output; do
+            docker volume rm $volume || true
+          done
