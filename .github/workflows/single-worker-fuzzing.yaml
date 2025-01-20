@@ -23,7 +23,7 @@ env:
 
 jobs:
   fuzzing:
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -36,66 +36,39 @@ jobs:
           ./scripts/check-docker.sh
         shell: bash
 
-      - name: Cleanup Previous Runs
-        run: |
-          echo "Starting Docker cleanup..."
-          
-          echo "Forcefully removing specific containers if they exist..."
-          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
-            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER}\$"; then
-              sudo docker rm -f ${CONTAINER}
-            fi
-          done
-          
-          echo "Stopping all running containers..."
-          sudo docker ps -q | xargs -r sudo docker stop || true
-          
-          echo "Removing all containers..."
-          sudo docker ps -aq | xargs -r sudo docker rm -f || true
-          
-          echo "Removing existing Docker network..."
-          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          
-          echo "Pruning unused Docker volumes..."
-          sudo docker volume prune -f || true
-          
-          echo "Pruning unused Docker networks..."
-          sudo docker network prune -f || true
-          
-          echo "Cleanup completed successfully."
-        shell: bash
-
-      - name: Verify Cleanup
-        run: |
-          echo "Verifying Docker containers are removed..."
-          sudo docker ps -a
-        shell: bash
-
       - name: Create Docker Network
         run: |
           echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
-          if sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
-            echo "Network exists, removing it first..."
-            sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }}
-          fi
-          sudo docker network create ${{ env.DOCKER_NETWORK_NAME }}
+          docker network create ${{ env.DOCKER_NETWORK_NAME }}
           echo "Network created successfully."
+        shell: bash
+
+      - name: Build VAmPI Images
+        run: |
+          echo "Building VAmPI images..."
+          
+          # Build VAmPI for RESTler
+          docker build -t vampi-vulnerable-restler:latest \
+            --build-arg PORT=${{ env.VAMPI_RESTLER_PORT }} \
+            -f services/vampi/Dockerfile services/vampi/
+          
+          # Build VAmPI for WuppieFuzz
+          docker build -t vampi-vulnerable-wuppiefuzz:latest \
+            --build-arg PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }} \
+            -f services/vampi/Dockerfile services/vampi/
+          
+          # Build VAmPI for EvoMaster
+          docker build -t vampi-vulnerable-evomaster:latest \
+            --build-arg PORT=${{ env.VAMPI_EVOMASTER_PORT }} \
+            -f services/vampi/Dockerfile services/vampi/
         shell: bash
 
       - name: Start VAmPI Containers
         run: |
           echo "Starting VAmPI containers..."
           
-          # Ensure no existing containers with the same names are running
-          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
-            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER}\$"; then
-              echo "Removing existing container: ${CONTAINER}"
-              sudo docker rm -f ${CONTAINER}
-            fi
-          done
-          
           # Start VAmPI for RESTler
-          sudo docker run -d \
+          docker run -d \
             --name vampi-restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_RESTLER_PORT }}:5000 \
@@ -103,7 +76,7 @@ jobs:
             vampi-vulnerable-restler:latest
 
           # Start VAmPI for WuppieFuzz
-          sudo docker run -d \
+          docker run -d \
             --name vampi-wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_WUPPIEFUZZ_PORT }}:5000 \
@@ -111,7 +84,7 @@ jobs:
             vampi-vulnerable-wuppiefuzz:latest
 
           # Start VAmPI for EvoMaster
-          sudo docker run -d \
+          docker run -d \
             --name vampi-evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_EVOMASTER_PORT }}:5000 \
@@ -121,3 +94,90 @@ jobs:
           echo "Waiting for services to start..."
           sleep 10
         shell: bash
+
+      - name: Build Fuzzer Images
+        run: |
+          echo "Building fuzzer images..."
+          
+          # Build RESTler
+          docker build -t restler-fuzzer:latest \
+            -f services/restler/Dockerfile.restler services/restler/
+          
+          # Build WuppieFuzz
+          docker build -t wuppiefuzz:latest \
+            -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
+          
+          # Build EvoMaster
+          docker build -t evomaster:latest \
+            -f services/evomaster/Dockerfile.evomaster services/evomaster/
+        shell: bash
+
+      - name: Run Fuzzing Tests
+        run: |
+          echo "Starting fuzzing tests..."
+          
+          # Create results directory
+          mkdir -p ${{ env.BASE_DIR }}/results
+          
+          # Run RESTler
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/results:/results \
+            restler-fuzzer:latest \
+            --target_ip vampi-restler \
+            --target_port 5000 \
+            --time_budget 1h
+          
+          # Run WuppieFuzz
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/results:/results \
+            wuppiefuzz:latest \
+            --target http://vampi-wuppiefuzz:5000 \
+            --duration 1h
+          
+          # Run EvoMaster
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/results:/results \
+            evomaster:latest \
+            --targetHost vampi-evomaster \
+            --targetPort 5000 \
+            --maxTime 1h
+        shell: bash
+
+      - name: Upload Fuzzing Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-results
+          path: ${{ env.BASE_DIR }}/results
+          retention-days: 14
+
+      - name: Process Results
+        run: |
+          echo "Processing fuzzing results..."
+          
+          # Check for any discovered vulnerabilities
+          if find ${{ env.BASE_DIR }}/results -type f -exec grep -l "vulnerability" {} \; | grep -q .; then
+            echo "::warning ::Potential vulnerabilities found in fuzzing results"
+          fi
+          
+          # Generate summary report
+          echo "### Fuzzing Test Summary" > ${{ env.BASE_DIR }}/results/summary.md
+          echo "Results for each fuzzer:" >> ${{ env.BASE_DIR }}/results/summary.md
+          
+          for FUZZER in ${{ env.FUZZERS }}; do
+            echo "#### $FUZZER" >> ${{ env.BASE_DIR }}/results/summary.md
+            if [ -d "${{ env.BASE_DIR }}/results/$FUZZER" ]; then
+              find "${{ env.BASE_DIR }}/results/$FUZZER" -type f -name "*.json" -exec cat {} \; | \
+                jq -r '. | select(.type=="finding") | "- " + .description' >> ${{ env.BASE_DIR }}/results/summary.md
+            fi
+          done
+        shell: bash
+
+      - name: Upload Summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-summary
+          path: ${{ env.BASE_DIR }}/results/summary.md
+          retention-days: 14
