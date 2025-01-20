@@ -26,15 +26,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Setup Docker Permissions
-        run: |
-          echo "Setting up Docker permissions..."
-          sudo usermod -aG docker $USER
-          sudo systemctl restart docker
-          # Verify docker group membership
-          groups $USER
-        shell: bash
-
       - name: Check Docker Configuration
         run: |
           chmod +x scripts/check-docker.sh
@@ -45,20 +36,25 @@ jobs:
         run: |
           echo "Starting Docker cleanup..."
           
+          echo "Disconnecting containers from network..."
+          for container in $(sudo docker ps -q); do
+            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
+          done
+          
           echo "Stopping all running containers..."
-          docker ps -q | xargs -r docker stop || true
+          sudo docker ps -q | xargs -r sudo docker stop || true
           
           echo "Removing all containers..."
-          docker ps -aq | xargs -r docker rm -f || true
+          sudo docker ps -aq | xargs -r sudo docker rm -f || true
           
           echo "Removing existing Docker network..."
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           
           echo "Pruning unused Docker volumes..."
-          docker volume prune -f || true
+          sudo docker volume prune -f || true
           
           echo "Pruning unused Docker networks..."
-          docker network prune -f || true
+          sudo docker network prune -f || true
           
           echo "Cleanup completed successfully."
         shell: bash
@@ -66,7 +62,11 @@ jobs:
       - name: Create Docker Network
         run: |
           echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
-          docker network create ${{ env.DOCKER_NETWORK_NAME }}
+          if sudo docker network inspect ${{ env.DOCKER_NETWORK_NAME }} >/dev/null 2>&1; then
+            echo "Network exists, removing it first..."
+            sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }}
+          fi
+          sudo docker network create ${{ env.DOCKER_NETWORK_NAME }}
           echo "Network created successfully."
         shell: bash
 
@@ -75,7 +75,7 @@ jobs:
           echo "Building VAmPI images for each fuzzer..."
           # Build separate VAmPI instances for each fuzzer
           for FUZZER in ${{ env.FUZZERS }}; do
-            docker build \
+            sudo docker build \
               --file services/vampi/Dockerfile \
               --build-arg vulnerable=1 \
               --tag vampi-vulnerable-${FUZZER}:latest \
@@ -88,20 +88,20 @@ jobs:
           # Build WuppieFuzz
           git clone https://github.com/TNO-S3/WuppieFuzz.git temp_wuppiefuzz
           cp -r temp_wuppiefuzz/* services/wuppiefuzz/
-          docker build \
+          sudo docker build \
             --file services/wuppiefuzz/Dockerfile.wuppiefuzz \
             --tag wuppiefuzz:latest \
             services/wuppiefuzz/
           rm -rf temp_wuppiefuzz
 
           # Build RESTler
-          docker build \
+          sudo docker build \
             --file services/restler/Dockerfile.restler \
             --tag restler:latest \
             services/restler/
 
           # Build EvoMaster
-          docker build \
+          sudo docker build \
             --file services/evomaster/Dockerfile.evomaster \
             --tag evomaster:latest \
             services/evomaster/
@@ -110,7 +110,7 @@ jobs:
         run: |
           echo "Starting VAmPI containers..."
           # Start VAmPI for RESTler
-          docker run -d \
+          sudo docker run -d \
             --name vampi-restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_RESTLER_PORT }}:5000 \
@@ -118,7 +118,7 @@ jobs:
             vampi-vulnerable-restler:latest
 
           # Start VAmPI for WuppieFuzz
-          docker run -d \
+          sudo docker run -d \
             --name vampi-wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_WUPPIEFUZZ_PORT }}:5000 \
@@ -126,26 +126,26 @@ jobs:
             vampi-vulnerable-wuppiefuzz:latest
 
           # Start VAmPI for EvoMaster
-          docker run -d \
+          sudo docker run -d \
             --name vampi-evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_EVOMASTER_PORT }}:5000 \
             -e vulnerable=1 \
             vampi-vulnerable-evomaster:latest
 
-          # Give services time to start up
+          echo "Waiting for services to start..."
           sleep 10
 
       - name: Run Fuzzing Tests
         run: |
           echo "Starting fuzzing tests..."
           # Create volumes for results
-          docker volume create restler_output
-          docker volume create wuppiefuzz_output
-          docker volume create evomaster_output
+          sudo docker volume create restler_output
+          sudo docker volume create wuppiefuzz_output
+          sudo docker volume create evomaster_output
 
           # Run RESTler
-          docker run --rm \
+          sudo docker run --rm \
             --name restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v restler_output:/results \
@@ -154,7 +154,7 @@ jobs:
             http://vampi-restler:5000 /workspace/openapi3.yml
 
           # Run WuppieFuzz
-          docker run --rm \
+          sudo docker run --rm \
             --name wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v wuppiefuzz_output:/results \
@@ -163,7 +163,7 @@ jobs:
             http://vampi-wuppiefuzz:5000 /specs/openapi3.yml
 
           # Run EvoMaster
-          docker run --rm \
+          sudo docker run --rm \
             --name evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v evomaster_output:/results \
@@ -175,16 +175,19 @@ jobs:
         if: success()
         run: |
           echo "Collecting fuzzing results..."
-          mkdir -p fuzzing_results
+          sudo mkdir -p fuzzing_results
           
           # Copy results from each fuzzer's volume
           for FUZZER in ${{ env.FUZZERS }}; do
-            mkdir -p fuzzing_results/${FUZZER}
-            docker run --rm \
+            sudo mkdir -p fuzzing_results/${FUZZER}
+            sudo docker run --rm \
               -v ${FUZZER}_output:/results \
               -v ${{ github.workspace }}/fuzzing_results/${FUZZER}:/output \
               alpine cp -r /results/* /output/
           done
+          
+          # Fix permissions on results directory
+          sudo chown -R $USER:$USER fuzzing_results
 
       - name: Upload Results
         uses: actions/upload-artifact@v4
@@ -198,21 +201,26 @@ jobs:
         run: |
           echo "Starting final cleanup..."
           
+          echo "Disconnecting containers from network..."
+          for container in $(sudo docker ps -q); do
+            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
+          done
+          
           echo "Stopping and removing all containers..."
-          docker ps -q | xargs -r docker stop || true
-          docker ps -aq | xargs -r docker rm -f || true
+          sudo docker ps -q | xargs -r sudo docker stop || true
+          sudo docker ps -aq | xargs -r sudo docker rm -f || true
           
           echo "Removing Docker network..."
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           
           echo "Removing fuzzer output volumes..."
           for volume in restler_output wuppiefuzz_output evomaster_output; do
             echo "Removing volume: $volume"
-            docker volume rm $volume || true
+            sudo docker volume rm $volume || true
           done
           
           echo "Pruning unused Docker resources..."
-          docker system prune -f || true
+          sudo docker system prune -f || true
           
           echo "Cleanup completed."
         shell: bash
