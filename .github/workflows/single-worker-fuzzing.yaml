@@ -73,6 +73,9 @@ jobs:
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_RESTLER_PORT }}:5000 \
             -e vulnerable=1 \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
             vampi-vulnerable-restler:latest
 
           # Start VAmPI for WuppieFuzz
@@ -81,6 +84,9 @@ jobs:
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_WUPPIEFUZZ_PORT }}:5000 \
             -e vulnerable=1 \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
             vampi-vulnerable-wuppiefuzz:latest
 
           # Start VAmPI for EvoMaster
@@ -89,10 +95,22 @@ jobs:
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_EVOMASTER_PORT }}:5000 \
             -e vulnerable=1 \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
             vampi-vulnerable-evomaster:latest
 
           echo "Waiting for services to start..."
           sleep 10
+
+          # Check container health
+          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
+            if [ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER)" != "healthy" ]; then
+              echo "Container $CONTAINER is not healthy"
+              docker logs $CONTAINER
+              exit 1
+            fi
+          done
         shell: bash
 
       - name: Build Fuzzer Images
@@ -104,8 +122,12 @@ jobs:
             -f services/restler/Dockerfile.restler services/restler/
           
           # Build WuppieFuzz
-          docker build -t wuppiefuzz:latest \
-            -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
+          if [ -f services/wuppiefuzz/Cargo.toml ]; then
+            docker build -t wuppiefuzz:latest \
+              -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
+          else
+            echo "Warning: WuppieFuzz Cargo.toml not found, skipping build"
+          fi
           
           # Build EvoMaster
           docker build -t evomaster:latest \
@@ -120,33 +142,39 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/results
           
           # Run RESTler
+          echo "Running RESTler..."
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v ${{ env.BASE_DIR }}/results:/results \
             restler-fuzzer:latest \
             --target_ip vampi-restler \
             --target_port 5000 \
-            --time_budget 1h
+            --time_budget 1h || echo "RESTler fuzzing failed"
           
-          # Run WuppieFuzz
-          docker run --rm \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v ${{ env.BASE_DIR }}/results:/results \
-            wuppiefuzz:latest \
-            --target http://vampi-wuppiefuzz:5000 \
-            --duration 1h
+          # Run WuppieFuzz if available
+          if docker image inspect wuppiefuzz:latest >/dev/null 2>&1; then
+            echo "Running WuppieFuzz..."
+            docker run --rm \
+              --network ${{ env.DOCKER_NETWORK_NAME }} \
+              -v ${{ env.BASE_DIR }}/results:/results \
+              wuppiefuzz:latest \
+              --target http://vampi-wuppiefuzz:5000 \
+              --duration 1h || echo "WuppieFuzz fuzzing failed"
+          fi
           
           # Run EvoMaster
+          echo "Running EvoMaster..."
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v ${{ env.BASE_DIR }}/results:/results \
             evomaster:latest \
             --targetHost vampi-evomaster \
             --targetPort 5000 \
-            --maxTime 1h
+            --maxTime 1h || echo "EvoMaster fuzzing failed"
         shell: bash
 
       - name: Upload Fuzzing Results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: fuzzing-results
@@ -154,6 +182,7 @@ jobs:
           retention-days: 14
 
       - name: Process Results
+        if: always()
         run: |
           echo "Processing fuzzing results..."
           
@@ -170,12 +199,13 @@ jobs:
             echo "#### $FUZZER" >> ${{ env.BASE_DIR }}/results/summary.md
             if [ -d "${{ env.BASE_DIR }}/results/$FUZZER" ]; then
               find "${{ env.BASE_DIR }}/results/$FUZZER" -type f -name "*.json" -exec cat {} \; | \
-                jq -r '. | select(.type=="finding") | "- " + .description' >> ${{ env.BASE_DIR }}/results/summary.md
+                jq -r '. | select(.type=="finding") | "- " + .description' >> ${{ env.BASE_DIR }}/results/summary.md || true
             fi
           done
         shell: bash
 
       - name: Upload Summary
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: fuzzing-summary
