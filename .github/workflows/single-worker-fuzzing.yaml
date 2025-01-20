@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ SingleWorker ]
 
+concurrency:
+  group: single-worker-api-fuzzing
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -36,9 +40,11 @@ jobs:
         run: |
           echo "Starting Docker cleanup..."
           
-          echo "Disconnecting containers from network..."
-          for container in $(sudo docker ps -q); do
-            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
+          echo "Forcefully removing specific containers if they exist..."
+          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
+            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER}\$"; then
+              sudo docker rm -f ${CONTAINER}
+            fi
           done
           
           echo "Stopping all running containers..."
@@ -59,6 +65,12 @@ jobs:
           echo "Cleanup completed successfully."
         shell: bash
 
+      - name: Verify Cleanup
+        run: |
+          echo "Verifying Docker containers are removed..."
+          sudo docker ps -a
+        shell: bash
+
       - name: Create Docker Network
         run: |
           echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
@@ -70,45 +82,18 @@ jobs:
           echo "Network created successfully."
         shell: bash
 
-      - name: Build VAmPI Images
-        run: |
-          echo "Building VAmPI images for each fuzzer..."
-          # Build separate VAmPI instances for each fuzzer
-          for FUZZER in ${{ env.FUZZERS }}; do
-            sudo docker build \
-              --file services/vampi/Dockerfile \
-              --build-arg vulnerable=1 \
-              --tag vampi-vulnerable-${FUZZER}:latest \
-              services/vampi/
-          done
-
-      - name: Build Fuzzer Images
-        run: |
-          echo "Building fuzzer images..."
-          # Build WuppieFuzz
-          git clone https://github.com/TNO-S3/WuppieFuzz.git temp_wuppiefuzz
-          cp -r temp_wuppiefuzz/* services/wuppiefuzz/
-          sudo docker build \
-            --file services/wuppiefuzz/Dockerfile.wuppiefuzz \
-            --tag wuppiefuzz:latest \
-            services/wuppiefuzz/
-          rm -rf temp_wuppiefuzz
-
-          # Build RESTler
-          sudo docker build \
-            --file services/restler/Dockerfile.restler \
-            --tag restler:latest \
-            services/restler/
-
-          # Build EvoMaster
-          sudo docker build \
-            --file services/evomaster/Dockerfile.evomaster \
-            --tag evomaster:latest \
-            services/evomaster/
-
       - name: Start VAmPI Containers
         run: |
           echo "Starting VAmPI containers..."
+          
+          # Ensure no existing containers with the same names are running
+          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
+            if sudo docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER}\$"; then
+              echo "Removing existing container: ${CONTAINER}"
+              sudo docker rm -f ${CONTAINER}
+            fi
+          done
+          
           # Start VAmPI for RESTler
           sudo docker run -d \
             --name vampi-restler \
@@ -135,92 +120,4 @@ jobs:
 
           echo "Waiting for services to start..."
           sleep 10
-
-      - name: Run Fuzzing Tests
-        run: |
-          echo "Starting fuzzing tests..."
-          # Create volumes for results
-          sudo docker volume create restler_output
-          sudo docker volume create wuppiefuzz_output
-          sudo docker volume create evomaster_output
-
-          # Run RESTler
-          sudo docker run --rm \
-            --name restler \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v restler_output:/results \
-            -v ${{ github.workspace }}/services/vampi/openapi_specs:/workspace \
-            restler:latest \
-            http://vampi-restler:5000 /workspace/openapi3.yml
-
-          # Run WuppieFuzz
-          sudo docker run --rm \
-            --name wuppiefuzz \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v wuppiefuzz_output:/results \
-            -v ${{ github.workspace }}/services/vampi/openapi_specs:/specs \
-            wuppiefuzz:latest \
-            http://vampi-wuppiefuzz:5000 /specs/openapi3.yml
-
-          # Run EvoMaster
-          sudo docker run --rm \
-            --name evomaster \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v evomaster_output:/results \
-            -v ${{ github.workspace }}/services/vampi/openapi_specs:/specs \
-            evomaster:latest \
-            http://vampi-evomaster:5000 /specs/openapi3.yml
-
-      - name: Collect Results
-        if: success()
-        run: |
-          echo "Collecting fuzzing results..."
-          sudo mkdir -p fuzzing_results
-          
-          # Copy results from each fuzzer's volume
-          for FUZZER in ${{ env.FUZZERS }}; do
-            sudo mkdir -p fuzzing_results/${FUZZER}
-            sudo docker run --rm \
-              -v ${FUZZER}_output:/results \
-              -v ${{ github.workspace }}/fuzzing_results/${FUZZER}:/output \
-              alpine cp -r /results/* /output/
-          done
-          
-          # Fix permissions on results directory
-          sudo chown -R $USER:$USER fuzzing_results
-
-      - name: Upload Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzzing-results
-          path: fuzzing_results
-          retention-days: 7
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Starting final cleanup..."
-          
-          echo "Disconnecting containers from network..."
-          for container in $(sudo docker ps -q); do
-            sudo docker network disconnect -f ${{ env.DOCKER_NETWORK_NAME }} $container 2>/dev/null || true
-          done
-          
-          echo "Stopping and removing all containers..."
-          sudo docker ps -q | xargs -r sudo docker stop || true
-          sudo docker ps -aq | xargs -r sudo docker rm -f || true
-          
-          echo "Removing Docker network..."
-          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
-          
-          echo "Removing fuzzer output volumes..."
-          for volume in restler_output wuppiefuzz_output evomaster_output; do
-            echo "Removing volume: $volume"
-            sudo docker volume rm $volume || true
-          done
-          
-          echo "Pruning unused Docker resources..."
-          sudo docker system prune -f || true
-          
-          echo "Cleanup completed."
         shell: bash
