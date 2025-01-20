@@ -25,11 +25,22 @@ jobs:
       with:
         version: 'latest'
         
+    - name: Cache Docker images
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/.minikube/cache/images
+        key: minikube-docker-images-${{ runner.os }}-${{ hashFiles('**/Dockerfile*') }}
+
     - name: Set up Minikube
       uses: medyagh/setup-minikube@master
       with:
         driver: docker
         kubernetes-version: stable
+        cpus: 2
+        memory: 4096
+        addons: |
+          dashboard
+          metrics-server
         start: true
         
     - name: Switch to Minikube Docker env
@@ -47,6 +58,26 @@ jobs:
         # Build Evomaster variant
         docker build -t vampi-vulnerable-evomaster:latest -f services/vampi/Dockerfile services/vampi
 
+    - name: Wait for CoreDNS
+      run: |
+        echo "Waiting for CoreDNS to be ready..."
+        kubectl -n kube-system rollout status deployment/coredns --timeout=300s
+        
+        # Verify DNS resolution
+        kubectl run dnsutils --image=gcr.io/kubernetes-e2e-test-images/dnsutils:1.3 \
+          --restart=Never --command -- sleep 3600
+        kubectl wait --for=condition=ready pod/dnsutils --timeout=60s
+        kubectl exec dnsutils -- nslookup kubernetes.default
+        kubectl delete pod dnsutils
+
+    - name: Cluster Debug Info
+      run: |
+        minikube status
+        kubectl get nodes -o wide
+        kubectl get pods --all-namespaces
+        kubectl describe nodes
+        kubectl -n kube-system logs -l k8s-app=kube-dns
+
     - name: Deploy to Kubernetes
       run: |
         # Create namespace
@@ -54,6 +85,10 @@ jobs:
         
         # Apply network policy
         kubectl apply -f k8s/network-policy.yaml
+        
+        # Verify Network Policies
+        kubectl wait --for=condition=established networkpolicy -n fuzzing-system --all --timeout=60s
+        kubectl describe networkpolicy -n fuzzing-system
         
         # Deploy services
         kubectl apply -f k8s/vampi-restler.yaml

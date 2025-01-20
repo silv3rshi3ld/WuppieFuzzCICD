@@ -19,11 +19,25 @@ jobs:
       with:
         version: 'latest'
         
+    - name: Cache Docker images
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/.minikube/cache/images
+        key: minikube-docker-images-${{ runner.os }}-${{ hashFiles('**/Dockerfile*') }}
+
     - name: Set up Minikube
       uses: medyagh/setup-minikube@master
       with:
         driver: docker
         kubernetes-version: stable
+        cpus: 2
+        memory: 4096
+        docker-env: |
+          DOCKER_BUILDKIT=1
+          COMPOSE_DOCKER_CLI_BUILD=1
+        mount: true
+        mount-string: "$(pwd):/workspace"
+        wait: true
         
     - name: Check cluster status
       id: check
@@ -73,13 +87,29 @@ jobs:
         driver: docker
         kubernetes-version: stable
         
+    - name: Cluster Debug Info
+      run: |
+        minikube status
+        kubectl get nodes -o wide
+        kubectl get pods --all-namespaces
+        kubectl describe nodes
+        kubectl -n kube-system logs -l k8s-app=kube-dns
+
     - name: Wait for services
       run: |
         echo "Waiting for VAmPI services to be ready..."
+        
+        # Wait for CoreDNS first
+        kubectl -n kube-system rollout status deployment/coredns --timeout=300s
         kubectl wait --for=condition=ready pods -l app=vampi-restler -n fuzzing-system --timeout=300s
         kubectl wait --for=condition=ready pods -l app=vampi-wuppiefuzz -n fuzzing-system --timeout=300s
         kubectl wait --for=condition=ready pods -l app=vampi-evomaster -n fuzzing-system --timeout=300s
         
+    - name: Verify Network Policies
+      run: |
+        kubectl wait --for=condition=established networkpolicy -n fuzzing-system --all --timeout=60s
+        kubectl describe networkpolicy -n fuzzing-system
+
     - name: Build fuzzer images
       run: |
         # Build and push Restler
