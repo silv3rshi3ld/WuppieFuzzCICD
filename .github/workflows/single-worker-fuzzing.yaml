@@ -34,21 +34,21 @@ jobs:
       - name: Cleanup Previous Runs
         run: |
           # Stop and remove any existing containers
-          sudo docker ps -aq | xargs -r sudo docker rm -f
+          docker ps -aq | xargs -r docker rm -f
           # Remove existing network if it exists
-          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           # Cleanup any leftover volumes
-          sudo docker volume prune -f
+          docker volume prune -f
 
       - name: Create Docker Network
         run: |
-          sudo docker network create ${{ env.DOCKER_NETWORK_NAME }}
+          docker network create ${{ env.DOCKER_NETWORK_NAME }}
 
       - name: Build VAmPI Images
         run: |
           # Build separate VAmPI instances for each fuzzer
           for FUZZER in ${{ env.FUZZERS }}; do
-            sudo docker build \
+            docker build \
               --file services/vampi/Dockerfile \
               --build-arg vulnerable=1 \
               --tag vampi-vulnerable-${FUZZER}:latest \
@@ -60,20 +60,20 @@ jobs:
           # Build WuppieFuzz
           git clone https://github.com/TNO-S3/WuppieFuzz.git temp_wuppiefuzz
           cp -r temp_wuppiefuzz/* services/wuppiefuzz/
-          sudo docker build \
+          docker build \
             --file services/wuppiefuzz/Dockerfile.wuppiefuzz \
             --tag wuppiefuzz:latest \
             services/wuppiefuzz/
           rm -rf temp_wuppiefuzz
 
           # Build RESTler
-          sudo docker build \
+          docker build \
             --file services/restler/Dockerfile.restler \
             --tag restler:latest \
             services/restler/
 
           # Build EvoMaster
-          sudo docker build \
+          docker build \
             --file services/evomaster/Dockerfile.evomaster \
             --tag evomaster:latest \
             services/evomaster/
@@ -81,7 +81,7 @@ jobs:
       - name: Start VAmPI Containers
         run: |
           # Start VAmPI for RESTler
-          sudo docker run -d \
+          docker run -d \
             --name vampi-restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_RESTLER_PORT }}:5000 \
@@ -89,7 +89,7 @@ jobs:
             vampi-vulnerable-restler:latest
 
           # Start VAmPI for WuppieFuzz
-          sudo docker run -d \
+          docker run -d \
             --name vampi-wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_WUPPIEFUZZ_PORT }}:5000 \
@@ -97,7 +97,7 @@ jobs:
             vampi-vulnerable-wuppiefuzz:latest
 
           # Start VAmPI for EvoMaster
-          sudo docker run -d \
+          docker run -d \
             --name vampi-evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_EVOMASTER_PORT }}:5000 \
@@ -110,12 +110,12 @@ jobs:
       - name: Run Fuzzing Tests
         run: |
           # Create volumes for results
-          sudo docker volume create restler_output
-          sudo docker volume create wuppiefuzz_output
-          sudo docker volume create evomaster_output
+          docker volume create restler_output
+          docker volume create wuppiefuzz_output
+          docker volume create evomaster_output
 
           # Run RESTler
-          sudo docker run --rm \
+          docker run --rm \
             --name restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v restler_output:/results \
@@ -124,7 +124,7 @@ jobs:
             http://vampi-restler:5000 /specs/openapi3.yml
 
           # Run WuppieFuzz
-          sudo docker run --rm \
+          docker run --rm \
             --name wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v wuppiefuzz_output:/results \
@@ -133,7 +133,7 @@ jobs:
             http://vampi-wuppiefuzz:5000 /specs/openapi3.yml
 
           # Run EvoMaster
-          sudo docker run --rm \
+          docker run --rm \
             --name evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v evomaster_output:/results \
@@ -148,7 +148,7 @@ jobs:
           # Copy results from each fuzzer's volume
           for FUZZER in ${{ env.FUZZERS }}; do
             mkdir -p fuzzing_results/${FUZZER}
-            sudo docker run --rm \
+            docker run --rm \
               -v ${FUZZER}_output:/results \
               -v ${{ github.workspace }}/fuzzing_results/${FUZZER}:/output \
               alpine cp -r /results/* /output/
@@ -165,8 +165,8 @@ jobs:
         if: always()
         run: |
           # Stop and remove containers
-          sudo docker ps -aq | xargs -r sudo docker rm -f
+          docker ps -aq | xargs -r docker rm -f
           # Remove network
-          sudo docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           # Remove volumes
-          sudo docker volume rm restler_output wuppiefuzz_output evomaster_output || true
+          docker volume rm restler_output wuppiefuzz_output evomaster_output || true
