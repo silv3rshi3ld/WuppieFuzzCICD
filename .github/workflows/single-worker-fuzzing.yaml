@@ -42,8 +42,8 @@ jobs:
         uses: ./.github/actions/setup-vampi
         with:
           port: ${{ env.VAMPI_PORT }}
-          network_name: restler_network
-          container_name: vampi-restler
+          network_name: restler_network_${{ github.run_id }}
+          container_name: vampi-restler-${{ github.run_id }}
 
       - name: Calculate Time Budgets
         id: time-budgets
@@ -71,8 +71,13 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi-restler || true
-          docker network rm restler_network || true
+          docker rm -fv vampi-restler-${{ github.run_id }} || true
+          docker network rm restler_network_${{ github.run_id }} || true
+          # Add retry loop for cleanup
+          for i in {1..5}; do
+            docker rm -fv vampi-restler-${{ github.run_id }} || break
+            sleep 5
+          done
           docker image prune -f || true
 
   wuppiefuzz-fuzzing:
@@ -85,8 +90,8 @@ jobs:
         uses: ./.github/actions/setup-vampi
         with:
           port: ${{ env.VAMPI_PORT }}
-          network_name: wuppiefuzz_network
-          container_name: vampi-wuppiefuzz
+          network_name: wuppiefuzz_network_${{ github.run_id }}
+          container_name: vampi-wuppiefuzz-${{ github.run_id }}
 
       - name: Run WuppieFuzz
         uses: ./.github/actions/run-wuppiefuzz
@@ -104,8 +109,12 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi-wuppiefuzz || true
-          docker network rm wuppiefuzz_network || true
+          docker rm -fv vampi-wuppiefuzz-${{ github.run_id }} || true
+          docker network rm wuppiefuzz_network_${{ github.run_id }} || true
+          for i in {1..5}; do
+            docker rm -fv vampi-wuppiefuzz-${{ github.run_id }} || break
+            sleep 5
+          done
           docker image prune -f || true
 
   evomaster-fuzzing:
@@ -118,8 +127,8 @@ jobs:
         uses: ./.github/actions/setup-vampi
         with:
           port: ${{ env.VAMPI_PORT }}
-          network_name: evomaster_network
-          container_name: vampi-evomaster
+          network_name: evomaster_network_${{ github.run_id }}
+          container_name: vampi-evomaster-${{ github.run_id }}
 
       - name: Run EvoMaster
         uses: ./.github/actions/run-evomaster
@@ -135,8 +144,12 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi-evomaster || true
-          docker network rm evomaster_network || true
+          docker rm -fv vampi-evomaster-${{ github.run_id }} || true
+          docker network rm evomaster_network_${{ github.run_id }} || true
+          for i in {1..5}; do
+            docker rm -fv vampi-evomaster-${{ github.run_id }} || break
+            sleep 5
+          done
           docker image prune -f || true
 
   process-results:
