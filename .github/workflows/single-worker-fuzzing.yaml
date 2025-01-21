@@ -36,10 +36,25 @@ jobs:
           ./scripts/check-docker.sh
         shell: bash
 
+      - name: Cleanup Previous Run
+        run: |
+          echo "Cleaning up resources from previous runs..."
+          # Remove containers
+          docker rm -f vampi-restler vampi-wuppiefuzz vampi-evomaster 2>/dev/null || true
+          # Remove network
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
+          # Clean up dangling images
+          docker image prune -f 2>/dev/null || true
+          echo "Cleanup completed"
+        shell: bash
+
       - name: Create Docker Network
         run: |
           echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
-          docker network create ${{ env.DOCKER_NETWORK_NAME }}
+          if ! docker network create ${{ env.DOCKER_NETWORK_NAME }}; then
+            echo "Failed to create network ${{ env.DOCKER_NETWORK_NAME }}"
+            exit 1
+          fi
           echo "Network created successfully."
         shell: bash
 
@@ -101,16 +116,32 @@ jobs:
             vampi-vulnerable-evomaster:latest
 
           echo "Waiting for services to start..."
-          sleep 10
+          # Increased wait time to ensure services are fully ready
+          sleep 30
 
           # Check container health
+          FAILED_CONTAINERS=""
           for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
-            if [ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER)" != "healthy" ]; then
-              echo "Container $CONTAINER is not healthy"
+            echo "Checking health of $CONTAINER..."
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER)
+            echo "Health status: $HEALTH_STATUS"
+            
+            if [ "$HEALTH_STATUS" != "healthy" ]; then
+              echo "::error::Container $CONTAINER is not healthy (status: $HEALTH_STATUS)"
+              echo "Last health check results:"
+              docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' $CONTAINER
+              echo "Container logs:"
               docker logs $CONTAINER
-              exit 1
+              FAILED_CONTAINERS="$FAILED_CONTAINERS $CONTAINER"
             fi
           done
+
+          if [ ! -z "$FAILED_CONTAINERS" ]; then
+            echo "::error::The following containers failed health checks:$FAILED_CONTAINERS"
+            exit 1
+          fi
+          
+          echo "All containers are healthy"
         shell: bash
 
       - name: Build Fuzzer Images
@@ -180,6 +211,19 @@ jobs:
           name: fuzzing-results
           path: ${{ env.BASE_DIR }}/results
           retention-days: 14
+
+      - name: Cleanup Resources
+        if: always()
+        run: |
+          echo "Cleaning up resources..."
+          # Remove containers
+          docker rm -f vampi-restler vampi-wuppiefuzz vampi-evomaster 2>/dev/null || true
+          # Remove network
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
+          # Clean up dangling images
+          docker image prune -f 2>/dev/null || true
+          echo "Cleanup completed"
+        shell: bash
 
       - name: Process Results
         if: always()
