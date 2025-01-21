@@ -6,7 +6,7 @@ RUN pip install -r requirements.txt
 
 # Build a fresh container, copying across files & compiled parts
 FROM python:3.11-alpine
-RUN apk --update add wget
+RUN apk --update add wget curl
 COPY . /vampi
 WORKDIR /vampi
 COPY --from=builder /usr/local/lib /usr/local/lib
