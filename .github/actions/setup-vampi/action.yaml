@@ -1,0 +1,89 @@
+name: Setup VAmPI
+description: Sets up VAmPI container with network and health checks
+
+inputs:
+  port:
+    description: Port to run VAmPI on
+    required: true
+  network_name:
+    description: Docker network name
+    required: true
+  container_name:
+    description: Docker container name
+    required: true
+
+outputs:
+  port:
+    description: The actual port VAmPI is running on
+    value: ${{ steps.start-vampi.outputs.port }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check Docker Configuration
+      run: |
+        chmod +x scripts/check-docker.sh
+        ./scripts/check-docker.sh
+      shell: bash
+
+    - name: Create Docker Network
+      run: |
+        echo "Creating Docker network: ${{ inputs.network_name }}..."
+        docker network create ${{ inputs.network_name }} || true
+      shell: bash
+
+    - name: Build and Start VAmPI
+      id: start-vampi
+      run: |
+        docker build -t vampi-vulnerable:latest \
+          --build-arg PORT=${{ inputs.port }} \
+          --cache-from vampi-vulnerable:latest \
+          -f services/vampi/Dockerfile services/vampi/
+
+        docker rm -f ${{ inputs.container_name }} || true
+        
+        PORT=${{ inputs.port }}
+        MAX_RETRIES=5
+        
+        for i in $(seq 1 $MAX_RETRIES); do
+          if docker run -d \
+            --name ${{ inputs.container_name }} \
+            --network ${{ inputs.network_name }} \
+            -p ${PORT}:5000 \
+            -e vulnerable=1 \
+            -e tokentimetolive=60 \
+            -e PYTHONPATH=/vampi \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
+            vampi-vulnerable:latest; then
+            echo "Successfully started VAmPI on port ${PORT}"
+            echo "port=${PORT}" >> $GITHUB_OUTPUT
+            break
+          else
+            echo "Failed to start VAmPI on port ${PORT}"
+            docker rm -f ${{ inputs.container_name }} || true
+            if [ $i -eq $MAX_RETRIES ]; then
+              echo "Failed to start VAmPI after ${MAX_RETRIES} attempts"
+              exit 1
+            fi
+            PORT=$((PORT + 1))
+            echo "Retrying with port ${PORT}"
+          fi
+        done
+
+        echo "Waiting for VAmPI to become healthy..."
+        for i in {1..30}; do
+          if docker exec ${{ inputs.container_name }} curl -s http://localhost:5000/health >/dev/null; then
+            echo "VAmPI is ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "VAmPI failed to become ready"
+            docker logs ${{ inputs.container_name }}
+            exit 1
+          fi
+          echo "Waiting for VAmPI to be ready... (attempt $i/30)"
+          sleep 2
+        done
+      shell: bash

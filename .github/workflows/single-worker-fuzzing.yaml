@@ -2,9 +2,26 @@ name: Single Worker API Fuzzing
 
 on:
   push:
-    branches: [ SingleWorker ]
+    branches: [SingleWorker]
   pull_request:
-    branches: [ SingleWorker ]
+    branches: [SingleWorker]
+  workflow_dispatch:
+    inputs:
+      restler_time_budget:
+        description: RESTler fuzzing time budget (hours)
+        required: false
+        default: '1'
+        type: string
+      wuppiefuzz_time_budget:
+        description: WuppieFuzz time budget (minutes)
+        required: false
+        default: '60'
+        type: string
+      evomaster_time_budget:
+        description: EvoMaster time budget (minutes)
+        required: false
+        default: '10'
+        type: string
 
 concurrency:
   group: single-worker-api-fuzzing
@@ -12,168 +29,56 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: write
+  security-events: write
 
 env:
   BASE_DIR: ${{ github.workspace }}
+  DOCKER_BUILDKIT: 1
 
 jobs:
-  restler-fuzzing:
+  scan-docker-images:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build VAmPI Image
+        run: docker build -t vampi-vulnerable:latest -f services/vampi/Dockerfile services/vampi
+
+      - name: Scan VAmPI Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: vampi-vulnerable:latest
+          format: sarif
+          output: trivy-results.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  restler-fuzzing:
+    needs: scan-docker-images
+    runs-on: self-hosted
     env:
       VAMPI_PORT: 5012
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Setup VAmPI Container
+        uses: ./.github/actions/setup-vampi
         with:
-          fetch-depth: 1
-
-      - name: Check Docker Configuration
-        run: |
-          chmod +x scripts/check-docker.sh
-          ./scripts/check-docker.sh
-        shell: bash
-
-      - name: Create Docker Network
-        run: |
-          echo "Creating Docker network: restler_network..."
-          docker network create restler_network || true
-        shell: bash
-
-      - name: Build and Start VAmPI
-        run: |
-          # Build VAmPI
-          docker build -t vampi-vulnerable:latest \
-            --build-arg PORT=${{ env.VAMPI_PORT }} \
-            -f services/vampi/Dockerfile services/vampi/
-
-          # Cleanup any existing containers
-          docker rm -f vampi-restler || true
-          
-          # Try to start VAmPI with retries on different ports
-          PORT=${{ env.VAMPI_PORT }}
-          MAX_RETRIES=5
-          
-          for i in $(seq 1 $MAX_RETRIES); do
-            if docker run -d \
-              --name vampi-restler \
-              --network restler_network \
-              -p ${PORT}:5000 \
-              -e vulnerable=1 \
-              -e tokentimetolive=60 \
-              -e PYTHONPATH=/vampi \
-              --health-cmd "curl -f http://localhost:5000/health || exit 1" \
-              --health-interval 10s \
-              --health-retries 3 \
-              vampi-vulnerable:latest; then
-              echo "Successfully started VAmPI on port ${PORT}"
-              # Export the port for later use if needed
-              echo "VAMPI_PORT=${PORT}" >> $GITHUB_ENV
-              break
-            else
-              echo "Failed to start VAmPI on port ${PORT}"
-              docker rm -f vampi-restler || true
-              if [ $i -eq $MAX_RETRIES ]; then
-                echo "Failed to start VAmPI after ${MAX_RETRIES} attempts"
-                exit 1
-              fi
-              PORT=$((PORT + 1))
-              echo "Retrying with port ${PORT}"
-            fi
-          done
-
-          echo "Waiting for VAmPI to become healthy..."
-          for i in {1..30}; do
-            if docker exec vampi-restler curl -s http://localhost:5000/health >/dev/null; then
-              echo "VAmPI is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI failed to become ready"
-              docker logs vampi-restler
-              exit 1
-            fi
-            echo "Waiting for VAmPI to be ready... (attempt $i/30)"
-            sleep 2
-          done
-        shell: bash
-
-      - name: Create Workspace
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Compile
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/restlerConfig
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/examples
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Test
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Fuzz
-        shell: bash
-
-      - name: Copy RESTler Files
-        run: |
-          cp -r services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
-          cp services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
-          cp services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-          docker cp vampi-restler:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
-        shell: bash
+          port: ${{ env.VAMPI_PORT }}
+          network_name: restler_network
+          container_name: vampi-restler
 
       - name: Run RESTler
-        working-directory: ${{ env.BASE_DIR }}/workspace/restler
-        env:
-          TARGET_PORT: "5000"
-          TARGET_HOST: "vampi-restler"
-          RUN_FUZZ_LEAN: "true"
-          RUN_FUZZ: "true"
-          FUZZ_LEAN_TIME_BUDGET: "0.25"
-          FUZZ_TIME_BUDGET: "0.75"
-          DOCKER_NETWORK_NAME: "restler_network"
-        run: |
-          docker build -t restler-fuzzer:latest -f Dockerfile.restler .
-          
-          # Ensure all directories have correct permissions
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/output
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Compile
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/restlerConfig
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/examples
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Test
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
-          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Fuzz
-          
-          # Run RESTler using the entrypoint script
-          docker run --rm \
-            --network restler_network \
-            -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
-            -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
-            -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
-            -v ${{ env.BASE_DIR }}/workspace/restler/restlerConfig:/workspace/restlerConfig \
-            -v ${{ env.BASE_DIR }}/workspace/restler/examples:/workspace/examples \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Test:/workspace/Test \
-            -v ${{ env.BASE_DIR }}/workspace/restler/FuzzLean:/workspace/FuzzLean \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Fuzz:/workspace/Fuzz \
-            -e RESTLER_TELEMETRY_OPTOUT=1 \
-            -e TARGET_IP=${TARGET_HOST} \
-            -e TARGET_PORT=${TARGET_PORT} \
-            -e RUN_FUZZ_LEAN=${RUN_FUZZ_LEAN} \
-            -e FUZZ_LEAN_TIME_BUDGET=${FUZZ_LEAN_TIME_BUDGET} \
-            -e RUN_FUZZ=${RUN_FUZZ} \
-            -e FUZZ_TIME_BUDGET=${FUZZ_TIME_BUDGET} \
-            restler-fuzzer:latest
-        shell: bash
+        uses: ./.github/actions/run-restler
+        with:
+          base_dir: ${{ env.BASE_DIR }}
+          time_budget: ${{ github.event.inputs.restler_time_budget || 1 }}
 
-      - name: Upload RESTler Results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: |
-            ${{ env.BASE_DIR }}/workspace/restler/output
-            ${{ env.BASE_DIR }}/workspace/restler/Compile
-            ${{ env.BASE_DIR }}/workspace/restler/Test
-            ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
-            ${{ env.BASE_DIR }}/workspace/restler/Fuzz
-          retention-days: 14
+          path: ${{ env.BASE_DIR }}/workspace/restler/output
 
       - name: Cleanup
         if: always()
@@ -181,184 +86,32 @@ jobs:
           docker rm -f vampi-restler || true
           docker network rm restler_network || true
           docker image prune -f || true
-        shell: bash
 
   wuppiefuzz-fuzzing:
+    needs: scan-docker-images
     runs-on: self-hosted
     env:
       VAMPI_PORT: 5022
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Setup VAmPI Container
+        uses: ./.github/actions/setup-vampi
         with:
-          fetch-depth: 1
-
-      - name: Check Docker Configuration
-        run: |
-          chmod +x scripts/check-docker.sh
-          ./scripts/check-docker.sh
-        shell: bash
-
-      - name: Create Docker Network
-        run: |
-          echo "Creating Docker network: wuppiefuzz_network..."
-          docker network create wuppiefuzz_network || true
-        shell: bash
-
-      - name: Checkout WuppieFuzz Repository
-        uses: actions/checkout@v4
-        with:
-          repository: TNO-S3/WuppieFuzz
-          path: ${{ env.BASE_DIR }}/wuppiefuzz
-
-      - name: Install Build Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-        shell: bash
-
-      - name: rustup toolchain install
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-
-      - name: Cache Rust Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            ${{ env.BASE_DIR }}/wuppiefuzz/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Calculate WuppieFuzz Source Hash
-        id: wuppiefuzz-hash
-        run: |
-          cd ${{ env.BASE_DIR }}/wuppiefuzz
-          hash=$(find . -type f -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' | sort | xargs sha1sum | sha1sum | awk '{ print $1 }')
-          echo "hash=$hash" >> $GITHUB_OUTPUT
-
-      - name: Cache WuppieFuzz Binary
-        id: cache-binary
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
-          key: wuppiefuzz-binary-${{ runner.os }}-${{ steps.wuppiefuzz-hash.outputs.hash }}
-
-      - name: Build WuppieFuzz
-        if: steps.cache-binary.outputs.cache-hit != 'true'
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: cargo build --release
-        shell: bash
-
-      - name: Verify Binary
-        working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
-        run: |
-          if [ ! -f "target/release/wuppiefuzz" ]; then
-            echo "Binary was not built successfully"
-            exit 1
-          fi
-          file target/release/wuppiefuzz
-          ls -l target/release/wuppiefuzz
-        shell: bash
-
-      - name: Upload WuppieFuzz Binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-binary
-          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
-          if-no-files-found: error
-
-      - name: Create Workspace
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/wuppiefuzz/output
-          chmod +x ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
-        shell: bash
-
-      - name: Build and Start VAmPI
-        run: |
-          # Build VAmPI
-          docker build -t vampi-vulnerable:latest \
-            --build-arg PORT=${{ env.VAMPI_PORT }} \
-            -f services/vampi/Dockerfile services/vampi/
-
-          # Cleanup any existing containers
-          docker rm -f vampi-wuppiefuzz || true
-          
-          # Try to start VAmPI with retries on different ports
-          PORT=${{ env.VAMPI_PORT }}
-          MAX_RETRIES=5
-          
-          for i in $(seq 1 $MAX_RETRIES); do
-            if docker run -d \
-              --name vampi-wuppiefuzz \
-              --network wuppiefuzz_network \
-              -p ${PORT}:5000 \
-              -e vulnerable=1 \
-              -e tokentimetolive=60 \
-              -e PYTHONPATH=/vampi \
-              --health-cmd "curl -f http://localhost:5000/health || exit 1" \
-              --health-interval 10s \
-              --health-retries 3 \
-              vampi-vulnerable:latest; then
-              echo "Successfully started VAmPI on port ${PORT}"
-              # Export the port for later use if needed
-              echo "VAMPI_PORT=${PORT}" >> $GITHUB_ENV
-              break
-            else
-              echo "Failed to start VAmPI on port ${PORT}"
-              docker rm -f vampi-wuppiefuzz || true
-              if [ $i -eq $MAX_RETRIES ]; then
-                echo "Failed to start VAmPI after ${MAX_RETRIES} attempts"
-                exit 1
-              fi
-              PORT=$((PORT + 1))
-              echo "Retrying with port ${PORT}"
-            fi
-          done
-
-          echo "Waiting for VAmPI to become healthy..."
-          for i in {1..30}; do
-            if docker exec vampi-wuppiefuzz curl -s http://localhost:5000/health >/dev/null; then
-              echo "VAmPI is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI failed to become ready"
-              docker logs vampi-wuppiefuzz
-              exit 1
-            fi
-            echo "Waiting for VAmPI to be ready... (attempt $i/30)"
-            sleep 2
-          done
-        shell: bash
+          port: ${{ env.VAMPI_PORT }}
+          network_name: wuppiefuzz_network
+          container_name: vampi-wuppiefuzz
 
       - name: Run WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/workspace/wuppiefuzz
-        run: |
-          mkdir -p reports
-          ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz output-corpus \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
-            corpus_directory
-          ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz fuzz \
-            --report \
-            --log-level=info \
-            --initial-corpus=corpus_directory \
-            --coverage-host=localhost:${VAMPI_PORT} \
-            --timeout=60 \
-            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
+        uses: ./.github/actions/run-wuppiefuzz
+        with:
+          port: ${{ env.VAMPI_PORT }}
+          time_budget: ${{ github.event.inputs.wuppiefuzz_time_budget || 60 }}
 
-      - name: Upload WuppieFuzz Results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/workspace/wuppiefuzz/reports/
+          path: wuppiefuzz/reports
           if-no-files-found: warn
 
       - name: Cleanup
@@ -367,130 +120,31 @@ jobs:
           docker rm -f vampi-wuppiefuzz || true
           docker network rm wuppiefuzz_network || true
           docker image prune -f || true
-          rm -rf ${{ env.BASE_DIR }}/workspace/wuppiefuzz
-        shell: bash
 
   evomaster-fuzzing:
+    needs: scan-docker-images
     runs-on: self-hosted
     env:
       VAMPI_PORT: 5032
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Setup VAmPI Container
+        uses: ./.github/actions/setup-vampi
         with:
-          fetch-depth: 1
+          port: ${{ env.VAMPI_PORT }}
+          network_name: evomaster_network
+          container_name: vampi-evomaster
 
-      - name: Check Docker Configuration
-        run: |
-          chmod +x scripts/check-docker.sh
-          ./scripts/check-docker.sh
-        shell: bash
+      - name: Run EvoMaster
+        uses: ./.github/actions/run-evomaster
+        with:
+          time_budget: ${{ github.event.inputs.evomaster_time_budget || 10 }}
 
-      - name: Create Docker Network
-        run: |
-          echo "Creating Docker network: evomaster_network..."
-          docker network create evomaster_network || true
-        shell: bash
-
-      - name: Build and Start VAmPI
-        run: |
-          # Build VAmPI
-          docker build -t vampi-vulnerable:latest \
-            --build-arg PORT=${{ env.VAMPI_PORT }} \
-            -f services/vampi/Dockerfile services/vampi/
-
-          # Cleanup any existing containers
-          docker rm -f vampi-evomaster || true
-          
-          # Try to start VAmPI with retries on different ports
-          PORT=${{ env.VAMPI_PORT }}
-          MAX_RETRIES=5
-          
-          for i in $(seq 1 $MAX_RETRIES); do
-            if docker run -d \
-              --name vampi-evomaster \
-              --network evomaster_network \
-              -p ${PORT}:5000 \
-              -e vulnerable=1 \
-              -e tokentimetolive=60 \
-              -e PYTHONPATH=/vampi \
-              --health-cmd "curl -f http://localhost:5000/health || exit 1" \
-              --health-interval 10s \
-              --health-retries 3 \
-              vampi-vulnerable:latest; then
-              echo "Successfully started VAmPI on port ${PORT}"
-              # Export the port for later use if needed
-              echo "VAMPI_PORT=${PORT}" >> $GITHUB_ENV
-              break
-            else
-              echo "Failed to start VAmPI on port ${PORT}"
-              docker rm -f vampi-evomaster || true
-              if [ $i -eq $MAX_RETRIES ]; then
-                echo "Failed to start VAmPI after ${MAX_RETRIES} attempts"
-                exit 1
-              fi
-              PORT=$((PORT + 1))
-              echo "Retrying with port ${PORT}"
-            fi
-          done
-
-          echo "Waiting for VAmPI to become healthy..."
-          for i in {1..30}; do
-            if docker exec vampi-evomaster curl -s http://localhost:5000/health >/dev/null; then
-              echo "VAmPI is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI failed to become ready"
-              docker logs vampi-evomaster
-              exit 1
-            fi
-            echo "Waiting for VAmPI to be ready... (attempt $i/30)"
-            sleep 2
-          done
-        shell: bash
-
-      - name: Build EvoMaster
-        run: |
-          docker build -t evomaster:latest \
-            -f services/evomaster/Dockerfile.evomaster services/evomaster/
-        shell: bash
-
-      - name: Create Workspace
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/output
-          mkdir -p ${{ env.BASE_DIR }}/workspace/evomaster/config
-        shell: bash
-
-      - name: Copy EvoMaster Files
-        run: |
-          docker cp vampi-evomaster:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
-        shell: bash
-
-      - name: Run EvoMaster Tests
-        working-directory: ${{ env.BASE_DIR }}/workspace/evomaster
-        run: |
-          # Ensure output directory has correct permissions
-          chmod -R 755 output
-
-          docker run --rm \
-            --network evomaster_network \
-            -v ${{ env.BASE_DIR }}/workspace/evomaster/output:/results \
-            -v ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml:/evomaster/openapi3.yml:ro \
-            -e SPEC_PATH=/evomaster/openapi3.yml \
-            -e OUTPUT_DIR=/results \
-            -e TARGET_URL=http://vampi-evomaster:5000 \
-            -e TIME_BUDGET=10m \
-            evomaster:latest
-        shell: bash
-
-      - name: Upload EvoMaster Results
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: evomaster-results
-          path: ${{ env.BASE_DIR }}/workspace/evomaster/output
-          retention-days: 14
+          path: workspace/evomaster/output
 
       - name: Cleanup
         if: always()
@@ -498,67 +152,37 @@ jobs:
           docker rm -f vampi-evomaster || true
           docker network rm evomaster_network || true
           docker image prune -f || true
-        shell: bash
 
   process-results:
     needs: [restler-fuzzing, wuppiefuzz-fuzzing, evomaster-fuzzing]
     runs-on: self-hosted
     if: always()
     steps:
-      - name: Create Workspace
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/summary
-        shell: bash
-
-      - name: Download All Results
-        uses: actions/download-artifact@v4
-        with:
-          path: ${{ env.BASE_DIR }}/workspace/summary
-
+      - uses: actions/checkout@v4
       - name: Process Results
-        working-directory: ${{ env.BASE_DIR }}/workspace/summary
-        run: |
-          echo "# Fuzzing Results Summary" > summary.md
-          echo "Generated on $(date)" >> summary.md
-          
-          for FUZZER in restler wuppiefuzz evomaster; do
-            echo "## ${FUZZER^} Results" >> summary.md
-            
-            if [ -d "$FUZZER-results" ]; then
-              # Process RESTler results
-              if [ "$FUZZER" = "restler" ] && [ -f "$FUZZER-results/Test/RestlerResults/logs/main.txt" ]; then
-                echo "### Test Phase" >> summary.md
-                grep -A 5 "Found bugs:" "$FUZZER-results/Test/RestlerResults/logs/main.txt" >> summary.md || true
-                
-                if [ -f "$FUZZER-results/FuzzLean/RestlerResults/logs/main.txt" ]; then
-                  echo "### Fuzz-Lean Phase" >> summary.md
-                  grep -A 5 "Found bugs:" "$FUZZER-results/FuzzLean/RestlerResults/logs/main.txt" >> summary.md || true
-                fi
-                
-                if [ -f "$FUZZER-results/Fuzz/RestlerResults/logs/main.txt" ]; then
-                  echo "### Full Fuzzing Phase" >> summary.md
-                  grep -A 5 "Found bugs:" "$FUZZER-results/Fuzz/RestlerResults/logs/main.txt" >> summary.md || true
-                fi
-              
-              # Process WuppieFuzz results
-              elif [ "$FUZZER" = "wuppiefuzz" ]; then
-                find "$FUZZER-results" -type f -name "*.json" -exec cat {} \; | \
-                  jq -r '. | select(.type=="finding") | "- " + .description' >> summary.md || true
-              
-              # Process EvoMaster results
-              elif [ "$FUZZER" = "evomaster" ]; then
-                find "$FUZZER-results" -type f -name "statistics.csv" -exec cat {} \; >> summary.md || true
-              fi
-            else
-              echo "No results found for $FUZZER" >> summary.md
-            fi
-            
-            echo "" >> summary.md
-          done
+        id: process-results
+        uses: ./.github/actions/process-results
 
-      - name: Upload Summary
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: fuzzing-summary
-          path: ${{ env.BASE_DIR }}/workspace/summary/summary.md
-          retention-days: 14
+          path: summary/summary.md
+
+      - uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('summary/summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Check for Critical Findings
+        if: steps.process-results.outputs.critical_findings == '1'
+        run: |
+          echo "Critical security findings detected! Check the summary for details."
+          exit 1

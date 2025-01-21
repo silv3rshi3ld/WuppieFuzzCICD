@@ -1,0 +1,55 @@
+name: Run WuppieFuzz
+description: Run WuppieFuzz against VAmPI
+
+inputs:
+  port:
+    description: Port number for VAmPI
+    required: true
+  time_budget:
+    description: Time budget in minutes
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: TNO-S3/WuppieFuzz
+        path: wuppiefuzz
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt, clippy
+
+    - uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build WuppieFuzz
+      working-directory: wuppiefuzz
+      shell: bash
+      run: cargo build --release
+
+    - name: Generate Corpus
+      working-directory: wuppiefuzz
+      shell: bash
+      run: |
+        mkdir -p reports
+        ./target/release/wuppiefuzz output-corpus \
+          --openapi-spec=../services/vampi/openapi_specs/openapi3.yml \
+          corpus_directory
+
+    - name: Run WuppieFuzz
+      working-directory: wuppiefuzz
+      shell: bash
+      run: |
+        ./target/release/wuppiefuzz fuzz \
+          --report \
+          --log-level=info \
+          --initial-corpus=corpus_directory \
+          --coverage-host=localhost:${{ inputs.port }} \
+          --timeout=${{ inputs.time_budget }} \
+          ../services/vampi/openapi_specs/openapi3.yml
