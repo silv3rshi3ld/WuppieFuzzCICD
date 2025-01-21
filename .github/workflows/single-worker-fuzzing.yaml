@@ -19,7 +19,7 @@ env:
 
 jobs:
   restler-fuzzing:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       VAMPI_PORT: 5012
     steps:
