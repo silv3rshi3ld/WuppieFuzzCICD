@@ -1,0 +1,50 @@
+{
+    "SwaggerSpecFilePath": "/workspace/openapi3.yml",
+    "UseRefreshableToken": false,
+    "ResolveBodyDependencies": true,
+    "ResolveQueryDependencies": true,
+    "MaxResponseBodiesLogged": 10,
+    "CustomDictionaryFilePath": "/workspace/restlerConfig/dict.json",
+    "AnnotationFilePath": "/workspace/restlerConfig/annotations.json",
+    "DataFuzzing": true,
+    "ReadOnlyFuzz": false,
+    "SaveRequestsData": true,
+    "AllowGetProducers": true,
+    "IncludeOptionalParameters": true,
+    "TrackFuzzedParameterNames": true,
+    "DiscoverExamples": true,
+    "ExamplesDirectory": "/workspace/examples",
+    "MaxExamplesPerSchema": 20,
+    "GenerateAnnotations": true,
+    "EngineSettingsFilePath": "/workspace/restlerConfig/engine_settings.json",
+    "CheckerSettings": {
+        "PayloadBodyChecker": {
+            "Enabled": true,
+            "Mode": "normal"
+        },
+        "ExamplesChecker": {
+            "Enabled": true,
+            "Mode": "normal"
+        },
+        "LeakageRuleChecker": {
+            "Enabled": true,
+            "Mode": "normal"
+        },
+        "ResourceHierarchyChecker": {
+            "Enabled": true,
+            "Mode": "exhaustive"
+        },
+        "UseAfterFreeChecker": {
+            "Enabled": true,
+            "Mode": "exhaustive"
+        },
+        "NameSpaceRuleChecker": {
+            "Enabled": true,
+            "Mode": "normal"
+        },
+        "InvalidDynamicObjectChecker": {
+            "Enabled": true,
+            "Mode": "normal"
+        }
+    }
+}

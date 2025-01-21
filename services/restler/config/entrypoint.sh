@@ -50,18 +50,42 @@ if [ ! -f "/workspace/openapi3.yml" ]; then
     exit 1
 fi
 
-# Compile API specification
-echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/workspace/openapi3.yml"
+# First generate the config files
+echo "Generating RESTler config files..."
+dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" generate_config \
+    --specs "/workspace/openapi3.yml"
 
-# Verify grammar file exists in Compile directory
-if [ ! -f "/workspace/Compile/grammar.py" ]; then
-    echo "Error: Grammar file was not generated!"
-    echo "Checking Compile directory contents:"
-    ls -la /workspace/Compile
+# Check if config files were generated
+if [ ! -d "/workspace/restlerConfig" ]; then
+    echo "Error: Failed to generate RESTler config files"
     exit 1
 fi
+
+# Copy engine settings if not already in config
+if [ ! -f "/workspace/restlerConfig/engine_settings.json" ] && [ -f "/workspace/config/engine_settings.json" ]; then
+    cp "/workspace/config/engine_settings.json" "/workspace/restlerConfig/"
+fi
+
+# Compile API specification with full config
+echo "Compiling API specification..."
+dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
+    --config_path "/workspace/restlerConfig/config.json"
+
+# Verify compilation output
+echo "Checking compilation output..."
+if [ ! -f "/workspace/Compile/grammar.py" ] || [ ! -f "/workspace/Compile/grammar.json" ]; then
+    echo "Error: Grammar files were not generated!"
+    echo "Checking Compile directory contents:"
+    ls -la /workspace/Compile
+    echo "Checking config directory contents:"
+    ls -la /workspace/restlerConfig
+    echo "Checking compilation logs:"
+    cat /workspace/Compile/RestlerCompile.log || echo "No compile log found"
+    exit 1
+fi
+
+echo "Compilation successful. Generated files:"
+ls -la /workspace/Compile/
 
 # Display compilation logs
 echo "Compilation logs:"
