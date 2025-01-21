@@ -13,13 +13,27 @@ rm -rf /workspace/Compile
 # Change to the workspace directory
 cd /workspace
 
-# Debug: Check if OpenAPI file exists
-echo "Checking OpenAPI file..."
-if [ ! -f "/workspace/openapi3.yml" ]; then
-    echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
-    ls -la /workspace/
+# Wait for vampi service to be ready
+echo "Waiting for vampi service to be ready..."
+for i in {1..30}; do
+    if curl -s "http://${TARGET_IP}:${TARGET_PORT}/health" > /dev/null; then
+        echo "Vampi service is ready"
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        echo "Vampi service failed to become ready"
+        exit 1
+    fi
+    echo "Waiting for vampi service... (attempt $i/30)"
+    sleep 2
+done
+
+# Download OpenAPI spec from vampi service
+echo "Downloading OpenAPI spec from ${SWAGGER_URL}..."
+curl -f -o /workspace/openapi3.yml ${SWAGGER_URL} || {
+    echo "Error: Failed to download OpenAPI spec from ${SWAGGER_URL}"
     exit 1
-fi
+}
 
 # Compile API specification
 echo "Compiling API specification..."

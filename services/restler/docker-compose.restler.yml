@@ -12,11 +12,12 @@ services:
       FUZZ_LEAN_TIME_BUDGET: "0.05"
       RUN_FUZZ: "true"
       FUZZ_TIME_BUDGET: "0.25"
-      TARGET_IP: ${TARGET_HOST:-vampi-vulnerable-restler}
-      TARGET_PORT: ${TARGET_PORT:-5000}
+      TARGET_IP: "vampi-vulnerable"
+      TARGET_PORT: "5000"
+      SWAGGER_URL: "http://vampi-vulnerable:5000/openapi.yaml"
     volumes:
-      - ./openapi3.yml:/workspace/openapi3.yml:ro
-      - ./output:/workspace/output
+      - ./:/workspace
+      - ./config:/service/config
     networks:
       - cicd_network
 

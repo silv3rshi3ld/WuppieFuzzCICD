@@ -205,6 +205,12 @@ jobs:
           repository: TNO-S3/WuppieFuzz
           path: ${{ env.BASE_DIR }}/wuppiefuzz
 
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+        shell: bash
+
       - name: rustup toolchain install
         uses: dtolnay/rust-toolchain@v1
         with:
