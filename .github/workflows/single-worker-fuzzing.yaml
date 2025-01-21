@@ -81,6 +81,11 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Compile
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/restlerConfig
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/examples
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Test
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Fuzz
         shell: bash
 
       - name: Copy RESTler Files
@@ -104,9 +109,14 @@ jobs:
         run: |
           docker build -t restler-fuzzer:latest -f Dockerfile.restler .
           
-          # Ensure directories have correct permissions
+          # Ensure all directories have correct permissions
           chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/output
           chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Compile
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/restlerConfig
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/examples
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Test
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Fuzz
           
           # Run RESTler using the entrypoint script
           docker run --rm \
@@ -115,6 +125,11 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
+            -v ${{ env.BASE_DIR }}/workspace/restler/restlerConfig:/workspace/restlerConfig \
+            -v ${{ env.BASE_DIR }}/workspace/restler/examples:/workspace/examples \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Test:/workspace/Test \
+            -v ${{ env.BASE_DIR }}/workspace/restler/FuzzLean:/workspace/FuzzLean \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Fuzz:/workspace/Fuzz \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             -e TARGET_IP=${TARGET_HOST} \
             -e TARGET_PORT=${TARGET_PORT} \
@@ -133,6 +148,9 @@ jobs:
           path: |
             ${{ env.BASE_DIR }}/workspace/restler/output
             ${{ env.BASE_DIR }}/workspace/restler/Compile
+            ${{ env.BASE_DIR }}/workspace/restler/Test
+            ${{ env.BASE_DIR }}/workspace/restler/FuzzLean
+            ${{ env.BASE_DIR }}/workspace/restler/Fuzz
           retention-days: 14
 
       - name: Cleanup
@@ -227,6 +245,13 @@ jobs:
           ls -l target/release/wuppiefuzz
         shell: bash
 
+      - name: Upload WuppieFuzz Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-binary
+          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          if-no-files-found: error
+
       - name: Create Workspace
         run: |
           mkdir -p ${{ env.BASE_DIR }}/workspace/wuppiefuzz/output
@@ -284,14 +309,12 @@ jobs:
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
 
-      - name: Upload WuppieFuzz Results and Binary
+      - name: Upload WuppieFuzz Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: |
-            ${{ env.BASE_DIR }}/workspace/wuppiefuzz/reports/
-            ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          path: ${{ env.BASE_DIR }}/workspace/wuppiefuzz/reports/
           if-no-files-found: warn
 
       - name: Cleanup
@@ -391,7 +414,7 @@ jobs:
             -e SPEC_PATH=/evomaster/openapi3.yml \
             -e OUTPUT_DIR=/results \
             -e TARGET_URL=http://vampi-evomaster:5000 \
-            -e TIME_BUDGET=1h \
+            -e TIME_BUDGET=10m \
             evomaster:latest
         shell: bash
 
