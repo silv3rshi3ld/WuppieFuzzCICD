@@ -15,15 +15,13 @@ permissions:
 
 env:
   DOCKER_NETWORK_NAME: fuzzing_network
-  VAMPI_RESTLER_PORT: 5012
-  VAMPI_WUPPIEFUZZ_PORT: 5022
-  VAMPI_EVOMASTER_PORT: 5032
   BASE_DIR: ${{ github.workspace }}
-  FUZZERS: restler wuppiefuzz evomaster
 
 jobs:
-  fuzzing:
+  restler-fuzzing:
     runs-on: ubuntu-latest
+    env:
+      VAMPI_PORT: 5012
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -36,231 +34,299 @@ jobs:
           ./scripts/check-docker.sh
         shell: bash
 
-      - name: Cleanup Previous Run
+      - name: Create Docker Network
         run: |
-          echo "Cleaning up resources from previous runs..."
-          # Remove containers
-          docker rm -f vampi-restler vampi-wuppiefuzz vampi-evomaster 2>/dev/null || true
-          # Remove network
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
-          # Clean up dangling images
-          docker image prune -f 2>/dev/null || true
-          echo "Cleanup completed"
+          echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
+          docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+        shell: bash
+
+      - name: Build and Start VAmPI
+        run: |
+          # Build VAmPI
+          docker build -t vampi-vulnerable:latest \
+            --build-arg PORT=${{ env.VAMPI_PORT }} \
+            -f services/vampi/Dockerfile services/vampi/
+
+          # Start VAmPI
+          docker run -d \
+            --name vampi \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -p ${{ env.VAMPI_PORT }}:5000 \
+            -e vulnerable=1 \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
+            vampi-vulnerable:latest
+
+          echo "Waiting for service to start..."
+          sleep 30
+
+          # Check container health
+          HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' vampi)
+          echo "Health status: $HEALTH_STATUS"
+          
+          if [ "$HEALTH_STATUS" != "healthy" ]; then
+            echo "::error::VAmPI container is not healthy (status: $HEALTH_STATUS)"
+            docker logs vampi
+            exit 1
+          fi
+        shell: bash
+
+      - name: Build RESTler
+        run: |
+          docker build -t restler-fuzzer:latest \
+            -f services/restler/Dockerfile.restler services/restler/
+        shell: bash
+
+      - name: Run RESTler Tests
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/results/restler
+          
+          # Copy OpenAPI spec
+          docker cp vampi:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/openapi3.yml
+          
+          # Run RESTler
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/results/restler:/results \
+            -v ${{ env.BASE_DIR }}/openapi3.yml:/workspace/openapi3.yml \
+            restler-fuzzer:latest \
+            --target_ip vampi \
+            --target_port 5000 \
+            --time_budget 1h
+        shell: bash
+
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: restler-results
+          path: ${{ env.BASE_DIR }}/results/restler
+          retention-days: 14
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f vampi || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker image prune -f || true
+        shell: bash
+
+  wuppiefuzz-fuzzing:
+    runs-on: ubuntu-latest
+    env:
+      VAMPI_PORT: 5022
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Check Docker Configuration
+        run: |
+          chmod +x scripts/check-docker.sh
+          ./scripts/check-docker.sh
         shell: bash
 
       - name: Create Docker Network
         run: |
           echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
-          if ! docker network create ${{ env.DOCKER_NETWORK_NAME }}; then
-            echo "Failed to create network ${{ env.DOCKER_NETWORK_NAME }}"
-            exit 1
-          fi
-          echo "Network created successfully."
+          docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
         shell: bash
 
-      - name: Build VAmPI Images
+      - name: Build and Start VAmPI
         run: |
-          echo "Building VAmPI images..."
-          
-          # Build VAmPI for RESTler
-          docker build -t vampi-vulnerable-restler:latest \
-            --build-arg PORT=${{ env.VAMPI_RESTLER_PORT }} \
+          # Build VAmPI
+          docker build -t vampi-vulnerable:latest \
+            --build-arg PORT=${{ env.VAMPI_PORT }} \
             -f services/vampi/Dockerfile services/vampi/
-          
-          # Build VAmPI for WuppieFuzz
-          docker build -t vampi-vulnerable-wuppiefuzz:latest \
-            --build-arg PORT=${{ env.VAMPI_WUPPIEFUZZ_PORT }} \
-            -f services/vampi/Dockerfile services/vampi/
-          
-          # Build VAmPI for EvoMaster
-          docker build -t vampi-vulnerable-evomaster:latest \
-            --build-arg PORT=${{ env.VAMPI_EVOMASTER_PORT }} \
-            -f services/vampi/Dockerfile services/vampi/
-        shell: bash
 
-      - name: Start VAmPI Containers
-        run: |
-          echo "Starting VAmPI containers..."
-          
-          # Start VAmPI for RESTler
+          # Start VAmPI
           docker run -d \
-            --name vampi-restler \
+            --name vampi \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -p ${{ env.VAMPI_RESTLER_PORT }}:5000 \
+            -p ${{ env.VAMPI_PORT }}:5000 \
             -e vulnerable=1 \
             --health-cmd "curl -f http://localhost:5000/health || exit 1" \
             --health-interval 10s \
             --health-retries 3 \
-            vampi-vulnerable-restler:latest
+            vampi-vulnerable:latest
 
-          # Start VAmPI for WuppieFuzz
-          docker run -d \
-            --name vampi-wuppiefuzz \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -p ${{ env.VAMPI_WUPPIEFUZZ_PORT }}:5000 \
-            -e vulnerable=1 \
-            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
-            --health-interval 10s \
-            --health-retries 3 \
-            vampi-vulnerable-wuppiefuzz:latest
-
-          # Start VAmPI for EvoMaster
-          docker run -d \
-            --name vampi-evomaster \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -p ${{ env.VAMPI_EVOMASTER_PORT }}:5000 \
-            -e vulnerable=1 \
-            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
-            --health-interval 10s \
-            --health-retries 3 \
-            vampi-vulnerable-evomaster:latest
-
-          echo "Waiting for services to start..."
-          # Increased wait time to ensure services are fully ready
+          echo "Waiting for service to start..."
           sleep 30
 
           # Check container health
-          FAILED_CONTAINERS=""
-          for CONTAINER in vampi-restler vampi-wuppiefuzz vampi-evomaster; do
-            echo "Checking health of $CONTAINER..."
-            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER)
-            echo "Health status: $HEALTH_STATUS"
-            
-            if [ "$HEALTH_STATUS" != "healthy" ]; then
-              echo "::error::Container $CONTAINER is not healthy (status: $HEALTH_STATUS)"
-              echo "Last health check results:"
-              docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' $CONTAINER
-              echo "Container logs:"
-              docker logs $CONTAINER
-              FAILED_CONTAINERS="$FAILED_CONTAINERS $CONTAINER"
-            fi
-          done
-
-          if [ ! -z "$FAILED_CONTAINERS" ]; then
-            echo "::error::The following containers failed health checks:$FAILED_CONTAINERS"
+          HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' vampi)
+          echo "Health status: $HEALTH_STATUS"
+          
+          if [ "$HEALTH_STATUS" != "healthy" ]; then
+            echo "::error::VAmPI container is not healthy (status: $HEALTH_STATUS)"
+            docker logs vampi
             exit 1
           fi
-          
-          echo "All containers are healthy"
         shell: bash
 
-      - name: Build Fuzzer Images
+      - name: Build WuppieFuzz
         run: |
-          echo "Building fuzzer images..."
+          docker build -t wuppiefuzz:latest \
+            -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
+        shell: bash
+
+      - name: Run WuppieFuzz Tests
+        run: |
+          mkdir -p ${{ env.BASE_DIR }}/results/wuppiefuzz
           
-          # Build RESTler
-          docker build -t restler-fuzzer:latest \
-            -f services/restler/Dockerfile.restler services/restler/
+          # Copy OpenAPI spec
+          docker cp vampi:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/openapi3.yml
           
-          # Build WuppieFuzz
-          if [ -f services/wuppiefuzz/Cargo.toml ]; then
-            docker build -t wuppiefuzz:latest \
-              -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
-          else
-            echo "Warning: WuppieFuzz Cargo.toml not found, skipping build"
+          # Run WuppieFuzz
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/results/wuppiefuzz:/results \
+            -v ${{ env.BASE_DIR }}/openapi3.yml:/wuppiefuzz/openapi3.yml \
+            wuppiefuzz:latest \
+            --target http://vampi:5000 \
+            --spec /wuppiefuzz/openapi3.yml \
+            --duration 1h
+        shell: bash
+
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: wuppiefuzz-results
+          path: ${{ env.BASE_DIR }}/results/wuppiefuzz
+          retention-days: 14
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f vampi || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker image prune -f || true
+        shell: bash
+
+  evomaster-fuzzing:
+    runs-on: ubuntu-latest
+    env:
+      VAMPI_PORT: 5032
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Check Docker Configuration
+        run: |
+          chmod +x scripts/check-docker.sh
+          ./scripts/check-docker.sh
+        shell: bash
+
+      - name: Create Docker Network
+        run: |
+          echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
+          docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+        shell: bash
+
+      - name: Build and Start VAmPI
+        run: |
+          # Build VAmPI
+          docker build -t vampi-vulnerable:latest \
+            --build-arg PORT=${{ env.VAMPI_PORT }} \
+            -f services/vampi/Dockerfile services/vampi/
+
+          # Start VAmPI
+          docker run -d \
+            --name vampi \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -p ${{ env.VAMPI_PORT }}:5000 \
+            -e vulnerable=1 \
+            --health-cmd "curl -f http://localhost:5000/health || exit 1" \
+            --health-interval 10s \
+            --health-retries 3 \
+            vampi-vulnerable:latest
+
+          echo "Waiting for service to start..."
+          sleep 30
+
+          # Check container health
+          HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' vampi)
+          echo "Health status: $HEALTH_STATUS"
+          
+          if [ "$HEALTH_STATUS" != "healthy" ]; then
+            echo "::error::VAmPI container is not healthy (status: $HEALTH_STATUS)"
+            docker logs vampi
+            exit 1
           fi
-          
-          # Build EvoMaster
+        shell: bash
+
+      - name: Build EvoMaster
+        run: |
           docker build -t evomaster:latest \
             -f services/evomaster/Dockerfile.evomaster services/evomaster/
         shell: bash
 
-      - name: Run Fuzzing Tests
+      - name: Run EvoMaster Tests
         run: |
-          echo "Starting fuzzing tests..."
+          mkdir -p ${{ env.BASE_DIR }}/results/evomaster
           
-          # Create results directory
-          mkdir -p ${{ env.BASE_DIR }}/results
-          
-          # Copy OpenAPI spec from VAmPI container
-          echo "Copying OpenAPI spec from VAmPI container..."
-          docker cp vampi-restler:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/openapi3.yml
-          
-          # Run RESTler
-          echo "Running RESTler..."
-          docker run --rm \
-            --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v ${{ env.BASE_DIR }}/results:/results \
-            -v ${{ env.BASE_DIR }}/openapi3.yml:/workspace/openapi3.yml \
-            restler-fuzzer:latest \
-            --target_ip vampi-restler \
-            --target_port 5000 \
-            --time_budget 1h || echo "RESTler fuzzing failed"
-          
-          # Run WuppieFuzz if available
-          if docker image inspect wuppiefuzz:latest >/dev/null 2>&1; then
-            echo "Running WuppieFuzz..."
-            docker run --rm \
-              --network ${{ env.DOCKER_NETWORK_NAME }} \
-              -v ${{ env.BASE_DIR }}/results:/results \
-              -v ${{ env.BASE_DIR }}/openapi3.yml:/wuppiefuzz/openapi3.yml \
-              wuppiefuzz:latest \
-              --target http://vampi-wuppiefuzz:5000 \
-              --spec /wuppiefuzz/openapi3.yml \
-              --duration 1h || echo "WuppieFuzz fuzzing failed"
-          fi
+          # Copy OpenAPI spec
+          docker cp vampi:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/openapi3.yml
           
           # Run EvoMaster
-          echo "Running EvoMaster..."
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
-            -v ${{ env.BASE_DIR }}/results:/results \
+            -v ${{ env.BASE_DIR }}/results/evomaster:/results \
             -v ${{ env.BASE_DIR }}/openapi3.yml:/evomaster/openapi3.yml \
             -e SPEC_PATH=/evomaster/openapi3.yml \
             -e OUTPUT_DIR=/results \
-            -e TARGET_URL=http://vampi-evomaster:5000 \
+            -e TARGET_URL=http://vampi:5000 \
             -e TIME_BUDGET=1h \
-            evomaster:latest || echo "EvoMaster fuzzing failed"
+            evomaster:latest
         shell: bash
 
-      - name: Upload Fuzzing Results
+      - name: Upload Results
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: fuzzing-results
-          path: ${{ env.BASE_DIR }}/results
+          name: evomaster-results
+          path: ${{ env.BASE_DIR }}/results/evomaster
           retention-days: 14
 
-      - name: Cleanup Resources
+      - name: Cleanup
         if: always()
         run: |
-          echo "Cleaning up resources..."
-          # Remove containers
-          docker rm -f vampi-restler vampi-wuppiefuzz vampi-evomaster 2>/dev/null || true
-          # Remove network
-          docker network rm ${{ env.DOCKER_NETWORK_NAME }} 2>/dev/null || true
-          # Clean up dangling images
-          docker image prune -f 2>/dev/null || true
-          echo "Cleanup completed"
+          docker rm -f vampi || true
+          docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
+          docker image prune -f || true
         shell: bash
+
+  process-results:
+    needs: [restler-fuzzing, wuppiefuzz-fuzzing, evomaster-fuzzing]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download All Results
+        uses: actions/download-artifact@v3
+        with:
+          path: ${{ env.BASE_DIR }}/results
 
       - name: Process Results
-        if: always()
         run: |
-          echo "Processing fuzzing results..."
+          echo "### Fuzzing Test Summary" > summary.md
+          echo "Results for each fuzzer:" >> summary.md
           
-          # Check for any discovered vulnerabilities
-          if find ${{ env.BASE_DIR }}/results -type f -exec grep -l "vulnerability" {} \; | grep -q .; then
-            echo "::warning ::Potential vulnerabilities found in fuzzing results"
-          fi
-          
-          # Generate summary report
-          echo "### Fuzzing Test Summary" > ${{ env.BASE_DIR }}/results/summary.md
-          echo "Results for each fuzzer:" >> ${{ env.BASE_DIR }}/results/summary.md
-          
-          for FUZZER in ${{ env.FUZZERS }}; do
-            echo "#### $FUZZER" >> ${{ env.BASE_DIR }}/results/summary.md
-            if [ -d "${{ env.BASE_DIR }}/results/$FUZZER" ]; then
-              find "${{ env.BASE_DIR }}/results/$FUZZER" -type f -name "*.json" -exec cat {} \; | \
-                jq -r '. | select(.type=="finding") | "- " + .description' >> ${{ env.BASE_DIR }}/results/summary.md || true
+          for FUZZER in restler wuppiefuzz evomaster; do
+            echo "#### $FUZZER" >> summary.md
+            if [ -d "${{ env.BASE_DIR }}/results/$FUZZER-results" ]; then
+              find "${{ env.BASE_DIR }}/results/$FUZZER-results" -type f -name "*.json" -exec cat {} \; | \
+                jq -r '. | select(.type=="finding") | "- " + .description' >> summary.md || true
             fi
           done
-        shell: bash
 
       - name: Upload Summary
-        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: fuzzing-summary
-          path: ${{ env.BASE_DIR }}/results/summary.md
+          path: summary.md
           retention-days: 14
