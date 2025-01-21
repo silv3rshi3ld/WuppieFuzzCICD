@@ -172,11 +172,16 @@ jobs:
           # Create results directory
           mkdir -p ${{ env.BASE_DIR }}/results
           
+          # Copy OpenAPI spec from VAmPI container
+          echo "Copying OpenAPI spec from VAmPI container..."
+          docker cp vampi-restler:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/openapi3.yml
+          
           # Run RESTler
           echo "Running RESTler..."
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v ${{ env.BASE_DIR }}/results:/results \
+            -v ${{ env.BASE_DIR }}/openapi3.yml:/workspace/openapi3.yml \
             restler-fuzzer:latest \
             --target_ip vampi-restler \
             --target_port 5000 \
@@ -188,8 +193,10 @@ jobs:
             docker run --rm \
               --network ${{ env.DOCKER_NETWORK_NAME }} \
               -v ${{ env.BASE_DIR }}/results:/results \
+              -v ${{ env.BASE_DIR }}/openapi3.yml:/wuppiefuzz/openapi3.yml \
               wuppiefuzz:latest \
               --target http://vampi-wuppiefuzz:5000 \
+              --spec /wuppiefuzz/openapi3.yml \
               --duration 1h || echo "WuppieFuzz fuzzing failed"
           fi
           
@@ -198,10 +205,12 @@ jobs:
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v ${{ env.BASE_DIR }}/results:/results \
-            evomaster:latest \
-            --targetHost vampi-evomaster \
-            --targetPort 5000 \
-            --maxTime 1h || echo "EvoMaster fuzzing failed"
+            -v ${{ env.BASE_DIR }}/openapi3.yml:/evomaster/openapi3.yml \
+            -e SPEC_PATH=/evomaster/openapi3.yml \
+            -e OUTPUT_DIR=/results \
+            -e TARGET_URL=http://vampi-evomaster:5000 \
+            -e TIME_BUDGET=1h \
+            evomaster:latest || echo "EvoMaster fuzzing failed"
         shell: bash
 
       - name: Upload Fuzzing Results
