@@ -81,6 +81,7 @@ jobs:
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
           mkdir -p ${{ env.BASE_DIR }}/workspace/restler/config
+          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/Compile
         shell: bash
 
       - name: Copy RESTler Files
@@ -102,8 +103,9 @@ jobs:
           FUZZ_TIME_BUDGET: "0.75"
         run: |
           docker build -t restler-fuzzer:latest -f Dockerfile.restler .
-          # Ensure output directory has correct permissions
+          # Ensure directories have correct permissions
           chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/output
+          chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/Compile
 
           # First compile the API specification
           docker run --rm \
@@ -111,6 +113,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             compile \
@@ -122,6 +125,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             test \
@@ -138,6 +142,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             fuzz \
@@ -155,7 +160,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: ${{ env.BASE_DIR }}/workspace/restler/output
+          path: |
+            ${{ env.BASE_DIR }}/workspace/restler/output
+            ${{ env.BASE_DIR }}/workspace/restler/Compile
           retention-days: 14
 
       - name: Cleanup
@@ -175,6 +182,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Check Docker Configuration
+        run: |
+          chmod +x scripts/check-docker.sh
+          ./scripts/check-docker.sh
+        shell: bash
+
+      - name: Create Docker Network
+        run: |
+          echo "Creating Docker network: ${{ env.DOCKER_NETWORK_NAME }}..."
+          docker network create ${{ env.DOCKER_NETWORK_NAME }} || true
+        shell: bash
 
       - name: Checkout WuppieFuzz Repository
         uses: actions/checkout@v4
@@ -208,7 +227,15 @@ jobs:
           hash=$(find . -type f -name '*.rs' -o -name 'Cargo.toml' -o -name 'Cargo.lock' | sort | xargs sha1sum | sha1sum | awk '{ print $1 }')
           echo "hash=$hash" >> $GITHUB_OUTPUT
 
+      - name: Cache WuppieFuzz Binary
+        id: cache-binary
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
+          key: wuppiefuzz-binary-${{ runner.os }}-${{ steps.wuppiefuzz-hash.outputs.hash }}
+
       - name: Build WuppieFuzz
+        if: steps.cache-binary.outputs.cache-hit != 'true'
         working-directory: ${{ env.BASE_DIR }}/wuppiefuzz
         run: cargo build --release
         shell: bash
@@ -281,12 +308,14 @@ jobs:
             --timeout=60 \
             ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
 
-      - name: Upload WuppieFuzz Results
+      - name: Upload WuppieFuzz Results and Binary
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/workspace/wuppiefuzz/reports/
+          path: |
+            ${{ env.BASE_DIR }}/workspace/wuppiefuzz/reports/
+            ${{ env.BASE_DIR }}/wuppiefuzz/target/release/wuppiefuzz
           if-no-files-found: warn
 
       - name: Cleanup
