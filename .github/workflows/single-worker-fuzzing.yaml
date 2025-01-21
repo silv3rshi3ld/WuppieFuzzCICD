@@ -52,6 +52,9 @@ jobs:
           echo "fuzz_lean_budget=$(echo "$TOTAL_BUDGET * 0.25" | bc)" >> $GITHUB_OUTPUT
           echo "fuzz_budget=$(echo "$TOTAL_BUDGET * 0.75" | bc)" >> $GITHUB_OUTPUT
 
+      - name: Create RESTler workspace directory
+        run: mkdir -p ${{ env.BASE_DIR }}/workspace/restler
+
       - name: Run RESTler
         uses: ./.github/actions/run-restler
         with:
