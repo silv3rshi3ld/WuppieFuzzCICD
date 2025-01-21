@@ -113,11 +113,15 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             compile \
             --api_spec /workspace/openapi3.yml
+
+          # Copy compiled files from container
+          docker create --name restler_temp restler-fuzzer:latest
+          docker cp restler_temp:/workspace/Compile ${{ env.BASE_DIR }}/workspace/restler/
+          docker rm restler_temp
 
           # Then run the test phase
           docker run --rm \
@@ -125,7 +129,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile:ro \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             test \
@@ -142,7 +146,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
-            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile \
+            -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile:ro \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
             restler-fuzzer:latest \
             fuzz \

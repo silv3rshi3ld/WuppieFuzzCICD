@@ -5,7 +5,10 @@ echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
 mkdir -p /workspace/output
-chmod 755 /workspace/output
+chmod -R 755 /workspace/output
+
+# Clean up any existing Compile directory
+rm -rf /workspace/Compile
 
 # Change to the workspace directory
 cd /workspace
