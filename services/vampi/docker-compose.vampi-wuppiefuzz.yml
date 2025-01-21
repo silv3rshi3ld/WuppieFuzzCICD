@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  vampi-wuppiefuzz:
+    image: localhost:5000/vampi-vulnerable-wuppiefuzz:latest
+    environment:
+      - vulnerable=1
+    ports:
+      - "5022:5000"
+    networks:
+      - wuppiefuzz_network
+    deploy:
+      placement:
+        constraints:
+          - node.labels.fuzzer == wuppiefuzz
+
+networks:
+  wuppiefuzz_network:
+    external: true
