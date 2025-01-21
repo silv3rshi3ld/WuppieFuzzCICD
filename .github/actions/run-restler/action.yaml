@@ -5,8 +5,11 @@ inputs:
   base_dir:
     description: Base directory for workspace
     required: true
-  time_budget:
-    description: Time budget in hours
+  fuzz_lean_time_budget:
+    description: Time budget for fuzz lean phase
+    required: true
+  fuzz_time_budget:
+    description: Time budget for fuzz phase
     required: true
 
 runs:
@@ -42,8 +45,8 @@ runs:
         TARGET_HOST: vampi-restler
         RUN_FUZZ_LEAN: 'true'
         RUN_FUZZ: 'true'
-        FUZZ_LEAN_TIME_BUDGET: ${{ fromJSON(inputs.time_budget) * 0.25 }}
-        FUZZ_TIME_BUDGET: ${{ fromJSON(inputs.time_budget) * 0.75 }}
+        FUZZ_LEAN_TIME_BUDGET: ${{ inputs.fuzz_lean_time_budget }}
+        FUZZ_TIME_BUDGET: ${{ inputs.fuzz_time_budget }}
       shell: bash
       run: |
         docker run --rm --network restler_network \

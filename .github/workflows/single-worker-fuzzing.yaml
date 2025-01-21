@@ -45,11 +45,19 @@ jobs:
           network_name: restler_network
           container_name: vampi-restler
 
+      - name: Calculate Time Budgets
+        id: time-budgets
+        run: |
+          TOTAL_BUDGET=${{ github.event.inputs.restler_time_budget || 1 }}
+          echo "fuzz_lean_budget=$(echo "$TOTAL_BUDGET * 0.25" | bc)" >> $GITHUB_OUTPUT
+          echo "fuzz_budget=$(echo "$TOTAL_BUDGET * 0.75" | bc)" >> $GITHUB_OUTPUT
+
       - name: Run RESTler
         uses: ./.github/actions/run-restler
         with:
           base_dir: ${{ env.BASE_DIR }}
-          time_budget: ${{ github.event.inputs.restler_time_budget || 1 }}
+          fuzz_lean_time_budget: ${{ steps.time-budgets.outputs.fuzz_lean_budget }}
+          fuzz_time_budget: ${{ steps.time-budgets.outputs.fuzz_budget }}
 
       - uses: actions/upload-artifact@v4
         if: always()
