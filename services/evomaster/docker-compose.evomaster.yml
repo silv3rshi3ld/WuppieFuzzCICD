@@ -7,7 +7,7 @@ services:
     environment:
       SPEC_PATH: "/specs/openapi3.yml"
       OUTPUT_DIR: "/evomaster/results"
-      TARGET_URL: "http://vampi-vulnerable:${VAMPI_PORT:-5032}"
+      TARGET_URL: "http://vampi-evomaster:5032"
       TIME_BUDGET: "3600"
     volumes:
       - type: bind
