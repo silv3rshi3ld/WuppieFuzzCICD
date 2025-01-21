@@ -50,26 +50,18 @@ if [ ! -f "/workspace/openapi3.yml" ]; then
     exit 1
 fi
 
-# First generate the config files
-echo "Generating RESTler config files..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" generate_config \
-    --specs "/workspace/openapi3.yml"
-
-# Check if config files were generated
-if [ ! -d "/workspace/restlerConfig" ]; then
-    echo "Error: Failed to generate RESTler config files"
+# Copy config files to restlerConfig directory
+echo "Setting up RESTler configuration..."
+mkdir -p /workspace/restlerConfig
+cp /workspace/config/* /workspace/restlerConfig/ || {
+    echo "Error: Failed to copy config files"
     exit 1
-fi
-
-# Copy engine settings if not already in config
-if [ ! -f "/workspace/restlerConfig/engine_settings.json" ] && [ -f "/workspace/config/engine_settings.json" ]; then
-    cp "/workspace/config/engine_settings.json" "/workspace/restlerConfig/"
-fi
+}
 
 # Compile API specification with full config
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --config_path "/workspace/restlerConfig/config.json"
+    --config_path "/workspace/config/config.json"
 
 # Verify compilation output
 echo "Checking compilation output..."
