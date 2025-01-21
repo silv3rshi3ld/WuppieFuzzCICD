@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  DOCKER_NETWORK_NAME: fuzzing_network
+  DOCKER_NETWORK_NAME: cicd_network
   BASE_DIR: ${{ github.workspace }}
 
 jobs:
@@ -49,7 +49,7 @@ jobs:
 
           # Start VAmPI
           docker run -d \
-            --name vampi \
+            --name vampi-restler \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_PORT }}:5000 \
             -e vulnerable=1 \
@@ -62,13 +62,13 @@ jobs:
 
           echo "Waiting for VAmPI to become healthy..."
           for i in {1..30}; do
-            if docker exec vampi curl -s http://localhost:5000/health >/dev/null; then
+            if docker exec vampi-restler curl -s http://localhost:5000/health >/dev/null; then
               echo "VAmPI is ready!"
               break
             fi
             if [ $i -eq 30 ]; then
               echo "VAmPI failed to become ready"
-              docker logs vampi
+              docker logs vampi-restler
               exit 1
             fi
             echo "Waiting for VAmPI to be ready... (attempt $i/30)"
@@ -89,14 +89,14 @@ jobs:
           cp -r services/restler/config/* ${{ env.BASE_DIR }}/workspace/restler/config/
           cp services/restler/docker-compose.restler.yml ${{ env.BASE_DIR }}/workspace/restler/
           cp services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/workspace/restler/
-          docker cp vampi:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
+          docker cp vampi-restler:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml
         shell: bash
 
       - name: Run RESTler
         working-directory: ${{ env.BASE_DIR }}/workspace/restler
         env:
           TARGET_PORT: "5000"
-          TARGET_HOST: "vampi"
+          TARGET_HOST: "vampi-restler"
           RUN_FUZZ_LEAN: "true"
           RUN_FUZZ: "true"
           FUZZ_LEAN_TIME_BUDGET: "0.25"
@@ -114,6 +114,8 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
+            -e TARGET_IP=vampi-restler \
+            -e TARGET_PORT=5000 \
             restler-fuzzer:latest \
             compile \
             --api_spec /workspace/openapi3.yml
@@ -131,13 +133,15 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile:ro \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
+            -e TARGET_IP=vampi-restler \
+            -e TARGET_PORT=5000 \
             restler-fuzzer:latest \
             test \
             --grammar_file /workspace/Compile/grammar.py \
             --dictionary_file /workspace/Compile/dict.json \
             --settings /workspace/Compile/engine_settings.json \
-            --target_ip $TARGET_HOST \
-            --target_port $TARGET_PORT \
+            --target_ip vampi-restler \
+            --target_port 5000 \
             --no_ssl
 
           # Finally run the fuzzing phase
@@ -148,13 +152,15 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/Compile:/workspace/Compile:ro \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
+            -e TARGET_IP=vampi-restler \
+            -e TARGET_PORT=5000 \
             restler-fuzzer:latest \
             fuzz \
             --grammar_file /workspace/Compile/grammar.py \
             --dictionary_file /workspace/Compile/dict.json \
             --settings /workspace/Compile/engine_settings.json \
-            --target_ip $TARGET_HOST \
-            --target_port $TARGET_PORT \
+            --target_ip vampi-restler \
+            --target_port 5000 \
             --no_ssl \
             --time_budget $FUZZ_TIME_BUDGET
         shell: bash
@@ -172,7 +178,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi || true
+          docker rm -f vampi-restler || true
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           docker image prune -f || true
         shell: bash
@@ -276,7 +282,7 @@ jobs:
 
           # Start VAmPI
           docker run -d \
-            --name vampi \
+            --name vampi-wuppiefuzz \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_PORT }}:5000 \
             -e vulnerable=1 \
@@ -289,13 +295,13 @@ jobs:
 
           echo "Waiting for VAmPI to become healthy..."
           for i in {1..30}; do
-            if curl -s http://localhost:${{ env.VAMPI_PORT }}/health >/dev/null; then
+            if docker exec vampi-wuppiefuzz curl -s http://localhost:5000/health >/dev/null; then
               echo "VAmPI is ready!"
               break
             fi
             if [ $i -eq 30 ]; then
               echo "VAmPI failed to become ready"
-              docker logs vampi
+              docker logs vampi-wuppiefuzz
               exit 1
             fi
             echo "Waiting for VAmPI to be ready... (attempt $i/30)"
@@ -331,7 +337,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi || true
+          docker rm -f vampi-wuppiefuzz || true
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           docker image prune -f || true
           rm -rf ${{ env.BASE_DIR }}/workspace/wuppiefuzz
@@ -368,7 +374,7 @@ jobs:
 
           # Start VAmPI
           docker run -d \
-            --name vampi \
+            --name vampi-evomaster \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -p ${{ env.VAMPI_PORT }}:5000 \
             -e vulnerable=1 \
@@ -381,13 +387,13 @@ jobs:
 
           echo "Waiting for VAmPI to become healthy..."
           for i in {1..30}; do
-            if curl -s http://localhost:${{ env.VAMPI_PORT }}/health >/dev/null; then
+            if docker exec vampi-evomaster curl -s http://localhost:5000/health >/dev/null; then
               echo "VAmPI is ready!"
               break
             fi
             if [ $i -eq 30 ]; then
               echo "VAmPI failed to become ready"
-              docker logs vampi
+              docker logs vampi-evomaster
               exit 1
             fi
             echo "Waiting for VAmPI to be ready... (attempt $i/30)"
@@ -409,7 +415,7 @@ jobs:
 
       - name: Copy EvoMaster Files
         run: |
-          docker cp vampi:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
+          docker cp vampi-evomaster:/vampi/openapi_specs/openapi3.yml ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml
         shell: bash
 
       - name: Run EvoMaster Tests
@@ -424,7 +430,7 @@ jobs:
             -v ${{ env.BASE_DIR }}/workspace/evomaster/openapi3.yml:/evomaster/openapi3.yml:ro \
             -e SPEC_PATH=/evomaster/openapi3.yml \
             -e OUTPUT_DIR=/results \
-            -e TARGET_URL=http://vampi:5000 \
+            -e TARGET_URL=http://vampi-evomaster:5000 \
             -e TIME_BUDGET=1h \
             evomaster:latest
         shell: bash
@@ -440,7 +446,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f vampi || true
+          docker rm -f vampi-evomaster || true
           docker network rm ${{ env.DOCKER_NETWORK_NAME }} || true
           docker image prune -f || true
         shell: bash
