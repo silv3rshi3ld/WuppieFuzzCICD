@@ -98,26 +98,56 @@ jobs:
           TARGET_HOST: "vampi"
           RUN_FUZZ_LEAN: "true"
           RUN_FUZZ: "true"
-          FUZZ_LEAN_TIME_BUDGET: "15m"
-          FUZZ_TIME_BUDGET: "45m"
+          FUZZ_LEAN_TIME_BUDGET: "0.25"
+          FUZZ_TIME_BUDGET: "0.75"
         run: |
           docker build -t restler-fuzzer:latest -f Dockerfile.restler .
           # Ensure output directory has correct permissions
           chmod -R 755 ${{ env.BASE_DIR }}/workspace/restler/output
 
+          # First compile the API specification
           docker run --rm \
             --network ${{ env.DOCKER_NETWORK_NAME }} \
             -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
             -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
             -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
-            -e TARGET_IP=$TARGET_HOST \
-            -e TARGET_PORT=$TARGET_PORT \
-            -e RUN_FUZZ_LEAN=$RUN_FUZZ_LEAN \
-            -e RUN_FUZZ=$RUN_FUZZ \
-            -e FUZZ_LEAN_TIME_BUDGET=$FUZZ_LEAN_TIME_BUDGET \
-            -e FUZZ_TIME_BUDGET=$FUZZ_TIME_BUDGET \
             -e RESTLER_TELEMETRY_OPTOUT=1 \
-            restler-fuzzer:latest
+            restler-fuzzer:latest \
+            compile \
+            --api_spec /workspace/openapi3.yml
+
+          # Then run the test phase
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
+            -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
+            -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
+            -e RESTLER_TELEMETRY_OPTOUT=1 \
+            restler-fuzzer:latest \
+            test \
+            --grammar_file /workspace/Compile/grammar.py \
+            --dictionary_file /workspace/Compile/dict.json \
+            --settings /workspace/Compile/engine_settings.json \
+            --target_ip $TARGET_HOST \
+            --target_port $TARGET_PORT \
+            --no_ssl
+
+          # Finally run the fuzzing phase
+          docker run --rm \
+            --network ${{ env.DOCKER_NETWORK_NAME }} \
+            -v ${{ env.BASE_DIR }}/workspace/restler/output:/workspace/output \
+            -v ${{ env.BASE_DIR }}/workspace/restler/openapi3.yml:/workspace/openapi3.yml:ro \
+            -v ${{ env.BASE_DIR }}/workspace/restler/config:/workspace/config:ro \
+            -e RESTLER_TELEMETRY_OPTOUT=1 \
+            restler-fuzzer:latest \
+            fuzz \
+            --grammar_file /workspace/Compile/grammar.py \
+            --dictionary_file /workspace/Compile/dict.json \
+            --settings /workspace/Compile/engine_settings.json \
+            --target_ip $TARGET_HOST \
+            --target_port $TARGET_PORT \
+            --no_ssl \
+            --time_budget $FUZZ_TIME_BUDGET
         shell: bash
 
       - name: Upload RESTler Results
