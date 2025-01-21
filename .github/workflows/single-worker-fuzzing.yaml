@@ -62,7 +62,7 @@ jobs:
 
           echo "Waiting for VAmPI to become healthy..."
           for i in {1..30}; do
-            if curl -s http://localhost:${{ env.VAMPI_PORT }}/health >/dev/null; then
+            if docker exec vampi curl -s http://localhost:5000/health >/dev/null; then
               echo "VAmPI is ready!"
               break
             fi

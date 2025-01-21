@@ -15,25 +15,43 @@ cd /workspace
 
 # Wait for vampi service to be ready
 echo "Waiting for vampi service to be ready..."
+echo "Checking health endpoint at http://${TARGET_IP}:${TARGET_PORT}/health"
 for i in {1..30}; do
-    if curl -s "http://${TARGET_IP}:${TARGET_PORT}/health" > /dev/null; then
-        echo "Vampi service is ready"
+    response=$(curl -s -w "\n%{http_code}" "http://${TARGET_IP}:${TARGET_PORT}/health")
+    status_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | head -n-1)
+    
+    if [ "$status_code" = "200" ]; then
+        echo "Vampi service is ready! Response: $body"
         break
     fi
+    
     if [ $i -eq 30 ]; then
-        echo "Vampi service failed to become ready"
+        echo "Vampi service failed to become ready after 30 attempts"
+        echo "Last response code: $status_code"
+        echo "Last response body: $body"
+        echo "Attempting DNS lookup for ${TARGET_IP}..."
+        getent hosts ${TARGET_IP} || echo "DNS lookup failed"
         exit 1
     fi
-    echo "Waiting for vampi service... (attempt $i/30)"
+    
+    echo "Waiting for vampi service... (attempt $i/30, last status: $status_code)"
     sleep 2
 done
 
-# Download OpenAPI spec from vampi service
-echo "Downloading OpenAPI spec from ${SWAGGER_URL}..."
-curl -f -o /workspace/openapi3.yml ${SWAGGER_URL} || {
-    echo "Error: Failed to download OpenAPI spec from ${SWAGGER_URL}"
+# Check if OpenAPI spec exists or needs to be downloaded
+if [ ! -f "/workspace/openapi3.yml" ] && [ -n "${SWAGGER_URL}" ]; then
+    echo "Downloading OpenAPI spec from ${SWAGGER_URL}..."
+    curl -f -o /workspace/openapi3.yml ${SWAGGER_URL} || {
+        echo "Error: Failed to download OpenAPI spec from ${SWAGGER_URL}"
+        exit 1
+    }
+fi
+
+if [ ! -f "/workspace/openapi3.yml" ]; then
+    echo "Error: OpenAPI spec not found at /workspace/openapi3.yml and no SWAGGER_URL provided"
     exit 1
-}
+fi
 
 # Compile API specification
 echo "Compiling API specification..."
