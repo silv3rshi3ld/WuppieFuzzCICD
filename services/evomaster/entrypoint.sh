@@ -6,4 +6,5 @@ java -jar evomaster.jar \
     --outputFolder="$OUTPUT_DIR" \
     --bbTargetUrl="$TARGET_URL" \
     --maxTime="$TIME_BUDGET" \
-    --blackBox=true
+    --blackBox=true \
+    --sqlCaseMode=UPPER_KEYWORDS
