@@ -12,15 +12,17 @@ services:
       FUZZ_LEAN_TIME_BUDGET: "0.05"
       RUN_FUZZ: "true"
       FUZZ_TIME_BUDGET: "0.25"
-      TARGET_IP: "vampi-restler"
-      TARGET_PORT: "5000"
-      SWAGGER_URL: "http://vampi-restler:5000/openapi3.yml"
+      TARGET_IP: ${TARGET_HOST:-vampi}
+      TARGET_PORT: ${TARGET_PORT:-5000}
+      SWAGGER_URL: "http://${TARGET_HOST:-vampi}:${TARGET_PORT:-5000}/openapi3.yml"
     volumes:
-      - ./:/workspace
-      - ./config:/service/config
+      - ${BASE_DIR:-./workspace/restler}/output:/workspace/output
+      - ${BASE_DIR:-./workspace/restler}/Compile:/workspace/Compile
+      - ${BASE_DIR:-./workspace/restler}/openapi3.yml:/workspace/openapi3.yml:ro
+      - ${BASE_DIR:-./workspace/restler}/config:/workspace/config:ro
     networks:
-      - restler_network
+      - ${DOCKER_NETWORK_NAME:-fuzzing_network}
 
 networks:
-  restler_network:
+  ${DOCKER_NETWORK_NAME:-fuzzing_network}:
     external: true

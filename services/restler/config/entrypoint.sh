@@ -4,14 +4,11 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/output
-chmod -R 755 /workspace/output
-
-# Clean up any existing Compile directory
-rm -rf /workspace/Compile
+mkdir -p /workspace/output /workspace/Compile /workspace/Test /workspace/FuzzLean /workspace/Fuzz
+chmod -R 755 /workspace/output /workspace/Compile /workspace/Test /workspace/FuzzLean /workspace/Fuzz
 
 # Change to the workspace directory
-cd /workspace
+cd /workspace || exit 1
 
 # Wait for vampi service to be ready
 echo "Waiting for vampi service to be ready..."
@@ -111,6 +108,12 @@ echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
     if [ -d "${dir}/RestlerResults" ]; then
         mkdir -p "output/${dir}"
-        cp -r "${dir}/RestlerResults" "output/${dir}/RestlerResults"
+        cp -r "${dir}/RestlerResults" "output/${dir}/RestlerResults" || {
+            echo "Failed to copy results from ${dir}"
+            exit 1
+        }
     fi
 done
+
+# Ensure output files are readable
+chmod -R 755 /workspace/output

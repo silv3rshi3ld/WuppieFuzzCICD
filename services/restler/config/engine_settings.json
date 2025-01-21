@@ -1,0 +1,55 @@
+{
+    "max_combinations": 20,
+    "max_request_execution_time": 90,
+    "max_async_resource_creation_time": 60,
+    "global_producer_timing_delay": 2,
+    "dyn_objects_cache_size": 10,
+    "fuzzing_mode": "directed-smoke-test",
+    "ignore_dependencies": false,
+    "ignore_feedback": false,
+    "authentication": {
+        "token_refresh_interval": 300,
+        "token_refresh_command": null
+    },
+    "checkers": {
+        "useafterfree": {
+            "mode": "exhaustive"
+        },
+        "leakagerule": {
+            "mode": "normal"
+        },
+        "resourcehierarchy": {
+            "mode": "exhaustive"
+        },
+        "invalidvalue": {
+            "mode": "normal",
+            "custom_payload": null,
+            "custom_payload_uuid4_suffix": false,
+            "value": []
+        },
+        "payloadbody": {
+            "mode": "normal"
+        },
+        "examples": {
+            "mode": "normal"
+        }
+    },
+    "client_certificate_path": null,
+    "settings": {
+        "max_args_combinations_to_profile": 100,
+        "max_response_wait_time": 120,
+        "max_request_send_time": 90,
+        "request_throttle_ms": 50,
+        "memory_limit_mb": 1024,
+        "thread_timeout_seconds": 300,
+        "path_regex": null,
+        "target_port": null,
+        "target_ip": null,
+        "no_ssl": true,
+        "host": null,
+        "include_user_agent": false,
+        "disable_cert_validation": false,
+        "ssl_cert_path": null,
+        "ssl_key_path": null
+    }
+}
