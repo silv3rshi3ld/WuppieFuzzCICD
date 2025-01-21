@@ -7,4 +7,3 @@ java -jar evomaster.jar \
     --bbTargetUrl="$TARGET_URL" \
     --maxTime="$TIME_BUDGET" \
     --blackBox=true \
-    --sqlCaseMode=UPPER_KEYWORDS
