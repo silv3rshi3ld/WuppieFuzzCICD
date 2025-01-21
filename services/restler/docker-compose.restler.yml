@@ -12,8 +12,9 @@ services:
       FUZZ_LEAN_TIME_BUDGET: "0.05"
       RUN_FUZZ: "true"
       FUZZ_TIME_BUDGET: "0.25"
-      TARGET_IP: "vampi"
+      TARGET_IP: "vampi-restler"
       TARGET_PORT: "5000"
+      SWAGGER_URL: "http://vampi-restler:5000/openapi3.yml"
     volumes:
       - ./:/workspace
       - ./config:/service/config
