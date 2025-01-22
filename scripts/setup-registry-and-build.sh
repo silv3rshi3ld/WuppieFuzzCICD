@@ -23,7 +23,8 @@ build_and_push() {
     docker push $tag
     
     # Verify push was successful by checking manifest
-    image_name=$(echo "$tag" | cut -d':' -f1 | sed 's|localhost:5000/||')
+    # Correctly extract image name by removing registry and tag parts
+    image_name=$(echo "$tag" | sed -e 's|^localhost:5000/||' -e 's/:.*//')
     echo "Verifying image $image_name in registry..."
     
     # Try to get manifest with retries
