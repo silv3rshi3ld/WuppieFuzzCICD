@@ -40,9 +40,9 @@ jobs:
           REGISTRY_NAME=registry-${{ github.run_id }}
           echo "name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
           
-          # Find available port
+          # Find available port using ss instead of netstat
           for port in {5000..5100}; do
-            if ! netstat -tuln | grep -q ":$port "; then
+            if ! ss -tuln | grep -q ":${port}\b"; then
               echo "port=$port" >> $GITHUB_OUTPUT
               docker rm -f $REGISTRY_NAME || true
               docker run -d \
