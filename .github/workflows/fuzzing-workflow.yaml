@@ -25,7 +25,7 @@ env:
 
 permissions:
   contents: read
-  packages: write
+  packages: read  # Required for pulling images
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -42,27 +42,16 @@ jobs:
 
       - name: Build and push images
         run: |
-          # Build and push VAmPI
-          docker build -t ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }} \
-            ${{ env.BASE_DIR }}/services/vampi
+          docker build -t ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }} ${{ env.BASE_DIR }}/services/vampi
           docker push ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
 
-          # Build and push RESTler
-          docker build -t ghcr.io/silv3rshi3ld/restler:${{ github.run_id }} \
-            -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
-            ${{ env.BASE_DIR }}/services/restler
+          docker build -t ghcr.io/silv3rshi3ld/restler:${{ github.run_id }} -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/services/restler
           docker push ghcr.io/silv3rshi3ld/restler:${{ github.run_id }}
 
-          # Build and push EvoMaster
-          docker build -t ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }} \
-            -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster \
-            ${{ env.BASE_DIR }}/services/evomaster
+          docker build -t ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }} -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster ${{ env.BASE_DIR }}/services/evomaster
           docker push ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }}
 
-          # Build and push WuppieFuzz
-          docker build -t ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }} \
-            -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz \
-            ${{ env.BASE_DIR }}/services/wuppiefuzz
+          docker build -t ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }} -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz ${{ env.BASE_DIR }}/services/wuppiefuzz
           docker push ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }}
 
   deploy_restler_vampi:
@@ -72,11 +61,13 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create network
         run: docker network create restler_network_${{ github.run_id }}
+
       - name: Deploy VAmPI
         run: |
           docker run -d \
@@ -84,6 +75,7 @@ jobs:
             --network restler_network_${{ github.run_id }} \
             -e vulnerable=1 \
             ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
+
       - name: Get IP
         id: get-ip
         run: |
@@ -97,11 +89,13 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create network
         run: docker network create wuppiefuzz_network_${{ github.run_id }}
+
       - name: Deploy VAmPI
         run: |
           docker run -d \
@@ -109,6 +103,7 @@ jobs:
             --network wuppiefuzz_network_${{ github.run_id }} \
             -e vulnerable=1 \
             ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
+
       - name: Get IP
         id: get-ip
         run: |
@@ -122,11 +117,13 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create network
         run: docker network create evomaster_network_${{ github.run_id }}
+
       - name: Deploy VAmPI
         run: |
           docker run -d \
@@ -134,6 +131,7 @@ jobs:
             --network evomaster_network_${{ github.run_id }} \
             -e vulnerable=1 \
             ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
+
       - name: Get IP
         id: get-ip
         run: |
@@ -145,8 +143,13 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create results directory
         run: mkdir -p fuzzing_results/restler
+
       - name: Run RESTler
         env:
           TARGET_IP: ${{ needs.deploy_restler_vampi.outputs.vampi_ip }}
@@ -164,13 +167,24 @@ jobs:
             -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
             ghcr.io/silv3rshi3ld/restler:${{ github.run_id }}
 
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-results
+          path: fuzzing_results/restler
+
   run_wuppiefuzz:
     needs: deploy_wuppiefuzz_vampi
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
+
       - name: Run WuppieFuzz
         env:
           TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
@@ -184,13 +198,24 @@ jobs:
             -e FUZZ_TIME="${{ github.event.inputs.wuppie_time }}" \
             ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }}
 
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-results
+          path: fuzzing_results/wuppiefuzz
+
   run_evomaster:
     needs: deploy_evomaster_vampi
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Create results directory
         run: mkdir -p fuzzing_results/evomaster
+
       - name: Run EvoMaster
         env:
           TARGET_IP: ${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}
@@ -203,6 +228,12 @@ jobs:
             -e TARGET_PORT=5000 \
             -e SEARCH_TIME="${{ github.event.inputs.evomaster_time }}" \
             ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: evomaster-results
+          path: fuzzing_results/evomaster
 
   cleanup:
     needs: 
