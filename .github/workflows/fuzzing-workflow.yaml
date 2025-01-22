@@ -21,7 +21,6 @@ on:
         default: 10
 
 env:
-  REGISTRY_PORT: 5000
   BASE_DIR: ${{ github.workspace }}
 
 concurrency:
@@ -33,6 +32,7 @@ jobs:
     runs-on: self-hosted
     outputs:
       registry_name: ${{ steps.set-registry.outputs.name }}
+      registry_port: ${{ steps.set-registry.outputs.port }}
     steps:
       - name: Configure unique registry
         id: set-registry
@@ -40,13 +40,20 @@ jobs:
           REGISTRY_NAME=registry-${{ github.run_id }}
           echo "name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
           
-          docker rm -f $REGISTRY_NAME || true
-          docker run -d \
-            -p ${{ env.REGISTRY_PORT }}:5000 \
-            --name $REGISTRY_NAME \
-            --rm \
-            registry:2
-          sleep 5
+          # Find available port
+          for port in {5000..5100}; do
+            if ! netstat -tuln | grep -q ":$port "; then
+              echo "port=$port" >> $GITHUB_OUTPUT
+              docker rm -f $REGISTRY_NAME || true
+              docker run -d \
+                -p $port:5000 \
+                --name $REGISTRY_NAME \
+                --rm \
+                registry:2
+              sleep 5
+              break
+            fi
+          done
 
   build_images:
     needs: setup_registry
@@ -57,27 +64,27 @@ jobs:
       - name: Build and push images
         run: |
           # Build VAmPI
-          docker build -t localhost:${{ env.REGISTRY_PORT }}/vampi \
+          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi \
             ${{ env.BASE_DIR }}/services/vampi
-          docker push localhost:${{ env.REGISTRY_PORT }}/vampi
+          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
 
           # Build RESTler
-          docker build -t localhost:${{ env.REGISTRY_PORT }}/restler \
+          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/restler \
             -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
             ${{ env.BASE_DIR }}/services/restler
-          docker push localhost:${{ env.REGISTRY_PORT }}/restler
+          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/restler
 
           # Build EvoMaster
-          docker build -t localhost:${{ env.REGISTRY_PORT }}/evomaster \
+          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster \
             -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster \
             ${{ env.BASE_DIR }}/services/evomaster
-          docker push localhost:${{ env.REGISTRY_PORT }}/evomaster
+          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster
 
           # Build WuppieFuzz
-          docker build -t localhost:${{ env.REGISTRY_PORT }}/wuppiefuzz \
+          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz \
             -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz \
             ${{ env.BASE_DIR }}/services/wuppiefuzz
-          docker push localhost:${{ env.REGISTRY_PORT }}/wuppiefuzz
+          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz
 
   deploy_restler_vampi:
     needs: [setup_registry, build_images]
@@ -94,7 +101,7 @@ jobs:
             --name vampi-restler_${{ github.run_id }} \
             --network restler_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ env.REGISTRY_PORT }}/vampi
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
       - name: Get IP
         id: get-ip
         run: |
@@ -116,7 +123,7 @@ jobs:
             --name vampi-wuppiefuzz_${{ github.run_id }} \
             --network wuppiefuzz_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ env.REGISTRY_PORT }}/vampi
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
       - name: Get IP
         id: get-ip
         run: |
@@ -138,7 +145,7 @@ jobs:
             --name vampi-evomaster_${{ github.run_id }} \
             --network evomaster_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ env.REGISTRY_PORT }}/vampi
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
       - name: Get IP
         id: get-ip
         run: |
@@ -167,7 +174,7 @@ jobs:
             -e RUN_FUZZ=true \
             -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
             -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
-            localhost:${{ env.REGISTRY_PORT }}/restler
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/restler
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
@@ -189,7 +196,7 @@ jobs:
             --network wuppiefuzz_network_${{ github.run_id }} \
             -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/wuppiefuzz/reports \
             -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs:/specs:ro \
-            localhost:${{ env.REGISTRY_PORT }}/wuppiefuzz fuzz \
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz fuzz \
               --report \
               --log-level info \
               --coverage-host ${{ env.TARGET_URL }} \
@@ -221,7 +228,7 @@ jobs:
             -e SPEC_PATH=${{ env.SPEC_PATH }} \
             -e OUTPUT_DIR=${{ env.OUTPUT_DIR }} \
             -e TIME_BUDGET=${{ github.event.inputs.evomaster_time }} \
-            localhost:${{ env.REGISTRY_PORT }}/evomaster
+            localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
