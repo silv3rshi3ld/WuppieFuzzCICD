@@ -31,11 +31,11 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/FuzzLean
 
 # Copy Restler configuration files and entrypoint
-COPY ./config /service/config
+COPY ./config /workspace/config
 
 # Ensure the entrypoint is executable
-RUN chmod +x /service/config/entrypoint.sh && \
-    sed -i 's/\r$//g' /service/config/entrypoint.sh
+RUN chmod +x /workspace/config/entrypoint.sh && \
+    sed -i 's/\r$//g' /workspace/config/entrypoint.sh
 
 # Set the entrypoint
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+ENTRYPOINT ["/workspace/config/entrypoint.sh"]

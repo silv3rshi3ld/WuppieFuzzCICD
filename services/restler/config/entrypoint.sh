@@ -60,7 +60,7 @@ cp /workspace/config/* /workspace/restlerConfig/ || {
 
 # Compile API specification with full config
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
+dotnet /restler_bin/restler/Restler.dll compile \
     --config_path "/workspace/config/config.json"
 
 # Verify compilation output

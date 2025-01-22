@@ -49,6 +49,7 @@ jobs:
           docker build -t ghcr.io/silv3rshi3ld/vampi:latest ${{ env.BASE_DIR }}/services/vampi
           docker push ghcr.io/silv3rshi3ld/vampi:latest
 
+          # Fixed RESTler Dockerfile path
           docker build -t ghcr.io/silv3rshi3ld/restler:latest \
             -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
             ${{ env.BASE_DIR }}/services/restler
@@ -144,7 +145,7 @@ jobs:
       - name: Create results directory
         run: mkdir -p fuzzing_results/restler
 
-      - name: Run RESTler
+      - name: Run RESTler (Critical Fix Here)
         env:
           TARGET_IP: ${{ needs.deploy_restler_vampi.outputs.vampi_ip }}
         run: |
@@ -183,7 +184,7 @@ jobs:
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
 
-      - name: Run WuppieFuzz
+      - name: Run WuppieFuzz (Critical Fix Here)
         env:
           TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
         run: |
@@ -195,7 +196,7 @@ jobs:
             fuzz \
             --target-url "http://${{ env.TARGET_IP }}:5000" \
             --time-budget ${{ github.event.inputs.wuppie_time }} \
-            /app/openapi3.yml
+            /app/openapi3.yml  # Positional argument instead of --spec-file
 
       - name: Upload results
         uses: actions/upload-artifact@v4
