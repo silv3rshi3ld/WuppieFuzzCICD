@@ -250,11 +250,17 @@ jobs:
         run: |
           docker run --rm \
             --network evomaster_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/evomaster:/app/results \
-            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
-            -e TARGET_IP=${{ env.TARGET_IP }} \
-            -e TARGET_PORT=5000 \
-            -e SEARCH_TIME="${{ github.event.inputs.evomaster_time }}" \
+            -v ${{ github.workspace }}/fuzzing_results/evomaster:/evomaster/results \
+            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/evomaster/openapi3.yml:ro \
+            -e TARGET_URL="http://${{ env.TARGET_IP }}:5000" \
+            -e SPEC_PATH="/evomaster/openapi3.yml" \
+            -e OUTPUT_DIR="/evomaster/results" \
+            -e TIME_BUDGET="${{ github.event.inputs.evomaster_time }}m" \
+            -e REPORT_ENABLED=true \
+            -e MAX_RETRIES=60 \
+            -e RETRY_INTERVAL=2 \
+            -e HEALTH_ENDPOINT="/health" \
+            -e SEED=42 \
             ghcr.io/silv3rshi3ld/evomaster:latest
 
       - name: Upload results
