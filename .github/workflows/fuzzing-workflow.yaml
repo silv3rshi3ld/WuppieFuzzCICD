@@ -2,7 +2,7 @@ name: Parallel API Fuzzing
 
 on:
   push:
-    branches: [main, SingleWorker] 
+    branches: [main, SingleWorker]
   pull_request:
     branches: [main, SingleWorker]
   workflow_dispatch:
@@ -79,73 +79,82 @@ jobs:
             ${{ env.BASE_DIR }}/services/wuppiefuzz
           docker push localhost:${{ env.REGISTRY_PORT }}/wuppiefuzz
 
-  deploy_vampis:
+  deploy_restler_vampi:
     needs: [setup_registry, build_images]
     runs-on: self-hosted
-    strategy:
-      matrix:
-        target: [restler, wuppiefuzz, evomaster]
     outputs:
-      vamp_ip_${{ matrix.target }}: ${{ steps.get-ip.outputs.ip }}
-    steps:
-      - name: Create isolated network
-        id: create-network
-        run: |
-          NETWORK_NAME=${{ matrix.target }}_network_${{ github.run_id }}
-          docker network create $NETWORK_NAME
-          echo "network=$NETWORK_NAME" >> $GITHUB_OUTPUT
-
-      - name: Launch VAmPI instance
-        id: launch-vampi
-        run: |
-          VAMPI_NAME=vampi-${{ matrix.target }}_${{ github.run_id }}
-          docker run -d \
-            --name $VAMPI_NAME \
-            --network ${{ steps.create-network.outputs.network }} \
-            -e vulnerable=1 \
-            localhost:${{ env.REGISTRY_PORT }}/vampi
-
-      - name: Verify VAmPI health
-        run: |
-          VAMPI_NAME=vampi-${{ matrix.target }}_${{ github.run_id }}
-          for i in {1..30}; do
-            if docker exec $VAMPI_NAME curl -s http://localhost:5000/health > /dev/null; then
-              echo "VAmPI instance is healthy!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI instance failed to become healthy"
-              exit 1
-            fi
-            echo "Waiting for VAmPI... (attempt $i/30)"
-            sleep 2
-          done
-
-      - name: Get container IP
-        id: get-ip
-        run: |
-          IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-            vampi-${{ matrix.target }}_${{ github.run_id }})
-          echo "ip=$IP" >> $GITHUB_OUTPUT
-
-  run_fuzzers:
-    needs: 
-      - setup_registry
-      - deploy_vampis
-    runs-on: self-hosted
-    strategy:
-      matrix:
-        fuzzer: [restler, wuppiefuzz, evomaster]
+      vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
+      - name: Create network
+        run: docker network create restler_network_${{ github.run_id }}
+      - name: Deploy VAmPI
+        run: |
+          docker run -d \
+            --name vampi-restler_${{ github.run_id }} \
+            --network restler_network_${{ github.run_id }} \
+            -e vulnerable=1 \
+            localhost:${{ env.REGISTRY_PORT }}/vampi
+      - name: Get IP
+        id: get-ip
+        run: |
+          IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vampi-restler_${{ github.run_id }})
+          echo "ip=$IP" >> $GITHUB_OUTPUT
 
+  deploy_wuppiefuzz_vampi:
+    needs: [setup_registry, build_images]
+    runs-on: self-hosted
+    outputs:
+      vampi_ip: ${{ steps.get-ip.outputs.ip }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create network
+        run: docker network create wuppiefuzz_network_${{ github.run_id }}
+      - name: Deploy VAmPI
+        run: |
+          docker run -d \
+            --name vampi-wuppiefuzz_${{ github.run_id }} \
+            --network wuppiefuzz_network_${{ github.run_id }} \
+            -e vulnerable=1 \
+            localhost:${{ env.REGISTRY_PORT }}/vampi
+      - name: Get IP
+        id: get-ip
+        run: |
+          IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vampi-wuppiefuzz_${{ github.run_id }})
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+  deploy_evomaster_vampi:
+    needs: [setup_registry, build_images]
+    runs-on: self-hosted
+    outputs:
+      vampi_ip: ${{ steps.get-ip.outputs.ip }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create network
+        run: docker network create evomaster_network_${{ github.run_id }}
+      - name: Deploy VAmPI
+        run: |
+          docker run -d \
+            --name vampi-evomaster_${{ github.run_id }} \
+            --network evomaster_network_${{ github.run_id }} \
+            -e vulnerable=1 \
+            localhost:${{ env.REGISTRY_PORT }}/vampi
+      - name: Get IP
+        id: get-ip
+        run: |
+          IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vampi-evomaster_${{ github.run_id }})
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+  run_restler:
+    needs: deploy_restler_vampi
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
       - name: Create results directory
-        run: mkdir -p fuzzing_results/${{ matrix.fuzzer }}
-
+        run: mkdir -p fuzzing_results/restler
       - name: Run RESTler
-        if: matrix.fuzzer == 'restler'
         env:
-          TARGET_IP: ${{ needs.deploy_vampis.outputs.vamp_ip_restler }}
+          TARGET_IP: ${{ needs.deploy_restler_vampi.outputs.vampi_ip }}
         run: |
           docker run --rm \
             --network restler_network_${{ github.run_id }} \
@@ -156,14 +165,25 @@ jobs:
             -e TARGET_PORT=5000 \
             -e RUN_FUZZ_LEAN=true \
             -e RUN_FUZZ=true \
-            -e FUZZ_LEAN_TIME_BUDGET=${{ github.event.inputs.restler_time * 0.25 }} \
-            -e FUZZ_TIME_BUDGET=${{ github.event.inputs.restler_time * 0.75 }} \
+            -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
+            -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
             localhost:${{ env.REGISTRY_PORT }}/restler
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-results
+          path: fuzzing_results/restler
 
+  run_wuppiefuzz:
+    needs: deploy_wuppiefuzz_vampi
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create results directory
+        run: mkdir -p fuzzing_results/wuppiefuzz
       - name: Run WuppieFuzz
-        if: matrix.fuzzer == 'wuppiefuzz'
         env:
-          TARGET_URL: http://${{ needs.deploy_vampis.outputs.vamp_ip_wuppiefuzz }}:5000
+          TARGET_URL: http://${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}:5000
         run: |
           docker run --rm \
             --network wuppiefuzz_network_${{ github.run_id }} \
@@ -175,12 +195,23 @@ jobs:
               --coverage-host ${{ env.TARGET_URL }} \
               --timeout ${{ github.event.inputs.wuppie_time }} \
               /specs/openapi3.yml
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-results
+          path: fuzzing_results/wuppiefuzz
 
+  run_evomaster:
+    needs: deploy_evomaster_vampi
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create results directory
+        run: mkdir -p fuzzing_results/evomaster
       - name: Run EvoMaster
-        if: matrix.fuzzer == 'evomaster'
         env:
-          TARGET_URL: http://${{ needs.deploy_vampis.outputs.vamp_ip_evomaster }}:5000
-          SPEC_PATH: http://${{ needs.deploy_vampis.outputs.vamp_ip_evomaster }}:5000/openapi.json
+          TARGET_URL: http://${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}:5000
+          SPEC_PATH: http://${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}:5000/openapi.json
           OUTPUT_DIR: /evomaster/results
         run: |
           docker run --rm \
@@ -191,18 +222,17 @@ jobs:
             -e OUTPUT_DIR=${{ env.OUTPUT_DIR }} \
             -e TIME_BUDGET=${{ github.event.inputs.evomaster_time }} \
             localhost:${{ env.REGISTRY_PORT }}/evomaster
-
-      - name: Upload fuzzing results
+      - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.fuzzer }}-results
-          path: fuzzing_results/${{ matrix.fuzzer }}
+          name: evomaster-results
+          path: fuzzing_results/evomaster
 
   cleanup:
     needs: 
-      - setup_registry
-      - deploy_vampis
-      - run_fuzzers
+      - run_restler
+      - run_wuppiefuzz
+      - run_evomaster
     runs-on: self-hosted
     if: always()
     steps:
