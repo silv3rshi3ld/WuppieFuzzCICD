@@ -22,11 +22,27 @@ build_and_push() {
     echo "Pushing $tag..."
     docker push $tag
     
-    # Verify push was successful
-    if ! curl -s "http://localhost:5000/v2/_catalog" | grep -q "\"$tag\""; then
-        echo "Failed to verify $tag in registry"
-        exit 1
-    fi
+    # Verify push was successful by checking manifest
+    image_name=$(echo "$tag" | cut -d':' -f1 | sed 's|localhost:5000/||')
+    echo "Verifying image $image_name in registry..."
+    
+    # Try to get manifest with retries
+    max_retries=3
+    for i in $(seq 1 $max_retries); do
+        response=$(curl -s -f -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "http://localhost:5000/v2/$image_name/manifests/latest" 2>&1)
+        if [ $? -eq 0 ]; then
+            echo "Successfully verified $tag in registry"
+            break
+        fi
+        if [ $i -eq $max_retries ]; then
+            echo "Failed to verify $tag in registry after $max_retries attempts"
+            echo "Registry response: $response"
+            exit 1
+        fi
+        echo "Attempt $i failed, retrying in 2 seconds..."
+        sleep 2
+    done
 }
 
 # Build base VAmPI image
