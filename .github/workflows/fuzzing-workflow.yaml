@@ -72,6 +72,9 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Create network
         run: docker network create restler_network_${{ github.run_id }}
       - name: Deploy VAmPI
@@ -94,6 +97,9 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Create network
         run: docker network create wuppiefuzz_network_${{ github.run_id }}
       - name: Deploy VAmPI
@@ -116,6 +122,9 @@ jobs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
       - name: Create network
         run: docker network create evomaster_network_${{ github.run_id }}
       - name: Deploy VAmPI
