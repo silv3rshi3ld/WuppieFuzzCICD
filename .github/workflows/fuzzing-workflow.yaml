@@ -88,7 +88,7 @@ jobs:
         run: |
           docker network create \
             --driver=bridge \
-            --subnet=172.${{ github.run_id }}.0.0/16 \
+            --subnet=172.${{ github.run_id % 255 }}.0.0/16 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -124,7 +124,7 @@ jobs:
         run: |
           docker network create \
             --driver=bridge \
-            --subnet=10.${{ github.run_id }}.0.0/16 \
+            --subnet=10.${{ github.run_id % 255 }}.0.0/16 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -160,7 +160,7 @@ jobs:
         run: |
           docker network create \
             --driver=bridge \
-            --subnet=192.${{ github.run_id }}.0.0/16 \
+            --subnet=192.${{ github.run_id % 255 }}.0.0/16 \
             evomaster_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
