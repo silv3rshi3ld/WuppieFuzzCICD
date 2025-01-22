@@ -240,18 +240,21 @@ jobs:
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
 
-      - name: Run WuppieFuzz
+      - name: Run RESTler
         env:
-          TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
+          TARGET_IP: ${{ needs.deploy_restler_vampi.outputs.vampi_ip }}
         run: |
           docker run --rm \
-            --network wuppiefuzz_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/app/results \
-            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
-            ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
-            fuzz \
-            --timeout $(( ${{ github.event.inputs.wuppie_time }} * 60 )) \  # Convert minutes to seconds
-            /app/openapi3.yml \
+            --network restler_network_${{ github.run_id }} \
+            -v ${{ github.workspace }}/fuzzing_results/restler:/workspace/output \
+            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro \
+            -e TARGET_IP=${{ env.TARGET_IP }} \
+            -e TARGET_PORT=5000 \
+            -e RUN_FUZZ_LEAN=true \
+            -e RUN_FUZZ=true \
+            -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
+            -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
+            ghcr.io/silv3rshi3ld/restler:latest
 
       - name: Upload results
         uses: actions/upload-artifact@v4
