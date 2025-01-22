@@ -250,8 +250,8 @@ jobs:
             -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
             ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
             fuzz \
-            --time-budget ${{ github.event.inputs.wuppie_time }} \
-            /app/openapi3.yml
+            --timeout $(( ${{ github.event.inputs.wuppie_time }} * 60 )) \  # Convert minutes to seconds
+            /app/openapi3.yml \
 
       - name: Upload results
         uses: actions/upload-artifact@v4
