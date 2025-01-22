@@ -9,13 +9,16 @@ on:
     inputs:
       restler_time:
         description: 'RESTler time (hours)'
-        default: '1'
+        type: number
+        default: 1
       wuppie_time:
         description: 'WuppieFuzz time (mins)'
-        default: '60'
+        type: number
+        default: 60
       evomaster_time:
         description: 'EvoMaster time (mins)'
-        default: '10'
+        type: number
+        default: 10
 
 env:
   REGISTRY_PORT: 5000
@@ -38,20 +41,17 @@ jobs:
 
       - name: Build and push images
         run: |
-          # Build VAmPI
-          docker build -t localhost:${{ env.REGISTRY_PORT }}/vampi $BASE_DIR/services/vampi
+          docker build -t localhost:${{ env.REGISTRY_PORT }}/vampi ${{ env.BASE_DIR }}/services/vampi
           docker push localhost:${{ env.REGISTRY_PORT }}/vampi
 
-          # Build RESTler
           docker build -t localhost:${{ env.REGISTRY_PORT }}/restler \
-            -f $BASE_DIR/services/restler/Dockerfile.restler \
-            $BASE_DIR/services/restler
+            -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
+            ${{ env.BASE_DIR }}/services/restler
           docker push localhost:${{ env.REGISTRY_PORT }}/restler
 
-          # Build EvoMaster
           docker build -t localhost:${{ env.REGISTRY_PORT }}/evomaster \
-            -f $BASE_DIR/services/evomaster/Dockerfile.evomaster \
-            $BASE_DIR/services/evomaster
+            -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster \
+            ${{ env.BASE_DIR }}/services/evomaster
           docker push localhost:${{ env.REGISTRY_PORT }}/evomaster
 
   fuzz:
@@ -83,11 +83,17 @@ jobs:
           docker exec ${{ env.VAMPI_NAME }} \
             curl -sS http://localhost:5000/health --retry 10 --retry-delay 5
 
+      - name: Calculate RESTler times
+        if: matrix.fuzzer == 'restler'
+        id: calculate
+        run: |
+          LEAN=$(echo "${{ github.event.inputs.restler_time }} * 0.25" | bc)
+          MAIN=$(echo "${{ github.event.inputs.restler_time }} * 0.75" | bc)
+          echo "FUZZ_LEAN=$LEAN" >> $GITHUB_ENV
+          echo "FUZZ_MAIN=$MAIN" >> $GITHUB_ENV
+
       - name: Run RESTler fuzzer
         if: matrix.fuzzer == 'restler'
-        env:
-          FUZZ_LEAN: ${{ github.event.inputs.restler_time * 0.25 }}
-          FUZZ_MAIN: ${{ github.event.inputs.restler_time * 0.75 }}
         run: |
           docker run --rm \
             --name ${{ env.FUZZER_NAME }} \
@@ -109,7 +115,7 @@ jobs:
             --log-level info \
             --coverage-host ${{ env.VAMPI_NAME }}:5000 \
             --timeout ${{ github.event.inputs.wuppie_time }} \
-            $BASE_DIR/services/vampi/openapi_specs/openapi3.yml
+            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml
 
       - name: Run EvoMaster
         if: matrix.fuzzer == 'evomaster'
