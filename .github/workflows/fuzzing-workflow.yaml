@@ -38,7 +38,11 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Build and push images
         run: |
@@ -63,7 +67,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create network
         run: docker network create restler_network_${{ github.run_id }}
@@ -91,7 +99,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create network
         run: docker network create wuppiefuzz_network_${{ github.run_id }}
@@ -119,7 +131,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create network
         run: docker network create evomaster_network_${{ github.run_id }}
@@ -145,7 +161,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create results directory
         run: mkdir -p fuzzing_results/restler
@@ -180,7 +200,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
@@ -211,7 +235,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        run: docker login ghcr.io -u silv3rshi3ld -p ${{ secrets.GHCR_TOKEN }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: silv3rshi3ld
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Create results directory
         run: mkdir -p fuzzing_results/evomaster
