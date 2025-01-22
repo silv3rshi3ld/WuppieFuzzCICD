@@ -5,12 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.wuppiefuzz
-    # Removed fixed container_name to avoid conflicts
     environment:
-      VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
+      TARGET_URL: "http://vampi:5000"  # Use service name from network
     volumes:
-      - ./reports:/wuppiefuzz/reports
-      - ../../openapi/openapi3.yml:/workspace/openapi3.yml:ro
+      - ./reports:/app/reports
+      - ../../openapi/openapi3.yml:/app/openapi3.yml:ro  # Match container path
     networks:
       - wuppiefuzz_network
 
