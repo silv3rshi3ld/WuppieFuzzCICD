@@ -25,7 +25,7 @@ env:
 
 permissions:
   contents: read
-  packages: write  # Required for pushing images
+  packages: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,13 +49,19 @@ jobs:
           docker build -t ghcr.io/silv3rshi3ld/vampi:latest ${{ env.BASE_DIR }}/services/vampi
           docker push ghcr.io/silv3rshi3ld/vampi:latest
 
-          docker build -t ghcr.io/silv3rshi3ld/restler:latest -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler ${{ env.BASE_DIR }}/services/restler
+          docker build -t ghcr.io/silv3rshi3ld/restler:latest \
+            -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
+            ${{ env.BASE_DIR }}/services/restler
           docker push ghcr.io/silv3rshi3ld/restler:latest
 
-          docker build -t ghcr.io/silv3rshi3ld/evomaster:latest -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster ${{ env.BASE_DIR }}/services/evomaster
+          docker build -t ghcr.io/silv3rshi3ld/evomaster:latest \
+            -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster \
+            ${{ env.BASE_DIR }}/services/evomaster
           docker push ghcr.io/silv3rshi3ld/evomaster:latest
 
-          docker build -t ghcr.io/silv3rshi3ld/wuppiefuzz:latest -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz ${{ env.BASE_DIR }}/services/wuppiefuzz
+          docker build -t ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
+            -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz \
+            ${{ env.BASE_DIR }}/services/wuppiefuzz
           docker push ghcr.io/silv3rshi3ld/wuppiefuzz:latest
 
   deploy_restler_vampi:
@@ -120,38 +126,6 @@ jobs:
         id: get-ip
         run: |
           IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vampi-wuppiefuzz_${{ github.run_id }})
-          echo "ip=$IP" >> $GITHUB_OUTPUT
-
-  deploy_evomaster_vampi:
-    needs: build_images
-    runs-on: [self-hosted, manager-runner]
-    outputs:
-      vampi_ip: ${{ steps.get-ip.outputs.ip }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create network
-        run: docker network create evomaster_network_${{ github.run_id }}
-
-      - name: Deploy VAmPI
-        run: |
-          docker run -d \
-            --name vampi-evomaster_${{ github.run_id }} \
-            --network evomaster_network_${{ github.run_id }} \
-            -e vulnerable=1 \
-            ghcr.io/silv3rshi3ld/vampi:latest
-
-      - name: Get IP
-        id: get-ip
-        run: |
-          IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vampi-evomaster_${{ github.run_id }})
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
   run_restler:
@@ -219,73 +193,12 @@ jobs:
             -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
             ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
             fuzz \
-            --spec-file /app/openapi3.yml \
             --target-url "http://${{ env.TARGET_IP }}:5000" \
-            --time-budget ${{ github.event.inputs.wuppie_time }}
+            --time-budget ${{ github.event.inputs.wuppie_time }} \
+            /app/openapi3.yml
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
           path: fuzzing_results/wuppiefuzz
-
-  run_evomaster:
-    needs: deploy_evomaster_vampi
-    runs-on: [self-hosted, manager-runner]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create results directory
-        run: mkdir -p fuzzing_results/evomaster
-
-      - name: Run EvoMaster
-        env:
-          TARGET_IP: ${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}
-        run: |
-          docker run --rm \
-            --network evomaster_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/evomaster:/evomaster/results \
-            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/evomaster/openapi3.yml:ro \
-            -e TARGET_URL="http://${{ env.TARGET_IP }}:5000" \
-            -e SPEC_PATH="/evomaster/openapi3.yml" \
-            -e OUTPUT_DIR="/evomaster/results" \
-            -e TIME_BUDGET="${{ github.event.inputs.evomaster_time }}m" \
-            -e REPORT_ENABLED=true \
-            -e MAX_RETRIES=60 \
-            -e RETRY_INTERVAL=2 \
-            -e HEALTH_ENDPOINT="/health" \
-            -e SEED=42 \
-            ghcr.io/silv3rshi3ld/evomaster:latest
-
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: evomaster-results
-          path: fuzzing_results/evomaster
-
-  cleanup_manager:
-    needs: [run_restler, run_evomaster]
-    runs-on: [self-hosted, manager-runner]
-    if: always()
-    steps:
-      - name: Clean manager-runner resources
-        run: |
-          docker network rm restler_network_${{ github.run_id }} evomaster_network_${{ github.run_id }} || true
-          docker rm -f vampi-restler_${{ github.run_id }} vampi-evomaster_${{ github.run_id }} || true
-
-  cleanup_worker:
-    needs: [run_wuppiefuzz]
-    runs-on: [self-hosted, worker-runner]
-    if: always()
-    steps:
-      - name: Clean worker-runner resources
-        run: |
-          docker network rm wuppiefuzz_network_${{ github.run_id }} || true
-          docker rm -f vampi-wuppiefuzz_${{ github.run_id }} || true
