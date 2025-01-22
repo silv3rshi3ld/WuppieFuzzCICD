@@ -23,71 +23,50 @@ on:
 env:
   BASE_DIR: ${{ github.workspace }}
 
+permissions:
+  contents: read
+  packages: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  setup_registry:
-    runs-on: self-hosted
-    outputs:
-      registry_name: ${{ steps.set-registry.outputs.name }}
-      registry_port: ${{ steps.set-registry.outputs.port }}
-    steps:
-      - name: Configure unique registry
-        id: set-registry
-        run: |
-          REGISTRY_NAME=registry-${{ github.run_id }}
-          echo "name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
-          
-          # Find available port using ss instead of netstat
-          for port in {5000..5100}; do
-            if ! ss -tuln | grep -q ":${port}\b"; then
-              echo "port=$port" >> $GITHUB_OUTPUT
-              docker rm -f $REGISTRY_NAME || true
-              docker run -d \
-                -p $port:5000 \
-                --name $REGISTRY_NAME \
-                --rm \
-                registry:2
-              sleep 5
-              break
-            fi
-          done
-
   build_images:
-    needs: setup_registry
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
       - name: Build and push images
         run: |
-          # Build VAmPI
-          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi \
+          # Build and push VAmPI
+          docker build -t ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }} \
             ${{ env.BASE_DIR }}/services/vampi
-          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
+          docker push ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
 
-          # Build RESTler
-          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/restler \
+          # Build and push RESTler
+          docker build -t ghcr.io/silv3rshi3ld/restler:${{ github.run_id }} \
             -f ${{ env.BASE_DIR }}/services/restler/Dockerfile.restler \
             ${{ env.BASE_DIR }}/services/restler
-          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/restler
+          docker push ghcr.io/silv3rshi3ld/restler:${{ github.run_id }}
 
-          # Build EvoMaster
-          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster \
+          # Build and push EvoMaster
+          docker build -t ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }} \
             -f ${{ env.BASE_DIR }}/services/evomaster/Dockerfile.evomaster \
             ${{ env.BASE_DIR }}/services/evomaster
-          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster
+          docker push ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }}
 
-          # Build WuppieFuzz
-          docker build -t localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz \
+          # Build and push WuppieFuzz
+          docker build -t ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }} \
             -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz \
             ${{ env.BASE_DIR }}/services/wuppiefuzz
-          docker push localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz
+          docker push ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }}
 
   deploy_restler_vampi:
-    needs: [setup_registry, build_images]
+    needs: build_images
     runs-on: self-hosted
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
@@ -101,7 +80,7 @@ jobs:
             --name vampi-restler_${{ github.run_id }} \
             --network restler_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
+            ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
       - name: Get IP
         id: get-ip
         run: |
@@ -109,7 +88,7 @@ jobs:
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
   deploy_wuppiefuzz_vampi:
-    needs: [setup_registry, build_images]
+    needs: build_images
     runs-on: self-hosted
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
@@ -123,7 +102,7 @@ jobs:
             --name vampi-wuppiefuzz_${{ github.run_id }} \
             --network wuppiefuzz_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
+            ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
       - name: Get IP
         id: get-ip
         run: |
@@ -131,7 +110,7 @@ jobs:
           echo "ip=$IP" >> $GITHUB_OUTPUT
 
   deploy_evomaster_vampi:
-    needs: [setup_registry, build_images]
+    needs: build_images
     runs-on: self-hosted
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
@@ -145,7 +124,7 @@ jobs:
             --name vampi-evomaster_${{ github.run_id }} \
             --network evomaster_network_${{ github.run_id }} \
             -e vulnerable=1 \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/vampi
+            ghcr.io/silv3rshi3ld/vampi:${{ github.run_id }}
       - name: Get IP
         id: get-ip
         run: |
@@ -174,12 +153,7 @@ jobs:
             -e RUN_FUZZ=true \
             -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
             -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/restler
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: restler-results
-          path: fuzzing_results/restler
+            ghcr.io/silv3rshi3ld/restler:${{ github.run_id }}
 
   run_wuppiefuzz:
     needs: deploy_wuppiefuzz_vampi
@@ -190,23 +164,16 @@ jobs:
         run: mkdir -p fuzzing_results/wuppiefuzz
       - name: Run WuppieFuzz
         env:
-          TARGET_URL: http://${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}:5000
+          TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
         run: |
           docker run --rm \
             --network wuppiefuzz_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/wuppiefuzz/reports \
-            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs:/specs:ro \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/wuppiefuzz fuzz \
-              --report \
-              --log-level info \
-              --coverage-host ${{ env.TARGET_URL }} \
-              --timeout ${{ github.event.inputs.wuppie_time }} \
-              /specs/openapi3.yml
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-results
-          path: fuzzing_results/wuppiefuzz
+            -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/app/results \
+            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
+            -e TARGET_IP=${{ env.TARGET_IP }} \
+            -e TARGET_PORT=5000 \
+            -e FUZZ_TIME="${{ github.event.inputs.wuppie_time }}" \
+            ghcr.io/silv3rshi3ld/wuppiefuzz:${{ github.run_id }}
 
   run_evomaster:
     needs: deploy_evomaster_vampi
@@ -217,23 +184,16 @@ jobs:
         run: mkdir -p fuzzing_results/evomaster
       - name: Run EvoMaster
         env:
-          TARGET_URL: http://${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}:5000
-          SPEC_PATH: http://${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}:5000/openapi.json
-          OUTPUT_DIR: /evomaster/results
+          TARGET_IP: ${{ needs.deploy_evomaster_vampi.outputs.vampi_ip }}
         run: |
           docker run --rm \
             --network evomaster_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/evomaster:${OUTPUT_DIR} \
-            -e TARGET_URL=${{ env.TARGET_URL }} \
-            -e SPEC_PATH=${{ env.SPEC_PATH }} \
-            -e OUTPUT_DIR=${{ env.OUTPUT_DIR }} \
-            -e TIME_BUDGET=${{ github.event.inputs.evomaster_time }} \
-            localhost:${{ needs.setup_registry.outputs.registry_port }}/evomaster
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: evomaster-results
-          path: fuzzing_results/evomaster
+            -v ${{ github.workspace }}/fuzzing_results/evomaster:/app/results \
+            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/app/openapi3.yml:ro \
+            -e TARGET_IP=${{ env.TARGET_IP }} \
+            -e TARGET_PORT=5000 \
+            -e SEARCH_TIME="${{ github.event.inputs.evomaster_time }}" \
+            ghcr.io/silv3rshi3ld/evomaster:${{ github.run_id }}
 
   cleanup:
     needs: 
@@ -256,6 +216,3 @@ jobs:
             vampi-restler_${{ github.run_id }} \
             vampi-wuppiefuzz_${{ github.run_id }} \
             vampi-evomaster_${{ github.run_id }} || true
-          
-          # Remove registry
-          docker rm -f registry-${{ github.run_id }} || true
