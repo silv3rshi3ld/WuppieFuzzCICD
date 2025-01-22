@@ -1,6 +1,10 @@
 name: Parallel API Fuzzing
-#test
+
 on:
+  push:
+    branches: [main, SingleWorker] 
+  pull_request:
+    branches: [main, SingleWorker]
   workflow_dispatch:
     inputs:
       restler_time:
