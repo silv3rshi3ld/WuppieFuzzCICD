@@ -56,9 +56,18 @@ done
 
 # Validate OpenAPI specification is accessible
 log "Validating OpenAPI specification at ${SPEC_PATH}..."
-if ! curl -s -f "${SPEC_PATH}" > /dev/null; then
-    log "ERROR: Unable to access OpenAPI specification at ${SPEC_PATH}"
-    exit 1
+if [[ "${SPEC_PATH}" =~ ^https?:// ]]; then
+    # For HTTP(S) URLs, try to fetch the spec
+    if ! curl -s -f "${SPEC_PATH}" > /dev/null; then
+        log "ERROR: Unable to access OpenAPI specification at ${SPEC_PATH}"
+        exit 1
+    fi
+else
+    # For local files, check if they exist and are readable
+    if [ ! -f "${SPEC_PATH}" ] || [ ! -r "${SPEC_PATH}" ]; then
+        log "ERROR: Unable to access OpenAPI specification at ${SPEC_PATH}"
+        exit 1
+    fi
 fi
 
 # Additional EvoMaster configuration options with defaults
