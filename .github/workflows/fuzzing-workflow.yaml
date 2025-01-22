@@ -25,7 +25,7 @@ env:
 
 permissions:
   contents: read
-  packages: write  # Still needed for pushing
+  packages: write  # Required for pushing images
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,7 +33,7 @@ concurrency:
 
 jobs:
   build_images:
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - uses: actions/checkout@v4
       
@@ -60,7 +60,7 @@ jobs:
 
   deploy_restler_vampi:
     needs: build_images
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
@@ -92,7 +92,7 @@ jobs:
 
   deploy_wuppiefuzz_vampi:
     needs: build_images
-    runs-on: self-hosted
+    runs-on: [self-hosted, worker-runner]
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
@@ -124,7 +124,7 @@ jobs:
 
   deploy_evomaster_vampi:
     needs: build_images
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     outputs:
       vampi_ip: ${{ steps.get-ip.outputs.ip }}
     steps:
@@ -156,7 +156,7 @@ jobs:
 
   run_restler:
     needs: deploy_restler_vampi
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -195,7 +195,7 @@ jobs:
 
   run_wuppiefuzz:
     needs: deploy_wuppiefuzz_vampi
-    runs-on: self-hosted
+    runs-on: [self-hosted, worker-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -230,7 +230,7 @@ jobs:
 
   run_evomaster:
     needs: deploy_evomaster_vampi
-    runs-on: self-hosted
+    runs-on: [self-hosted, manager-runner]
     steps:
       - uses: actions/checkout@v4
 
@@ -263,24 +263,22 @@ jobs:
           name: evomaster-results
           path: fuzzing_results/evomaster
 
-  cleanup:
-    needs: 
-      - run_restler
-      - run_wuppiefuzz
-      - run_evomaster
-    runs-on: self-hosted
+  cleanup_manager:
+    needs: [run_restler, run_evomaster]
+    runs-on: [self-hosted, manager-runner]
     if: always()
     steps:
-      - name: Remove all resources
+      - name: Clean manager-runner resources
         run: |
-          # Remove networks
-          docker network rm \
-            restler_network_${{ github.run_id }} \
-            wuppiefuzz_network_${{ github.run_id }} \
-            evomaster_network_${{ github.run_id }} || true
-          
-          # Remove containers
-          docker rm -f \
-            vampi-restler_${{ github.run_id }} \
-            vampi-wuppiefuzz_${{ github.run_id }} \
-            vampi-evomaster_${{ github.run_id }} || true
+          docker network rm restler_network_${{ github.run_id }} evomaster_network_${{ github.run_id }} || true
+          docker rm -f vampi-restler_${{ github.run_id }} vampi-evomaster_${{ github.run_id }} || true
+
+  cleanup_worker:
+    needs: [run_wuppiefuzz]
+    runs-on: [self-hosted, worker-runner]
+    if: always()
+    steps:
+      - name: Clean worker-runner resources
+        run: |
+          docker network rm wuppiefuzz_network_${{ github.run_id }} || true
+          docker rm -f vampi-wuppiefuzz_${{ github.run_id }} || true
