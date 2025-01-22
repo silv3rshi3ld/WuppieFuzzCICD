@@ -30,9 +30,21 @@ concurrency:
 env:
   BASE_DIR: ${{ github.workspace }}
   DOCKER_BUILDKIT: 1
+  REGISTRY_PORT: 5000
 
 jobs:
+  setup:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Registry and Build Images
+        run: |
+          chmod +x scripts/setup-registry-and-build.sh
+          ./scripts/setup-registry-and-build.sh
+
   restler-fuzzing:
+    needs: setup
     runs-on: self-hosted
     env:
       VAMPI_PORT: 5012
@@ -71,16 +83,26 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          echo "Cleaning up RESTler resources..."
+          # Stop and remove containers
           docker rm -fv vampi-restler-${{ github.run_id }} || true
-          docker network rm restler_network_${{ github.run_id }} || true
-          # Add retry loop for cleanup
+          
+          # Remove network with retry
           for i in {1..5}; do
-            docker rm -fv vampi-restler-${{ github.run_id }} || break
+            if docker network rm restler_network_${{ github.run_id }}; then
+              break
+            fi
+            echo "Attempt $i: Waiting for network to be free..."
             sleep 5
           done
-          docker image prune -f || true
+          
+          # Cleanup any orphaned containers
+          for container in $(docker ps -a --filter "name=vampi-restler-${{ github.run_id }}" --format "{{.ID}}"); do
+            docker rm -f $container || true
+          done
 
   wuppiefuzz-fuzzing:
+    needs: setup
     runs-on: self-hosted
     env:
       VAMPI_PORT: 5022
@@ -109,15 +131,26 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          echo "Cleaning up WuppieFuzz resources..."
+          # Stop and remove containers
           docker rm -fv vampi-wuppiefuzz-${{ github.run_id }} || true
-          docker network rm wuppiefuzz_network_${{ github.run_id }} || true
+          
+          # Remove network with retry
           for i in {1..5}; do
-            docker rm -fv vampi-wuppiefuzz-${{ github.run_id }} || break
+            if docker network rm wuppiefuzz_network_${{ github.run_id }}; then
+              break
+            fi
+            echo "Attempt $i: Waiting for network to be free..."
             sleep 5
           done
-          docker image prune -f || true
+          
+          # Cleanup any orphaned containers
+          for container in $(docker ps -a --filter "name=vampi-wuppiefuzz-${{ github.run_id }}" --format "{{.ID}}"); do
+            docker rm -f $container || true
+          done
 
   evomaster-fuzzing:
+    needs: setup
     runs-on: self-hosted
     env:
       VAMPI_PORT: 5032
@@ -144,14 +177,39 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          echo "Cleaning up EvoMaster resources..."
+          # Stop and remove containers
           docker rm -fv vampi-evomaster-${{ github.run_id }} || true
-          docker network rm evomaster_network_${{ github.run_id }} || true
+          
+          # Remove network with retry
           for i in {1..5}; do
-            docker rm -fv vampi-evomaster-${{ github.run_id }} || break
+            if docker network rm evomaster_network_${{ github.run_id }}; then
+              break
+            fi
+            echo "Attempt $i: Waiting for network to be free..."
             sleep 5
           done
-          docker image prune -f || true
+          
+          # Cleanup any orphaned containers
+          for container in $(docker ps -a --filter "name=vampi-evomaster-${{ github.run_id }}" --format "{{.ID}}"); do
+            docker rm -f $container || true
+          done
 
+  cleanup:
+    needs: [process-results]
+    runs-on: self-hosted
+    if: always()
+    steps:
+      - name: Final Cleanup
+        run: |
+          echo "Performing final cleanup..."
+          # Cleanup any remaining containers
+          docker ps -a --filter "name=vampi-.*-${{ github.run_id }}" --format "{{.ID}}" | xargs -r docker rm -f
+          # Cleanup networks
+          docker network ls --filter "name=.*_network_${{ github.run_id }}" --format "{{.ID}}" | xargs -r docker network rm
+          # Cleanup unused images
+          docker image prune -f
+          
   process-results:
     needs: [restler-fuzzing, wuppiefuzz-fuzzing, evomaster-fuzzing]
     runs-on: self-hosted

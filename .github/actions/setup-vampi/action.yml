@@ -1,0 +1,93 @@
+name: 'Setup VAmPI Container'
+description: 'Sets up and verifies a VAmPI container instance'
+
+inputs:
+  port:
+    description: 'Port to expose VAmPI on'
+    required: true
+  network_name:
+    description: 'Docker network name'
+    required: true
+  container_name:
+    description: 'Container name'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Verify Registry
+      shell: bash
+      run: |
+        echo "Verifying local registry..."
+        max_attempts=5
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          if curl -s http://localhost:5000/v2/_catalog > /dev/null; then
+            echo "Registry is accessible"
+            break
+          fi
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Failed to connect to registry after $max_attempts attempts"
+            exit 1
+          fi
+          echo "Attempt $attempt: Registry not ready, waiting..."
+          sleep 5
+          attempt=$((attempt + 1))
+        done
+
+    - name: Create Network
+      shell: bash
+      run: |
+        echo "Creating network ${{ inputs.network_name }}..."
+        if ! docker network inspect ${{ inputs.network_name }} >/dev/null 2>&1; then
+          docker network create ${{ inputs.network_name }}
+        fi
+
+    - name: Deploy VAmPI
+      shell: bash
+      run: |
+        echo "Deploying VAmPI container..."
+        docker run -d \
+          --name ${{ inputs.container_name }} \
+          --network ${{ inputs.network_name }} \
+          -p ${{ inputs.port }}:5000 \
+          -e vulnerable=1 \
+          localhost:5000/vampi-vulnerable:latest
+
+    - name: Wait for VAmPI
+      shell: bash
+      run: |
+        echo "Waiting for VAmPI to be ready..."
+        max_attempts=30
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          if curl -s http://localhost:${{ inputs.port }}/health > /dev/null; then
+            echo "VAmPI is ready"
+            break
+          fi
+          if [ $attempt -eq $max_attempts ]; then
+            echo "VAmPI failed to start after $max_attempts attempts"
+            docker logs ${{ inputs.container_name }}
+            exit 1
+          fi
+          echo "Attempt $attempt: VAmPI not ready, waiting..."
+          sleep 2
+          attempt=$((attempt + 1))
+        done
+
+    - name: Verify VAmPI
+      shell: bash
+      run: |
+        echo "Verifying VAmPI API..."
+        response=$(curl -s -w "\n%{http_code}" http://localhost:${{ inputs.port }}/health)
+        status_code=$(echo "$response" | tail -n1)
+        response_body=$(echo "$response" | head -n-1)
+        
+        if [ "$status_code" -ne 200 ]; then
+          echo "VAmPI health check failed with status $status_code"
+          echo "Response: $response_body"
+          docker logs ${{ inputs.container_name }}
+          exit 1
+        fi
+        
+        echo "VAmPI verification complete"
