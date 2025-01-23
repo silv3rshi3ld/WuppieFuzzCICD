@@ -6,9 +6,6 @@ RUN apk add --no-cache g++ libffi-dev
 COPY . /vampi
 WORKDIR /vampi
 
-# Copy without renaming
-COPY openapi_specs/${OPENAPI_SPEC} ./openapi_specs/
-
 # Install requirements (preserve existing paths)
 RUN pip install --user -r requirements.txt
 
