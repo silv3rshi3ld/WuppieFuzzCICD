@@ -26,6 +26,11 @@ env:
   OPENAPI_SPEC: openapi3.yml
   BUILDX_BUILDER: github-runner-builder
   WUPPIEFUZZ_REPO: "https://github.com/TNO-S3/WuppieFuzz.git"
+  GHCR_NAMESPACE: "ghcr.io/silv3shi3ld"  # Changed to your username
+
+permissions:  # Added permissions block
+  contents: read
+  packages: write
 
 jobs:
   swarm_init:
@@ -84,7 +89,8 @@ jobs:
           docker buildx create --name ${{ env.BUILDX_BUILDER }} --use
           docker buildx inspect --bootstrap
           
-      - uses: docker/login-action@v2
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -98,13 +104,11 @@ jobs:
 
       - name: Build and Push WuppieFuzz
         run: |
-          # Force fresh build when new commits exist
           docker buildx build \
             --platform linux/amd64 \
-            -t ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
-            -t ghcr.io/your-repo/wuppiefuzz:latest \
+            -t ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
+            -t ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:latest \
             --build-arg WUPPIEFUZZ_COMMIT=${{ steps.wuppie-commit.outputs.commit_hash }} \
-            --no-cache \
             --push \
             -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
             .
@@ -119,7 +123,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t ghcr.io/your-repo/restler:latest \
+            -t ${{ env.GHCR_NAMESPACE }}/restler:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
             --push \
             -f services/restler/Dockerfile.restler \
@@ -129,7 +133,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
-            -t ghcr.io/your-repo/evomaster:latest \
+            -t ${{ env.GHCR_NAMESPACE }}/evomaster:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
             --push \
             -f services/evomaster/Dockerfile.evomaster \
@@ -169,7 +173,7 @@ jobs:
             --health-timeout 5s \
             --health-retries 3 \
             -e vulnerable=1 \
-            ghcr.io/your-repo/vampi:latest
+            ${{ env.GHCR_NAMESPACE }}/vampi:latest
 
           # Wait for VAmPI readiness
           until docker service ps vampi-${{ matrix.tool }} --format '{{.CurrentState}}' | grep -q Running; do
@@ -186,7 +190,7 @@ jobs:
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
                 -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
-                ghcr.io/your-repo/restler:latest
+                ${{ env.GHCR_NAMESPACE }}/restler:latest
               ;;
 
             wuppiefuzz)
@@ -198,7 +202,7 @@ jobs:
                 -e AUTH_FILE=/corpus/auth.yaml \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/reports \
                 --mount type=bind,src=${{ github.workspace }}/${{ env.CORPUS_DIR }},dst=/corpus,ro \
-                ghcr.io/your-repo/wuppiefuzz:${{ needs.build_images.outputs.wuppie_commit }} \
+                ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:${{ needs.build_images.outputs.wuppie_commit }} \
                 fuzz \
                 --report \
                 --log-level info \
@@ -216,7 +220,7 @@ jobs:
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
                 -e TIME_BUDGET="${{ github.event.inputs.evomaster_time }}" \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
-                ghcr.io/your-repo/evomaster:latest
+                ${{ env.GHCR_NAMESPACE }}/evomaster:latest
               ;;
           esac
 
