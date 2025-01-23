@@ -21,6 +21,6 @@ WORKDIR /vampi
 ENV PATH=/root/.local/bin:$PATH \
     vulnerable=1 \
     tokentimetolive=60 \
-    OPENAPI_SPEC=/vampi/openapi_specs/openapi3.yml  # Explicit path
+    OPENAPI_SPEC=/vampi/openapi_specs/openapi3.yml
 
 ENTRYPOINT ["python", "app.py"]
