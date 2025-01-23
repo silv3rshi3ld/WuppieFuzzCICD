@@ -1,59 +1,35 @@
 services:
-  vampi-secure:
-    build:
-      context: ./
-      target: secure
-    ports:
-      - "${PORT:-5001}:5000"
-    environment:
-      - vulnerable=0
+  vampi:
+    image: ghcr.io/your-repo/vampi:latest
     networks:
-      - cicd_network
+      - fuzz-net
+    environment:
+      - vulnerable=${VULNERABLE:-1}  # Parameterized environment variable
+    configs:
+      - source: openapi-config
+        target: /vampi/openapi_specs/api.yml
+    deploy:
+      mode: replicated
+      replicas: ${REPLICAS:-1}
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 5s
       timeout: 3s
       retries: 5
       start_period: 2s
-    restart: "no"
-    stop_grace_period: 1s
-    deploy:
-      mode: replicated
-      replicas: 1
-      endpoint_mode: vip
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
 
-  vampi-vulnerable:
-    build:
-      context: ./
-      target: vulnerable
-    ports:
-      - "${PORT:-5002}:5000"
-    environment:
-      - vulnerable=1
-    networks:
-      - cicd_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 2s
-    restart: "no"
-    stop_grace_period: 1s
-    deploy:
-      mode: replicated
-      replicas: 1
-      endpoint_mode: vip
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
+configs:
+  openapi-config:
+    external: true  # Config must be created in Swarm first
+    name: openapi-spec
 
 networks:
-  cicd_network:
+  fuzz-net:
     external: true
-    driver: overlay
-    attachable: true
-    name: ${DOCKER_NETWORK_NAME:-cicd_network}
+    name: ${DOCKER_NETWORK_NAME:-fuzz-net}

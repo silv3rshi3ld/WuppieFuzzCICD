@@ -1,17 +1,8 @@
-FROM openjdk:11-jre-slim
+FROM openjdk:17-jdk-slim
+ARG OPENAPI_SPEC=api.yml
 
-ENV EVOMASTER_VERSION=3.3.0
+WORKDIR /app
+COPY services/evomaster/evomaster.jar .
+COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /app/api.yml
 
-WORKDIR /evomaster
-
-RUN apt-get update && apt-get install -y curl procps && \
-    curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v${EVOMASTER_VERSION}/evomaster.jar && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /evomaster/results
-
-COPY entrypoint.sh /evomaster/entrypoint.sh
-
-RUN chmod +x /evomaster/entrypoint.sh
-
-ENTRYPOINT ["/evomaster/entrypoint.sh"]
+ENTRYPOINT ["java", "-jar", "evomaster.jar"]

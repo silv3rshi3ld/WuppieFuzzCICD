@@ -1,17 +1,21 @@
-# Single multi-stage build for all variants
+# Stage 1: Builder
 FROM python:3.11-alpine as builder
-
-RUN apk --update add bash nano g++
+ARG OPENAPI_SPEC=api.yml  # Default path for unified spec
+RUN apk add --no-cache g++ libffi-dev
+COPY . /vampi
 WORKDIR /vampi
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt
+COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /vampi/openapi_specs/api.yml
+RUN pip install --user -r requirements.txt
 
+# Stage 2: Runtime
 FROM python:3.11-alpine
+RUN apk add --no-cache curl mongodb-tools
+COPY --from=builder /root/.local /root/.local
+COPY --from=builder /vampi /vampi
 WORKDIR /vampi
-COPY --from=builder /usr/local/lib /usr/local/lib
-COPY --from=builder /usr/local/bin /usr/local/bin
-COPY . .
+ENV PATH=/root/.local/bin:$PATH \
+    vulnerable=1 \
+    tokentimetolive=60 \
+    OPENAPI_SPEC=/vampi/openapi_specs/api.yml
 
-RUN apk --update add wget curl
-EXPOSE 5000
-CMD ["python", "app.py"]
+ENTRYPOINT ["python", "app.py"]
