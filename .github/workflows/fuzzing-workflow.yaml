@@ -248,13 +248,12 @@ jobs:
             --network wuppiefuzz_network_${{ github.run_id }} \
             -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/workspace/output \
             -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro \
-            -e TARGET_IP=${{ env.TARGET_IP }} \
-            -e TARGET_PORT=5000 \
-            -e RUN_FUZZ_LEAN=true \
-            -e RUN_FUZZ=true \
-            -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.wuppie_time }}" \
-            -e FUZZ_TIME_BUDGET="${{ github.event.inputs.wuppie_time }}" \
-            ghcr.io/silv3rshi3ld/wuppiefuzz:latest
+            -e RUST_LOG=debug \
+            ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
+            fuzz /workspace/openapi3.yml \
+            --target-url "http://${{ env.TARGET_IP }}:5000" \
+            --timeout ${{ github.event.inputs.wuppie_time }} \
+            --report
 
       - name: Upload results
         uses: actions/upload-artifact@v4

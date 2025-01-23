@@ -12,5 +12,9 @@ WORKDIR /WuppieFuzz
 # Build the application
 RUN cargo build --release
 
-# Set the entrypoint
+# Create workspace directory
+WORKDIR /workspace
+
+# Set the entrypoint and default command
 ENTRYPOINT ["./target/release/wuppiefuzz"]
+CMD ["fuzz", "/workspace/openapi3.yml", "--target-url", "http://localhost:5000", "--timeout", "60"]
