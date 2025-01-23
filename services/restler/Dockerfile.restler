@@ -1,23 +1,28 @@
-FROM python:3.8-slim
-ARG OPENAPI_SPEC=openapi_specs/openapi3.yml
+# Stage 1: Builder
+FROM python:3.11-alpine as builder
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    wget git curl build-essential libssl-dev && \
-    wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb && \
-    dpkg -i packages-microsoft-prod.deb && \
-    apt-get update && apt-get install -y dotnet-sdk-6.0
+# Add only essential build dependencies
+RUN apk --update add g++ libffi-dev
+COPY ./requirements.txt /vampi/requirements.txt
+WORKDIR /vampi
+RUN pip install -r requirements.txt
 
-# Clone RESTler, install dependencies, and build
-RUN git clone https://github.com/microsoft/restler-fuzzer /restler && \
-    cd /restler && \
-    pip install -r restler/requirements.txt && \
-    /usr/local/bin/python ./build-restler.py --dest_dir /restler_bin
+# Stage 2: Runtime
+FROM python:3.11-alpine
 
-# Copy OpenAPI spec and entrypoint script
-COPY ${OPENAPI_SPEC} /workspace/api.yml
-COPY config/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy application files and OpenAPI spec
+COPY . /vampi
+COPY openapi_specs/openapi3.yml /vampi/openapi_specs/  
 
-WORKDIR /workspace
-ENTRYPOINT ["/entrypoint.sh"]
+# Maintain original copy structure
+WORKDIR /vampi
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Set required environment variables
+ENV vulnerable=1 \
+    tokentimetolive=60 \
+    OPENAPI_SPEC="/vampi/openapi_specs/openapi3.yml" 
+
+ENTRYPOINT ["python"]
+CMD ["app.py"]
