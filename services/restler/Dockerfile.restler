@@ -1,23 +1,21 @@
 FROM python:3.8-slim
-ARG OPENAPI_SPEC=openapi_specs/openapi3.yml  # Path relative to build context
+ARG OPENAPI_SPEC=openapi_specs/openapi3.yml
 
-# Install base dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget git curl build-essential libssl-dev && \
     wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && \
     apt-get update && apt-get install -y dotnet-sdk-6.0
 
-# Clone and build RESTler
-RUN git clone https://github.com/microsoft/restler-fuzzer /restler
-WORKDIR /restler
-RUN pip install -r requirements.txt && \
-    python ./build-restler.py --dest_dir /restler_bin
+# Clone RESTler, install dependencies, and build
+RUN git clone https://github.com/microsoft/restler-fuzzer /restler && \
+    cd /restler && \
+    pip install -r restler/requirements.txt && \  # Corrected path
+    python ./restler/build-restler.py --dest_dir /restler_bin  # Updated build path
 
-# Copy the OpenAPI spec from the local build context
+# Copy OpenAPI spec and entrypoint script
 COPY ${OPENAPI_SPEC} /workspace/api.yml
-
-# Copy entrypoint script (relative to build context)
 COPY config/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
