@@ -98,18 +98,16 @@ jobs:
 
       - name: Build and Push WuppieFuzz
         run: |
-          if docker manifest inspect ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} >/dev/null 2>&1; then
-            echo "Existing WuppieFuzz image found - skipping build"
-          else
-            docker buildx build \
-              --platform linux/amd64 \
-              -t ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
-              -t ghcr.io/your-repo/wuppiefuzz:latest \
-              --build-arg WUPPIEFUZZ_COMMIT=${{ steps.wuppie-commit.outputs.commit_hash }} \
-              --push \
-              -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
-              .
-          fi
+          # Force fresh build when new commits exist
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
+            -t ghcr.io/your-repo/wuppiefuzz:latest \
+            --build-arg WUPPIEFUZZ_COMMIT=${{ steps.wuppie-commit.outputs.commit_hash }} \
+            --no-cache \
+            --push \
+            -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
+            .
 
       - name: Prepare OpenAPI Specs
         run: |
