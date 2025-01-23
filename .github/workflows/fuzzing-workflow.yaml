@@ -26,11 +26,12 @@ env:
   OPENAPI_SPEC: openapi3.yml
   BUILDX_BUILDER: github-runner-builder
   WUPPIEFUZZ_REPO: "https://github.com/TNO-S3/WuppieFuzz.git"
-  GHCR_NAMESPACE: "ghcr.io/silv3shi3ld"  # Changed to your username
+  GHCR_NAMESPACE: "ghcr.io/silv3rshi3ld"  # Corrected username with 'r'
 
-permissions:  # Added permissions block
+permissions:
   contents: read
-  packages: write
+  packages: write  # Required for GHCR access
+  actions: write
 
 jobs:
   swarm_init:
@@ -93,7 +94,7 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}  # Use repository owner
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get WuppieFuzz commit
@@ -108,7 +109,8 @@ jobs:
             --platform linux/amd64 \
             -t ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
             -t ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:latest \
-            --build-arg WUPPIEFUZZ_COMMIT=${{ steps.wuppie-commit.outputs.commit_hash }} \
+            --label "org.opencontainers.image.source=https://github.com/silv3rshi3ld/WuppieFuzzCICD" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
             --push \
             -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
             .
