@@ -81,20 +81,23 @@ jobs:
 
       - name: Cleanup old networks
         run: |
-          # Remove networks older than 5 minutes
-          docker network prune --force --filter "until=5m"
-          # Remove any remaining workflow networks
+          # Remove all existing workflow networks
           docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
+          docker network prune --force
 
       - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
+          # Generate unique hex value from RUN_ID
+          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
+          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
+          
           # For RESTler (172.17.x.0/24)
-          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
+          OCTET3=$(( DECIMAL % 256 ))
           docker network create \
             --driver=bridge \
-            --subnet=172.17.${SUBNET_OCTET3}.0/24 \
+            --subnet=172.17.$OCTET3.0/24 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -126,15 +129,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cleanup old networks
+        run: |
+          # Remove all existing workflow networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
+          docker network prune --force
+
       - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
+          # Generate unique hex value from RUN_ID
+          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
+          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
+          
           # For WuppieFuzz (10.0.x.0/24)
-          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
+          OCTET3=$(( (DECIMAL + 100) % 256 ))  # Offset to avoid overlap
           docker network create \
             --driver=bridge \
-            --subnet=10.0.${SUBNET_OCTET3}.0/24 \
+            --subnet=10.0.$OCTET3.0/24 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -166,15 +179,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cleanup old networks
+        run: |
+          # Remove all existing workflow networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
+          docker network prune --force
+
       - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
+          # Generate unique hex value from RUN_ID
+          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
+          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
+          
           # For EvoMaster (192.168.x.0/24)
-          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
+          OCTET3=$(( (DECIMAL + 200) % 256 ))  # Offset to avoid overlap
           docker network create \
             --driver=bridge \
-            --subnet=192.168.${SUBNET_OCTET3}.0/24 \
+            --subnet=192.168.$OCTET3.0/24 \
             evomaster_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -337,7 +360,7 @@ jobs:
           # Force remove networks
           docker network rm restler_network_${{ github.run_id }} evomaster_network_${{ github.run_id }} || true
           
-          # Remove networks older than 5 minutes
+          # Remove all networks older than 5 minutes
           docker network prune --force --filter "until=5m"
           # Remove any remaining workflow networks
           docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
@@ -353,7 +376,7 @@ jobs:
           docker network rm wuppiefuzz_network_${{ github.run_id }} || true
           docker rm -f vampi-wuppiefuzz_${{ github.run_id }} || true
           
-          # Remove networks older than 5 minutes
+          # Remove all networks older than 5 minutes
           docker network prune --force --filter "until=5m"
           # Remove any remaining workflow networks
           docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
