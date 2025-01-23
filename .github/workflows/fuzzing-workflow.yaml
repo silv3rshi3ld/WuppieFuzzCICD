@@ -240,20 +240,36 @@ jobs:
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
 
-      - name: Run WuppieFuzz
+      - name: Create dynamic OpenAPI spec
         env:
           TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
+        run: |
+          sed "s|http://vampi:5000|http://${{ env.TARGET_IP }}:5000|g" \
+            ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml \
+            > ${{ github.workspace }}/openapi3-modified.yml
+
+      - name: Create WuppieFuzz config
+        run: |
+          cat > ${{ github.workspace }}/wuppie-config.yml << EOF
+          coverage_format: lcov
+          report: true
+          output_format: human-readable
+          timeout: ${{ github.event.inputs.wuppie_time }}
+          source_dir: "/app/src"
+          EOF
+
+      - name: Run WuppieFuzz with config
         run: |
           docker run --rm \
             --network wuppiefuzz_network_${{ github.run_id }} \
             -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/workspace/output \
-            -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro \
+            -v ${{ github.workspace }}/openapi3-modified.yml:/workspace/openapi3.yml:ro \
+            -v ${{ github.workspace }}/wuppie-config.yml:/workspace/config.yml:ro \
             -e RUST_LOG=debug \
             ghcr.io/silv3rshi3ld/wuppiefuzz:latest \
             fuzz /workspace/openapi3.yml \
-            --target-url "http://${{ env.TARGET_IP }}:5000" \
-            --timeout ${{ github.event.inputs.wuppie_time }} \
-            --report
+            --config /workspace/config.yml \
+            --timeout ${{ github.event.inputs.wuppie_time }}
 
       - name: Upload results
         uses: actions/upload-artifact@v4

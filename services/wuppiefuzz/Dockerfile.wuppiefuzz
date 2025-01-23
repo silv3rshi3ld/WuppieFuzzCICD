@@ -15,6 +15,8 @@ RUN cargo build --release
 # Create workspace directory
 WORKDIR /workspace
 
-# Set the entrypoint and default command
+# Add environment variable for target URL
+ENV VAMPI_WUPPIEFUZZ_URL="http://vampi:5000"
+
+# Keep existing entrypoint
 ENTRYPOINT ["./target/release/wuppiefuzz"]
-CMD ["fuzz", "/workspace/openapi3.yml", "--target-url", "http://localhost:5000", "--timeout", "60"]
