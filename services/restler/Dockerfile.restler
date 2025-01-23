@@ -15,7 +15,7 @@ RUN pip install -r requirements.txt && \
     python ./build-restler.py --dest_dir /restler_bin
 
 # Configure unified spec
-COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /workspace/api.yml
+COPY ${OPENAPI_SPEC} /workspace/api.yml
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

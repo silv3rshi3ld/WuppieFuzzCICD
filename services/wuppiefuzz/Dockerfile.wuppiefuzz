@@ -3,12 +3,12 @@ ARG OPENAPI_SPEC=api.yml
 
 WORKDIR /app
 COPY . .
-COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /app/api.yml
+COPY ${OPENAPI_SPEC} /app/api.yml
 RUN cargo build --release
 
 # Final image
 FROM debian:bullseye-slim
 COPY --from=builder /app/target/release/wuppiefuzz /usr/local/bin/
-COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /app/api.yml
+COPY ${OPENAPI_SPEC} /app/api.yml
 
 ENTRYPOINT ["wuppiefuzz"]

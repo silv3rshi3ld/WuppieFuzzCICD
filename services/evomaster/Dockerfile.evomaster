@@ -3,6 +3,6 @@ ARG OPENAPI_SPEC=api.yml
 
 WORKDIR /app
 COPY services/evomaster/evomaster.jar .
-COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /app/api.yml
+COPY ${OPENAPI_SPEC} /app/api.yml
 
 ENTRYPOINT ["java", "-jar", "evomaster.jar"]
