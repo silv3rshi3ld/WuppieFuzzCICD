@@ -90,12 +90,11 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Calculate octets from RUN_ID
-          SUBNET_OCTET2=$(( ($RUN_ID / 256) % 256 ))
-          SUBNET_OCTET3=$(( $RUN_ID % 256 ))
+          # For RESTler (172.17.x.0/24)
+          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
           docker network create \
             --driver=bridge \
-            --subnet=172.${SUBNET_OCTET2}.${SUBNET_OCTET3}.0/24 \
+            --subnet=172.17.${SUBNET_OCTET3}.0/24 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -131,12 +130,11 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Calculate octets from RUN_ID
-          SUBNET_OCTET2=$(( ($RUN_ID / 256) % 256 ))
-          SUBNET_OCTET3=$(( $RUN_ID % 256 ))
+          # For WuppieFuzz (10.0.x.0/24)
+          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
           docker network create \
             --driver=bridge \
-            --subnet=10.${SUBNET_OCTET2}.${SUBNET_OCTET3}.0/24 \
+            --subnet=10.0.${SUBNET_OCTET3}.0/24 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -172,12 +170,11 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Calculate octets from RUN_ID
-          SUBNET_OCTET3=$(( ($RUN_ID / 256) % 256 ))
-          SUBNET_OCTET4=$(( $RUN_ID % 256 ))
+          # For EvoMaster (192.168.x.0/24)
+          SUBNET_OCTET3=$(( ($RUN_ID % 256) ))  # Range: 0-255
           docker network create \
             --driver=bridge \
-            --subnet=192.168.${SUBNET_OCTET3}.${SUBNET_OCTET4}.0/24 \
+            --subnet=192.168.${SUBNET_OCTET3}.0/24 \
             evomaster_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
