@@ -240,21 +240,21 @@ jobs:
       - name: Create results directory
         run: mkdir -p fuzzing_results/wuppiefuzz
 
-      - name: Run RESTler
+      - name: Run WuppieFuzz
         env:
-          TARGET_IP: ${{ needs.deploy_restler_vampi.outputs.vampi_ip }}
+          TARGET_IP: ${{ needs.deploy_wuppiefuzz_vampi.outputs.vampi_ip }}
         run: |
           docker run --rm \
-            --network restler_network_${{ github.run_id }} \
-            -v ${{ github.workspace }}/fuzzing_results/restler:/workspace/output \
+            --network wuppiefuzz_network_${{ github.run_id }} \
+            -v ${{ github.workspace }}/fuzzing_results/wuppiefuzz:/workspace/output \
             -v ${{ env.BASE_DIR }}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro \
             -e TARGET_IP=${{ env.TARGET_IP }} \
             -e TARGET_PORT=5000 \
             -e RUN_FUZZ_LEAN=true \
             -e RUN_FUZZ=true \
-            -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
-            -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
-            ghcr.io/silv3rshi3ld/restler:latest
+            -e FUZZ_LEAN_TIME_BUDGET="${{ github.event.inputs.wuppie_time }}" \
+            -e FUZZ_TIME_BUDGET="${{ github.event.inputs.wuppie_time }}" \
+            ghcr.io/silv3rshi3ld/wuppiefuzz:latest
 
       - name: Upload results
         uses: actions/upload-artifact@v4
