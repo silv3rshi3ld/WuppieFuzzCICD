@@ -2,7 +2,11 @@ FROM openjdk:17-jdk-slim
 ARG OPENAPI_SPEC=api.yml
 
 WORKDIR /app
-COPY services/evomaster/evomaster.jar .
+
+# Download evomaster.jar directly
+RUN apt-get update && apt-get install -y wget && \
+    wget https://github.com/WebFuzzing/EvoMaster/releases/download/v3.4.0/evomaster.jar
+
 COPY ${OPENAPI_SPEC} /app/api.yml
 
 ENTRYPOINT ["java", "-jar", "evomaster.jar"]
