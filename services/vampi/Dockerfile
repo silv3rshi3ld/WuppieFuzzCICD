@@ -3,14 +3,18 @@ FROM python:3.11-alpine AS builder
 ARG OPENAPI_SPEC=openapi3.yml  # Match actual filename
 
 RUN apk add --no-cache g++ libffi-dev
-COPY . /vampi
+
 WORKDIR /vampi
+
+# Copy and install requirements first for better layer caching
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# Copy the rest of the application
+COPY . .
 
 # Copy OpenAPI spec
 COPY ${OPENAPI_SPEC} ./openapi_specs/
-
-# Install requirements (preserve existing paths)
-RUN pip install --user -r requirements.txt
 
 # Stage 2: Runtime
 FROM python:3.11-alpine
