@@ -216,7 +216,7 @@ jobs:
                 --with-registry-auth \
                 --config source=openapi-config,target=/openapi3.yml \
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
-                -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
+                -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time || 1 }}" \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
                 ${{ env.GHCR_NAMESPACE }}/restler:latest
               ;;
@@ -236,7 +236,7 @@ jobs:
                 --report \
                 --log-level info \
                 --initial-corpus /corpus \
-                --timeout ${{ github.event.inputs.wuppie_time }} \
+                --timeout ${{ github.event.inputs.wuppie_time || 60 }} \
                 --authentication /corpus/auth.yaml \
                 /openapi3.yml
               ;;
@@ -248,12 +248,11 @@ jobs:
                 --with-registry-auth \
                 --config source=openapi-config,target=/openapi3.yml \
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
-                -e TIME_BUDGET="${{ github.event.inputs.evomaster_time }}" \
+                -e TIME_BUDGET="${{ github.event.inputs.evomaster_time || 10 }}" \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
                 ${{ env.GHCR_NAMESPACE }}/evomaster:latest
               ;;
-          esac
-
+              
   monitor_and_collect:
     needs: deploy_services
     runs-on: [self-hosted, manager-runner]
