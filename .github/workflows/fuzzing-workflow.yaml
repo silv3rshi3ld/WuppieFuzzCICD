@@ -83,18 +83,19 @@ jobs:
         run: |
           # Remove networks older than 5 minutes
           docker network prune --force --filter "until=5m"
-          # Remove workflow-specific networks
-          docker network ls --format '{{.Name}}' | grep -E 'restler|wuppiefuzz|evomaster' | xargs -r docker network rm || true
+          # Remove any remaining workflow networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
 
-      - name: Create network with specific subnet
+      - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # For RESTler (172.17.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 85) + 1 ))  # Range: 1-85
+          # Calculate octets from RUN_ID
+          SUBNET_OCTET2=$(( ($RUN_ID / 256) % 256 ))
+          SUBNET_OCTET3=$(( $RUN_ID % 256 ))
           docker network create \
             --driver=bridge \
-            --subnet=172.17.${SUBNET_PART}.0/24 \
+            --subnet=172.${SUBNET_OCTET2}.${SUBNET_OCTET3}.0/24 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -126,15 +127,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create network with specific subnet
+      - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # For WuppieFuzz (10.1.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 85) + 86 ))  # Range: 86-170
+          # Calculate octets from RUN_ID
+          SUBNET_OCTET2=$(( ($RUN_ID / 256) % 256 ))
+          SUBNET_OCTET3=$(( $RUN_ID % 256 ))
           docker network create \
             --driver=bridge \
-            --subnet=10.1.${SUBNET_PART}.0/24 \
+            --subnet=10.${SUBNET_OCTET2}.${SUBNET_OCTET3}.0/24 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -166,15 +168,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create network with specific subnet
+      - name: Create network with unique subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # For EvoMaster (192.168.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 85) + 171 ))  # Range: 171-255
+          # Calculate octets from RUN_ID
+          SUBNET_OCTET3=$(( ($RUN_ID / 256) % 256 ))
+          SUBNET_OCTET4=$(( $RUN_ID % 256 ))
           docker network create \
             --driver=bridge \
-            --subnet=192.168.${SUBNET_PART}.0/24 \
+            --subnet=192.168.${SUBNET_OCTET3}.${SUBNET_OCTET4}.0/24 \
             evomaster_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -337,8 +340,10 @@ jobs:
           # Force remove networks
           docker network rm restler_network_${{ github.run_id }} evomaster_network_${{ github.run_id }} || true
           
-          # Cleanup dangling networks
-          docker network prune --force
+          # Remove networks older than 5 minutes
+          docker network prune --force --filter "until=5m"
+          # Remove any remaining workflow networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
 
   cleanup_worker:
     needs: [run_wuppiefuzz]
@@ -347,5 +352,11 @@ jobs:
     steps:
       - name: Clean worker-runner resources
         run: |
+          # Force remove networks and containers
           docker network rm wuppiefuzz_network_${{ github.run_id }} || true
           docker rm -f vampi-wuppiefuzz_${{ github.run_id }} || true
+          
+          # Remove networks older than 5 minutes
+          docker network prune --force --filter "until=5m"
+          # Remove any remaining workflow networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
