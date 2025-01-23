@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 RUN git clone https://github.com/microsoft/restler-fuzzer /restler && \
     cd /restler && \
     pip install -r restler/requirements.txt && \
-    /usr/local/bin/python ./restler/build-restler.py --dest_dir /restler_bin
+    /usr/local/bin/python ./build-restler.py --dest_dir /restler_bin
 
 # Copy OpenAPI spec and entrypoint script
 COPY ${OPENAPI_SPEC} /workspace/api.yml
