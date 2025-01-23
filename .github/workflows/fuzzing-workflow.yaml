@@ -148,6 +148,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create shared resources
         run: |
+          # Create swarm network
+          docker network create \
+            --driver overlay \
+            --attachable \
+            --subnet=10.30.0.0/16 \
+            ${{ env.NETWORK_NAME }} || true
+
+          # Create other resources
           mkdir -p ${{ env.CORPUS_DIR }}
           echo "admin:admin" > ${{ env.CORPUS_DIR }}/auth.yaml
           docker config create openapi-config services/vampi/openapi_specs/openapi3.yml
