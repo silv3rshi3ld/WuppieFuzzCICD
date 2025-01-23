@@ -87,7 +87,8 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
+          # For RESTler (172.16.x.0/24)
+          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
           docker network create \
             --driver=bridge \
             --subnet=172.16.${SUBNET_PART}.0/24 \
@@ -126,7 +127,8 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
+          # For WuppieFuzz (10.0.x.0/24)
+          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
           docker network create \
             --driver=bridge \
             --subnet=10.0.${SUBNET_PART}.0/24 \
@@ -165,7 +167,8 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
+          # For EvoMaster (192.168.x.0/24)
+          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
           docker network create \
             --driver=bridge \
             --subnet=192.168.${SUBNET_PART}.0/24 \
