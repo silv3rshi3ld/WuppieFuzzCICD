@@ -2,8 +2,7 @@ name: Swarm Fuzzing Workflow
 
 on:
   push:
-    branches:
-      - SingleWorker
+    branches: [SingleWorker]
   workflow_dispatch:
     inputs:
       restler_time:
@@ -24,7 +23,8 @@ env:
   NETWORK_NAME: fuzz-net-${{ github.run_id }}
   VOLUME_NAME: results-${{ github.run_id }}
   CORPUS_DIR: ./corpus
-  OPENAPI_SPEC: /api.yml  # Unified spec path in containers
+  OPENAPI_SPEC: /api.yml
+  HOST_INTERFACE: ens18  # Explicit interface name
 
 jobs:
   swarm_init:
@@ -37,9 +37,22 @@ jobs:
       - name: Initialize Swarm
         run: |
           docker swarm leave --force || true
-          docker swarm init --advertise-addr eth0
+          
+          # Get IP for specific interface
+          HOST_IP=$(ip -4 addr show ${{ env.HOST_INTERFACE }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+          if [ -z "$HOST_IP" ]; then
+            echo "ERROR: No IP found on ${{ env.HOST_INTERFACE }}!"
+            ip addr show ${{ env.HOST_INTERFACE }}
+            exit 1
+          fi
+          
+          docker swarm init \
+            --advertise-addr ${HOST_IP}:2377 \
+            --default-addr-pool 10.30.0.0/16 \
+            --data-path-port 4789
+          
           docker swarm join-token -q worker > swarm_token.txt
-          ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' > manager_ip.txt
+          echo $HOST_IP > manager_ip.txt
       - name: Extract swarm token
         id: get-token
         run: echo "token=$(cat swarm_token.txt)" >> $GITHUB_OUTPUT
@@ -51,8 +64,15 @@ jobs:
     needs: swarm_init
     runs-on: [self-hosted, worker-runner]
     steps:
+      - name: Validate network interface
+        run: ip addr show ${{ env.HOST_INTERFACE }} || (echo "Missing ${{ env.HOST_INTERFACE }} interface!"; exit 1)
+      
       - name: Join Swarm cluster
-        run: docker swarm join --token ${{ needs.swarm_init.outputs.swarm_token }} ${{ needs.swarm_init.outputs.manager_ip }}:2377
+        run: |
+          docker swarm join \
+            --token ${{ needs.swarm_init.outputs.swarm_token }} \
+            --advertise-addr ${{ env.HOST_INTERFACE }} \
+            ${{ needs.swarm_init.outputs.manager_ip }}:2377
 
   build_images:
     needs: [swarm_init, swarm_join]
