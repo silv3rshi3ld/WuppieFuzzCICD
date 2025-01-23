@@ -81,20 +81,16 @@ jobs:
 
       - name: Cleanup old networks
         run: |
-          # Remove all existing workflow networks
-          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
           docker network prune --force
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
 
-      - name: Create network with unique subnet
+      - name: Create RESTler network
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Generate unique hex value from RUN_ID
-          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
-          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
-          
-          # For RESTler (172.17.x.0/24)
-          OCTET3=$(( DECIMAL % 256 ))
+          # Generate unique hex value from RUN_ID with job-specific suffix
+          HEX_HASH=$(echo "$RUN_ID-restler" | sha1sum | cut -c1-4)
+          OCTET3=$(( 0x$HEX_HASH % 256 ))
           docker network create \
             --driver=bridge \
             --subnet=172.17.$OCTET3.0/24 \
@@ -131,20 +127,16 @@ jobs:
 
       - name: Cleanup old networks
         run: |
-          # Remove all existing workflow networks
-          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
           docker network prune --force
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
 
-      - name: Create network with unique subnet
+      - name: Create WuppieFuzz network
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Generate unique hex value from RUN_ID
-          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
-          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
-          
-          # For WuppieFuzz (10.0.x.0/24)
-          OCTET3=$(( (DECIMAL + 100) % 256 ))  # Offset to avoid overlap
+          # Generate unique hex value from RUN_ID with job-specific suffix
+          HEX_HASH=$(echo "$RUN_ID-wuppiefuzz" | sha1sum | cut -c1-4)
+          OCTET3=$(( 0x$HEX_HASH % 256 ))
           docker network create \
             --driver=bridge \
             --subnet=10.0.$OCTET3.0/24 \
@@ -181,20 +173,16 @@ jobs:
 
       - name: Cleanup old networks
         run: |
-          # Remove all existing workflow networks
-          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
           docker network prune --force
+          docker network ls --format '{{.Name}}' | grep -E 'restler_network_|wuppiefuzz_network_|evomaster_network_' | xargs -r docker network rm || true
 
-      - name: Create network with unique subnet
+      - name: Create EvoMaster network
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # Generate unique hex value from RUN_ID
-          HEX_HASH=$(echo "$RUN_ID" | sha1sum | cut -c1-4)
-          DECIMAL=$(( 0x$HEX_HASH % 65536 ))  # 0-65535
-          
-          # For EvoMaster (192.168.x.0/24)
-          OCTET3=$(( (DECIMAL + 200) % 256 ))  # Offset to avoid overlap
+          # Generate unique hex value from RUN_ID with job-specific suffix
+          HEX_HASH=$(echo "$RUN_ID-evomaster" | sha1sum | cut -c1-4)
+          OCTET3=$(( 0x$HEX_HASH % 256 ))
           docker network create \
             --driver=bridge \
             --subnet=192.168.$OCTET3.0/24 \
