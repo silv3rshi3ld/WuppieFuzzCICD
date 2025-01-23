@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y \
 # Clone RESTler, install dependencies, and build
 RUN git clone https://github.com/microsoft/restler-fuzzer /restler && \
     cd /restler && \
-    pip install -r restler/requirements.txt && \  # Corrected path
-    python ./restler/build-restler.py --dest_dir /restler_bin  # Updated build path
+    pip install -r restler/requirements.txt && \
+    PYTHON ./restler/build-restler.py --dest_dir /restler_bin
 
 # Copy OpenAPI spec and entrypoint script
 COPY ${OPENAPI_SPEC} /workspace/api.yml
