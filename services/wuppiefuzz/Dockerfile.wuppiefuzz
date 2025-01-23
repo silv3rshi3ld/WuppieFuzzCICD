@@ -1,21 +1,23 @@
-# Builder stage using modern Rust version
-FROM rust:1.77 AS builder
+# Builder stage with modern Rust and dependency handling
+FROM rust:latest AS builder
 
 ARG WUPPIEFUZZ_COMMIT=main
 
-# Clone and prepare repository
+# Clone fresh repository and remove existing lock file
 RUN git clone https://github.com/TNO-S3/WuppieFuzz.git /wuppiefuzz && \
     cd /wuppiefuzz && \
-    git checkout $WUPPIEFUZZ_COMMIT
+    git checkout $WUPPIEFUZZ_COMMIT && \
+    rm -f Cargo.lock
 
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Build application
+# Build with updated toolchain
 WORKDIR /wuppiefuzz
-RUN cargo update && \
+RUN rustup update && \
+    cargo generate-lockfile && \
     cargo build --release
 
 # Final stage
