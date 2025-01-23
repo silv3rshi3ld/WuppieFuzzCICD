@@ -91,15 +91,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push images
         run: |
-          # Build with unified OpenAPI spec
+          # Build VAmPI image with correct context
           docker build -t ghcr.io/your-repo/vampi:latest \
-            --build-arg OPENAPI_SPEC=services/vampi/openapi_specs/openapi3.yml \
-            -f services/vampi/Dockerfile .
-          
-          # Other builds remain similar but reference unified spec
-          docker build -t ghcr.io/your-repo/restler:latest -f services/restler/Dockerfile.restler .
-          docker build -t ghcr.io/your-repo/evomaster:latest -f services/evomaster/Dockerfile.evomaster .
-          docker build -t ghcr.io/your-repo/wuppiefuzz:latest -f services/wuppiefuzz/Dockerfile.wuppiefuzz .
+            --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
+            -f services/vampi/Dockerfile services/vampi/  # Set context to services/vampi
+
+          # Build other tools similarly, adjusting context as needed
+          docker build -t ghcr.io/your-repo/restler:latest -f services/restler/Dockerfile.restler services/restler/
+          docker build -t ghcr.io/your-repo/evomaster:latest -f services/evomaster/Dockerfile.evomaster services/evomaster/
+          docker build -t ghcr.io/your-repo/wuppiefuzz:latest -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
           
           docker push ghcr.io/your-repo/vampi:latest
           docker push ghcr.io/your-repo/restler:latest
