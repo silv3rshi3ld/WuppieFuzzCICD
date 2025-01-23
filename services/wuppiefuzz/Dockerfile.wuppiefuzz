@@ -1,14 +1,27 @@
-FROM rust:1.68 as builder
-ARG OPENAPI_SPEC=api.yml
+# Builder stage
+FROM rust:1.68 AS builder
 
-WORKDIR /app
-COPY . .
-COPY ${OPENAPI_SPEC} /app/api.yml
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /wuppiefuzz
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY openapi_specs/openapi3.yml ./api.yml
+
+# Cache dependencies
+RUN cargo fetch
+
+# Build application
 RUN cargo build --release
 
-# Final image
+# Final stage
 FROM debian:bullseye-slim
-COPY --from=builder /app/target/release/wuppiefuzz /usr/local/bin/
-COPY ${OPENAPI_SPEC} /app/api.yml
+
+WORKDIR /wuppiefuzz
+COPY --from=builder /wuppiefuzz/target/release/wuppiefuzz /usr/local/bin/
+COPY --from=builder /wuppiefuzz/api.yml .
 
 ENTRYPOINT ["wuppiefuzz"]

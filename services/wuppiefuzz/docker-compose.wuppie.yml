@@ -3,16 +3,30 @@ version: '3.8'
 services:
   wuppiefuzz:
     build:
-      context: .
+      context: services/wuppiefuzz
       dockerfile: Dockerfile.wuppiefuzz
+      args:
+        OPENAPI_SPEC: openapi_specs/openapi3.yml
+    container_name: wuppiefuzz
     environment:
-      TARGET_URL: "http://vampi:5000"  # Use service name from network
+      VAMPI_WUPPIEFUZZ_URL: ${VAMPI_WUPPIEFUZZ_URL}
+      RUST_LOG: info
     volumes:
-      - ./reports:/app/reports
-      - ../../openapi/openapi3.yml:/app/openapi3.yml:ro  # Match container path
+      - fuzz-results:/wuppiefuzz/reports
     networks:
-      - wuppiefuzz_network
+      - cicd_network
+    configs:
+      - source: openapi-config
+        target: /wuppiefuzz/openapi3.yml
 
 networks:
-  wuppiefuzz_network:
+  cicd_network:
+    external: true
+
+volumes:
+  fuzz-results:
+    external: true
+
+configs:
+  openapi-config:
     external: true

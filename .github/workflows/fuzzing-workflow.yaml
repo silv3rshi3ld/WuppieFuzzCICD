@@ -23,8 +23,8 @@ env:
   NETWORK_NAME: fuzz-net-${{ github.run_id }}
   VOLUME_NAME: results-${{ github.run_id }}
   CORPUS_DIR: ./corpus
-  OPENAPI_SPEC: /openapi3.yml  # Update all references
-  HOST_INTERFACE: ens18  # Explicit interface name
+  OPENAPI_SPEC: openapi3.yml
+  BUILDX_BUILDER: github-runner-builder
 
 jobs:
   swarm_init:
@@ -36,21 +36,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Initialize Swarm
         run: |
-          # Leave if in wrong swarm
           CURRENT_SWARM=$(docker info --format '{{.Swarm.NodeID}}')
           if [ -n "$CURRENT_SWARM" ]; then
-            echo "Leaving existing swarm..."
             docker swarm leave --force || true
             sleep 5
           fi
 
-          # Initialize new swarm
           HOST_IP=$(ip -4 addr show ens18 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
           docker swarm init \
             --advertise-addr ${HOST_IP}:2377 \
             --default-addr-pool 10.30.0.0/16
 
-          # Store join tokens
           docker swarm join-token -q worker > swarm_token.txt
           echo $HOST_IP > manager_ip.txt
 
@@ -67,16 +63,12 @@ jobs:
     steps:
       - name: Join Swarm cluster
         run: |
-          # Check if already in correct swarm
           CURRENT_MANAGER=$(docker info --format '{{.Swarm.RemoteManagers}}' | grep -o ${{ needs.swarm_init.outputs.manager_ip }} || true)
           if [ -z "$CURRENT_MANAGER" ]; then
-            echo "Joining new swarm..."
             docker swarm leave --force || true
             docker swarm join \
               --token ${{ needs.swarm_init.outputs.swarm_token }} \
               ${{ needs.swarm_init.outputs.manager_ip }}:2377
-          else
-            echo "Already part of correct swarm"
           fi
 
   build_images:
@@ -84,46 +76,53 @@ jobs:
     runs-on: [self-hosted, manager-runner]
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --name ${{ env.BUILDX_BUILDER }} --use
+          docker buildx inspect --bootstrap
+          
       - uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Copy OpenAPI Spec to Services
+
+      - name: Prepare OpenAPI Specs
         run: |
-          # Copy OpenAPI spec to RESTler's directory
-          mkdir -p services/restler/openapi_specs
+          mkdir -p services/{restler,evomaster,wuppiefuzz}/openapi_specs
           cp services/vampi/openapi_specs/openapi3.yml services/restler/openapi_specs/
-
-          # Copy to EvoMaster
-          mkdir -p services/evomaster/openapi_specs
           cp services/vampi/openapi_specs/openapi3.yml services/evomaster/openapi_specs/
-
-          # Copy to WuppieFuzz
-          mkdir -p services/wuppiefuzz/openapi_specs
           cp services/vampi/openapi_specs/openapi3.yml services/wuppiefuzz/openapi_specs/
 
-      - name: Build and push images
+      - name: Build and Push WuppieFuzz
         run: |
-          # Build RESTler
-          docker build -t ghcr.io/your-repo/restler:latest \
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ghcr.io/your-repo/wuppiefuzz:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
-            -f services/restler/Dockerfile.restler services/restler/
+            --push \
+            -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
+            services/wuppiefuzz
 
-          # Build EvoMaster similarly
-          docker build -t ghcr.io/your-repo/evomaster:latest \
+      - name: Build and Push RESTler
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ghcr.io/your-repo/restler:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
-            -f services/evomaster/Dockerfile.evomaster services/evomaster/
+            --push \
+            -f services/restler/Dockerfile.restler \
+            services/restler
 
-          # Build WuppieFuzz
-          docker build -t ghcr.io/your-repo/wuppiefuzz:latest \
+      - name: Build and Push EvoMaster
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ghcr.io/your-repo/evomaster:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
-            -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
-
-          # Push all images
-          docker push ghcr.io/your-repo/restler:latest
-          docker push ghcr.io/your-repo/evomaster:latest
-          docker push ghcr.io/your-repo/wuppiefuzz:latest
+            --push \
+            -f services/evomaster/Dockerfile.evomaster \
+            services/evomaster
 
   prepare_environment:
     needs: build_images
@@ -135,6 +134,7 @@ jobs:
           mkdir -p ${{ env.CORPUS_DIR }}
           echo "admin:admin" > ${{ env.CORPUS_DIR }}/auth.yaml
           docker config create openapi-config services/vampi/openapi_specs/openapi3.yml
+          docker volume create ${{ env.VOLUME_NAME }}
 
   deploy_services:
     needs: [build_images, prepare_environment]
@@ -148,7 +148,7 @@ jobs:
         env:
           SERVICE_NAME: ${{ matrix.tool }}-fuzzer
         run: |
-          # Create service with health check
+          # VAmPI service deployment
           docker service create \
             --name vampi-${{ matrix.tool }} \
             --network ${{ env.NETWORK_NAME }} \
@@ -161,10 +161,11 @@ jobs:
             ghcr.io/your-repo/vampi:latest
 
           # Wait for VAmPI readiness
-          while [ $(docker service ps vampi-${{ matrix.tool }} --format '{{.CurrentState}}' | grep Running | wc -l) -lt 1 ]; do
+          until docker service ps vampi-${{ matrix.tool }} --format '{{.CurrentState}}' | grep -q Running; do
             sleep 5
           done
 
+          # Fuzzer service deployment
           case "${{ matrix.tool }}" in
             restler)
               docker service create \
@@ -173,7 +174,6 @@ jobs:
                 --config source=openapi-config,target=/openapi3.yml \
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
                 -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
-                -e RESTLER_TELEMETRY_OPTOUT=1 \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
                 ghcr.io/your-repo/restler:latest
               ;;
@@ -194,7 +194,7 @@ jobs:
                 --initial-corpus /corpus \
                 --timeout ${{ github.event.inputs.wuppie_time }} \
                 --authentication /corpus/auth.yaml \
-                ${{ env.OPENAPI_SPEC }}
+                /openapi3.yml
               ;;
 
             evomaster)
@@ -214,13 +214,11 @@ jobs:
     runs-on: [self-hosted, manager-runner]
     timeout-minutes: 120
     steps:
-      - name: Wait for completion
+      - name: Monitor completion
         run: |
           for tool in restler wuppiefuzz evomaster; do
-            docker service ps ${tool}-fuzzer --format '{{.CurrentState}}' | grep "Complete"
-            while [ $? -ne 0 ]; do
+            while ! docker service ps ${tool}-fuzzer --format '{{.CurrentState}}' | grep -q Complete; do
               sleep 30
-              docker service ps ${tool}-fuzzer --format '{{.CurrentState}}' | grep "Complete"
             done
           done
       - name: Package results
@@ -238,10 +236,11 @@ jobs:
     if: always()
     runs-on: [self-hosted, manager-runner]
     steps:
-      - name: Remove stack resources
+      - name: Remove swarm resources
         run: |
           docker service rm $(docker service ls -q --filter name=fuzz-) || true
           docker config rm openapi-config || true
           docker network rm ${{ env.NETWORK_NAME }} || true
           docker volume rm ${{ env.VOLUME_NAME }} || true
           docker swarm leave --force || true
+          docker buildx rm ${{ env.BUILDX_BUILDER }} || true
