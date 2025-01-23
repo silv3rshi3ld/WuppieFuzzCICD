@@ -25,6 +25,7 @@ env:
   CORPUS_DIR: ./corpus
   OPENAPI_SPEC: openapi3.yml
   BUILDX_BUILDER: github-runner-builder
+  WUPPIEFUZZ_REPO: "https://github.com/TNO-S3/WuppieFuzz.git"
 
 jobs:
   swarm_init:
@@ -74,6 +75,8 @@ jobs:
   build_images:
     needs: [swarm_init, swarm_join]
     runs-on: [self-hosted, manager-runner]
+    outputs:
+      wuppie_commit: ${{ steps.wuppie-commit.outputs.commit_hash }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -87,22 +90,32 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare OpenAPI Specs
+      - name: Get WuppieFuzz commit
+        id: wuppie-commit
         run: |
-          mkdir -p services/{restler,evomaster,wuppiefuzz}/openapi_specs
-          cp services/vampi/openapi_specs/openapi3.yml services/restler/openapi_specs/
-          cp services/vampi/openapi_specs/openapi3.yml services/evomaster/openapi_specs/
-          cp services/vampi/openapi_specs/openapi3.yml services/wuppiefuzz/openapi_specs/
+          COMMIT_HASH=$(git ls-remote ${{ env.WUPPIEFUZZ_REPO }} HEAD | cut -f1)
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
 
       - name: Build and Push WuppieFuzz
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            -t ghcr.io/your-repo/wuppiefuzz:latest \
-            --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
-            --push \
-            -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
-            services/wuppiefuzz
+          if docker manifest inspect ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} >/dev/null 2>&1; then
+            echo "Existing WuppieFuzz image found - skipping build"
+          else
+            docker buildx build \
+              --platform linux/amd64 \
+              -t ghcr.io/your-repo/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
+              -t ghcr.io/your-repo/wuppiefuzz:latest \
+              --build-arg WUPPIEFUZZ_COMMIT=${{ steps.wuppie-commit.outputs.commit_hash }} \
+              --push \
+              -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
+              .
+          fi
+
+      - name: Prepare OpenAPI Specs
+        run: |
+          mkdir -p services/{restler,evomaster}/openapi_specs
+          cp services/vampi/openapi_specs/openapi3.yml services/restler/openapi_specs/
+          cp services/vampi/openapi_specs/openapi3.yml services/evomaster/openapi_specs/
 
       - name: Build and Push RESTler
         run: |
@@ -187,7 +200,7 @@ jobs:
                 -e AUTH_FILE=/corpus/auth.yaml \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/reports \
                 --mount type=bind,src=${{ github.workspace }}/${{ env.CORPUS_DIR }},dst=/corpus,ro \
-                ghcr.io/your-repo/wuppiefuzz:latest \
+                ghcr.io/your-repo/wuppiefuzz:${{ needs.build_images.outputs.wuppie_commit }} \
                 fuzz \
                 --report \
                 --log-level info \
