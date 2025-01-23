@@ -116,7 +116,7 @@ jobs:
             -t ${{ env.GHCR_NAMESPACE }}/vampi:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
             --push \
-            -f services/vampi/Dockerfile.vampi \
+            -f services/vampi/Dockerfile \
             services/vampi
 
       - name: Build and Push WuppieFuzz
