@@ -81,17 +81,20 @@ jobs:
 
       - name: Cleanup old networks
         run: |
-          docker network prune --force --filter "until=1h"
+          # Remove networks older than 5 minutes
+          docker network prune --force --filter "until=5m"
+          # Remove workflow-specific networks
+          docker network ls --format '{{.Name}}' | grep -E 'restler|wuppiefuzz|evomaster' | xargs -r docker network rm || true
 
       - name: Create network with specific subnet
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # For RESTler (172.16.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
+          # For RESTler (172.17.x.0/24)
+          SUBNET_PART=$(( ($RUN_ID % 85) + 1 ))  # Range: 1-85
           docker network create \
             --driver=bridge \
-            --subnet=172.16.${SUBNET_PART}.0/24 \
+            --subnet=172.17.${SUBNET_PART}.0/24 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -127,11 +130,11 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          # For WuppieFuzz (10.0.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
+          # For WuppieFuzz (10.1.x.0/24)
+          SUBNET_PART=$(( ($RUN_ID % 85) + 86 ))  # Range: 86-170
           docker network create \
             --driver=bridge \
-            --subnet=10.0.${SUBNET_PART}.0/24 \
+            --subnet=10.1.${SUBNET_PART}.0/24 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -168,7 +171,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           # For EvoMaster (192.168.x.0/24)
-          SUBNET_PART=$(( ($RUN_ID % 255) + 1 ))  # Range: 1-255
+          SUBNET_PART=$(( ($RUN_ID % 85) + 171 ))  # Range: 171-255
           docker network create \
             --driver=bridge \
             --subnet=192.168.${SUBNET_PART}.0/24 \
