@@ -89,19 +89,38 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Copy OpenAPI Spec to Services
+        run: |
+          # Copy OpenAPI spec to RESTler's directory
+          mkdir -p services/restler/openapi_specs
+          cp services/vampi/openapi_specs/openapi3.yml services/restler/openapi_specs/
+
+          # Copy to EvoMaster
+          mkdir -p services/evomaster/openapi_specs
+          cp services/vampi/openapi_specs/openapi3.yml services/evomaster/openapi_specs/
+
+          # Copy to WuppieFuzz
+          mkdir -p services/wuppiefuzz/openapi_specs
+          cp services/vampi/openapi_specs/openapi3.yml services/wuppiefuzz/openapi_specs/
+
       - name: Build and push images
         run: |
-          # Build VAmPI image with correct context
-          docker build -t ghcr.io/your-repo/vampi:latest \
+          # Build RESTler with local OpenAPI spec
+          docker build -t ghcr.io/your-repo/restler:latest \
             --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
-            -f services/vampi/Dockerfile services/vampi/  # Set context to services/vampi
+            -f services/restler/Dockerfile.restler services/restler/
 
-          # Build other tools similarly, adjusting context as needed
-          docker build -t ghcr.io/your-repo/restler:latest -f services/restler/Dockerfile.restler services/restler/
-          docker build -t ghcr.io/your-repo/evomaster:latest -f services/evomaster/Dockerfile.evomaster services/evomaster/
-          docker build -t ghcr.io/your-repo/wuppiefuzz:latest -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
-          
-          docker push ghcr.io/your-repo/vampi:latest
+          # Build EvoMaster similarly
+          docker build -t ghcr.io/your-repo/evomaster:latest \
+            --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
+            -f services/evomaster/Dockerfile.evomaster services/evomaster/
+
+          # Build WuppieFuzz
+          docker build -t ghcr.io/your-repo/wuppiefuzz:latest \
+            --build-arg OPENAPI_SPEC=openapi_specs/openapi3.yml \
+            -f services/wuppiefuzz/Dockerfile.wuppiefuzz services/wuppiefuzz/
+
+          # Push all images
           docker push ghcr.io/your-repo/restler:latest
           docker push ghcr.io/your-repo/evomaster:latest
           docker push ghcr.io/your-repo/wuppiefuzz:latest

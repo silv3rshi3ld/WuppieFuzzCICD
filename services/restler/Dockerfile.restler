@@ -1,5 +1,5 @@
 FROM python:3.8-slim
-ARG OPENAPI_SPEC=api.yml
+ARG OPENAPI_SPEC=openapi_specs/openapi3.yml  # Path relative to build context
 
 # Install base dependencies
 RUN apt-get update && apt-get install -y \
@@ -14,9 +14,11 @@ WORKDIR /restler
 RUN pip install -r requirements.txt && \
     python ./build-restler.py --dest_dir /restler_bin
 
-# Configure unified spec
+# Copy the OpenAPI spec from the local build context
 COPY ${OPENAPI_SPEC} /workspace/api.yml
-COPY services/restler/config/entrypoint.sh /entrypoint.sh
+
+# Copy entrypoint script (relative to build context)
+COPY config/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 WORKDIR /workspace
