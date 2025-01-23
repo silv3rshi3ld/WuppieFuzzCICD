@@ -1,10 +1,15 @@
 # Stage 1: Builder
-FROM python:3.11-alpine as builder
-ARG OPENAPI_SPEC=api.yml  # Default path for unified spec
+FROM python:3.11-alpine AS builder
+ARG OPENAPI_SPEC=openapi3.yml  # Match actual filename
+
 RUN apk add --no-cache g++ libffi-dev
 COPY . /vampi
 WORKDIR /vampi
-COPY services/vampi/openapi_specs/${OPENAPI_SPEC} /vampi/openapi_specs/api.yml
+
+# Copy without renaming
+COPY services/vampi/openapi_specs/${OPENAPI_SPEC} ./openapi_specs/
+
+# Install requirements (preserve existing paths)
 RUN pip install --user -r requirements.txt
 
 # Stage 2: Runtime
@@ -16,6 +21,6 @@ WORKDIR /vampi
 ENV PATH=/root/.local/bin:$PATH \
     vulnerable=1 \
     tokentimetolive=60 \
-    OPENAPI_SPEC=/vampi/openapi_specs/api.yml
+    OPENAPI_SPEC=/vampi/openapi_specs/openapi3.yml  # Explicit path
 
 ENTRYPOINT ["python", "app.py"]

@@ -23,7 +23,7 @@ env:
   NETWORK_NAME: fuzz-net-${{ github.run_id }}
   VOLUME_NAME: results-${{ github.run_id }}
   CORPUS_DIR: ./corpus
-  OPENAPI_SPEC: /api.yml
+  OPENAPI_SPEC: /openapi3.yml  # Update all references
   HOST_INTERFACE: ens18  # Explicit interface name
 
 jobs:
@@ -88,7 +88,7 @@ jobs:
         run: |
           # Build with unified OpenAPI spec
           docker build -t ghcr.io/your-repo/vampi:latest \
-            --build-arg OPENAPI_SPEC=services/vampi/openapi_specs/api.yml \
+            --build-arg OPENAPI_SPEC=services/vampi/openapi_specs/openapi3.yml \
             -f services/vampi/Dockerfile .
           
           # Other builds remain similar but reference unified spec
@@ -110,7 +110,7 @@ jobs:
         run: |
           mkdir -p ${{ env.CORPUS_DIR }}
           echo "admin:admin" > ${{ env.CORPUS_DIR }}/auth.yaml
-          docker config create openapi-config services/vampi/openapi_specs/api.yml
+          docker config create openapi-config services/vampi/openapi_specs/openapi3.yml
 
   deploy_services:
     needs: [build_images, prepare_environment]
@@ -146,7 +146,7 @@ jobs:
               docker service create \
                 --name $SERVICE_NAME \
                 --network ${{ env.NETWORK_NAME }} \
-                --config source=openapi-config,target=${{ env.OPENAPI_SPEC }} \
+                --config source=openapi-config,target=/openapi3.yml \
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
                 -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time }}" \
                 -e RESTLER_TELEMETRY_OPTOUT=1 \
@@ -158,7 +158,7 @@ jobs:
               docker service create \
                 --name $SERVICE_NAME \
                 --network ${{ env.NETWORK_NAME }} \
-                --config source=openapi-config,target=${{ env.OPENAPI_SPEC }} \
+                --config source=openapi-config,target=/openapi3.yml \
                 -e RUST_LOG=info \
                 -e AUTH_FILE=/corpus/auth.yaml \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/reports \
@@ -177,7 +177,7 @@ jobs:
               docker service create \
                 --name $SERVICE_NAME \
                 --network ${{ env.NETWORK_NAME }} \
-                --config source=openapi-config,target=${{ env.OPENAPI_SPEC }} \
+                --config source=openapi-config,target=/openapi3.yml \
                 -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
                 -e TIME_BUDGET="${{ github.event.inputs.evomaster_time }}" \
                 --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
