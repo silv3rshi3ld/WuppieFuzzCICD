@@ -1,6 +1,9 @@
 name: Swarm Fuzzing Workflow
 
 on:
+  push:
+    branches:
+      - SingleWorker
   workflow_dispatch:
     inputs:
       restler_time:
