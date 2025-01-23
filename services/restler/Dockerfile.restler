@@ -3,7 +3,7 @@ FROM python:3.11-alpine as builder
 
 # Add only essential build dependencies
 RUN apk --update add g++ libffi-dev
-COPY ./requirements.txt /vampi/requirements.txt
+COPY services/vampi/requirements.txt /vampi/requirements.txt
 WORKDIR /vampi
 RUN pip install -r requirements.txt
 
