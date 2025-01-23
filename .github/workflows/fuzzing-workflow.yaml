@@ -36,23 +36,37 @@ jobs:
       - uses: actions/checkout@v4
       - name: Initialize Swarm
         run: |
-          docker swarm leave --force || true
-          
-          # Get IP for specific interface
-          HOST_IP=$(ip -4 addr show ${{ env.HOST_INTERFACE }} | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+          # Leave if in wrong swarm
+          CURRENT_SWARM=$(docker info --format '{{.Swarm.NodeID}}')
+          if [ -n "$CURRENT_SWARM" ]; then
+            echo "Leaving existing swarm..."
+            docker swarm leave --force || true
+            sleep 5
+          fi
+
+          # Initialize new swarm
+          HOST_IP=$(ip -4 addr show ens18 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
           if [ -z "$HOST_IP" ]; then
-            echo "ERROR: No IP found on ${{ env.HOST_INTERFACE }}!"
-            ip addr show ${{ env.HOST_INTERFACE }}
+            echo "ERROR: No IP found on ens18!"
+            ip addr show
             exit 1
           fi
-          
+
           docker swarm init \
             --advertise-addr ${HOST_IP}:2377 \
-            --default-addr-pool 10.30.0.0/16 \
-            --data-path-port 4789
-          
+            --default-addr-pool 10.30.0.0/16
+
+          # Verify swarm initialization
+          if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
+            echo "ERROR: Swarm initialization failed!"
+            docker info
+            exit 1
+          fi
+
+          # Store join tokens
           docker swarm join-token -q worker > swarm_token.txt
           echo $HOST_IP > manager_ip.txt
+
       - name: Extract swarm token
         id: get-token
         run: echo "token=$(cat swarm_token.txt)" >> $GITHUB_OUTPUT
@@ -64,15 +78,40 @@ jobs:
     needs: swarm_init
     runs-on: [self-hosted, worker-runner]
     steps:
-      - name: Validate network interface
-        run: ip addr show ${{ env.HOST_INTERFACE }} || (echo "Missing ${{ env.HOST_INTERFACE }} interface!"; exit 1)
-      
       - name: Join Swarm cluster
         run: |
-          docker swarm join \
-            --token ${{ needs.swarm_init.outputs.swarm_token }} \
-            --advertise-addr ${{ env.HOST_INTERFACE }} \
-            ${{ needs.swarm_init.outputs.manager_ip }}:2377
+          # Check if already in correct swarm
+          CURRENT_MANAGER=$(docker info --format '{{.Swarm.RemoteManagers}}' | grep -o ${{ needs.swarm_init.outputs.manager_ip }} || true)
+          if [ -z "$CURRENT_MANAGER" ]; then
+            echo "Joining new swarm..."
+            docker swarm leave --force || true
+            sleep 5
+            
+            # Join swarm with retry
+            for i in {1..3}; do
+              if docker swarm join \
+                --token ${{ needs.swarm_init.outputs.swarm_token }} \
+                ${{ needs.swarm_init.outputs.manager_ip }}:2377; then
+                break
+              fi
+              echo "Join attempt $i failed, retrying..."
+              sleep 5
+            done
+
+            # Verify join success
+            if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q "active"; then
+              echo "ERROR: Failed to join swarm!"
+              docker info
+              exit 1
+            fi
+          else
+            echo "Already part of correct swarm"
+            # Verify connection is healthy
+            if ! docker node ls &>/dev/null; then
+              echo "ERROR: Node connection is unhealthy!"
+              exit 1
+            fi
+          fi
 
   build_images:
     needs: [swarm_init, swarm_join]
