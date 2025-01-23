@@ -87,10 +87,10 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( $RUN_ID % 255 ))
+          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
           docker network create \
             --driver=bridge \
-            --subnet=172.${SUBNET_PART}.0.0/16 \
+            --subnet=172.16.${SUBNET_PART}.0/24 \
             restler_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -126,10 +126,10 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( $RUN_ID % 255 ))
+          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
           docker network create \
             --driver=bridge \
-            --subnet=10.${SUBNET_PART}.0.0/16 \
+            --subnet=10.0.${SUBNET_PART}.0/24 \
             wuppiefuzz_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
@@ -165,10 +165,10 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
         run: |
-          SUBNET_PART=$(( $RUN_ID % 255 ))
+          SUBNET_PART=$(( ($RUN_ID % 4095) + 1 ))  # 4095 = 2^12 -1
           docker network create \
             --driver=bridge \
-            --subnet=192.${SUBNET_PART}.0.0/16 \
+            --subnet=192.168.${SUBNET_PART}.0/24 \
             evomaster_network_${{ github.run_id }}
 
       - name: Deploy VAmPI
