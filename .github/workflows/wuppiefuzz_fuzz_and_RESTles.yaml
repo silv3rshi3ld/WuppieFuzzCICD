@@ -13,7 +13,6 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5002
   VAMPI_EVOMASTER_PORT: 5000
   BASE_DIR: ${{ github.workspace }}
-  NETWORK_SUFFIX: ${{ github.run_id }}
 
 jobs:
   cleanup:
@@ -27,44 +26,31 @@ jobs:
 
   prepare_networks:
     runs-on: manager-runner
-    needs: cleanup
     steps:
-      - name: Create networks
+      - name: Clean existing networks
         run: |
-          docker network create --subnet=172.18.0.0/16 "wuppiefuzz_network_$NETWORK_SUFFIX" || true
-          docker network create --subnet=172.19.0.0/16 "evomaster_network_$NETWORK_SUFFIX" || true
-          docker network create --subnet=172.20.0.0/16 "restler_network_$NETWORK_SUFFIX" || true
+          for net in wuppiefuzz_network evomaster_network restler_network; do
+            docker network rm $net || true
+          done
+
+      - name: Create dedicated networks
+        run: |
+          docker network create --subnet=10.10.0.0/24 wuppiefuzz_network
+          docker network create --subnet=10.20.0.0/24 evomaster_network
+          docker network create --subnet=10.30.0.0/24 restler_network
 
   setup_vampi:
     runs-on: manager-runner
     needs: prepare_networks
-    strategy:
-      matrix:
-        instance: [restler, wuppiefuzz, evomaster]
     steps:
       - uses: actions/checkout@v4
-      - name: Start VAmPI for ${{ matrix.instance }}
+      - name: Start VAmPI instances
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_${{ matrix.instance }} up -d vampi-vulnerable-${{ matrix.instance }}
-          sleep 10  # Initial buffer before health check
-
-      - name: Health check ${{ matrix.instance }}
-        run: |
-          port=$(jq -nr --arg i "${{ matrix.instance }}" \
-            '$i | 
-            if . == "restler" then 5003
-            elif . == "wuppiefuzz" then 5002
-            else 5000 end')
-          
-          for i in {1..15}; do
-            if curl -sSf http://localhost:$port/health; then
-              echo "VAmPI ${{ matrix.instance }} ready"
-              break
-            fi
-            sleep 4
-            echo "Waiting for VAmPI ${{ matrix.instance }}... ($i/15)"
-          done
+          docker-compose -f docker-compose.vampi.yml up -d \
+            vampi-evomaster \
+            vampi-restler \
+            vampi-wuppiefuzz
 
   run_restler:
     runs-on: manager-runner
@@ -74,7 +60,7 @@ jobs:
       - name: Run RESTler
         working-directory: ${{ env.BASE_DIR }}/services/restler
         env:
-          TARGET_HOST: vampi-vulnerable-restler
+          TARGET_HOST: vampi-restler
           TARGET_PORT: ${{ env.VAMPI_RESTLER_PORT }}
         run: |
           docker-compose -f docker-compose.restler.yml up --build
@@ -160,9 +146,9 @@ jobs:
     steps:
       - name: Remove networks
         run: |
-          docker network rm "wuppiefuzz_network_$NETWORK_SUFFIX" || true
-          docker network rm "evomaster_network_$NETWORK_SUFFIX" || true
-          docker network rm "restler_network_$NETWORK_SUFFIX" || true
+          for net in wuppiefuzz_network evomaster_network restler_network; do
+            docker network rm $net || true
+          done
       - name: Prune system
         run: |
           docker system prune -af

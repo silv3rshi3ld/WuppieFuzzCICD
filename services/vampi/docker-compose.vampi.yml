@@ -1,17 +1,39 @@
-version: "3"
-services:
- vampi-secure:
-  build: ./
-  container_name: vampi-secure
-  ports:
-   - 5001:5000
-  environment:
-   - vulnerable=0
+version: "3.8"
 
- vampi-vulnerable:
-  build: ./
-  container_name: vampi-vulnerable
-  ports:
-   - 5002:5000
-  environment:
-   - vulnerable=1
+services:
+  # Base service definition
+  vampi-base:
+    build: ./
+    environment:
+      - vulnerable=1  # Always vulnerable for fuzzing
+    networks:
+      - evomaster_network
+      - restler_network
+      - wuppiefuzz_network
+
+  # Specific instances with port mappings
+  vampi-evomaster:
+    extends: vampi-base
+    container_name: vampi-evomaster
+    ports:
+      - "5000:5000"  # Matches VAMPI_EVOMASTER_PORT
+
+  vampi-restler:
+    extends: vampi-base
+    container_name: vampi-restler
+    ports:
+      - "5003:5000"  # Matches VAMPI_RESTLER_PORT
+
+  vampi-wuppiefuzz:
+    extends: vampi-base
+    container_name: vampi-wuppiefuzz
+    ports:
+      - "5002:5000"  # Matches VAMPI_WUPPIEFUZZ_PORT
+
+networks:
+  evomaster_network:
+    external: true
+  restler_network:
+    external: true
+  wuppiefuzz_network:
+    external: true
