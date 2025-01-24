@@ -8,247 +8,162 @@ on:
     branches:
       - working
 
-permissions:
-  contents: read
-
 env:
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
   VAMPI_EVOMASTER_PORT: 5000
   BASE_DIR: ${{ github.workspace }}
+  NETWORK_SUFFIX: ${{ github.run_id }}
 
 jobs:
-  cleanup_restlerresults:
+  cleanup:
     runs-on: manager-runner
     steps:
-      - name: Remove RestlerResults Directory
+      - name: Clean previous artifacts
         run: |
-          echo "Attempting to remove RestlerResults directory..."
-          sudo rm -rf "$BASE_DIR/workspace/restler/output/" || echo "Directory not found or already removed."
+          sudo rm -rf "$BASE_DIR/workspace/restler/output" || true
+          sudo rm -rf "$BASE_DIR/wuppiefuzz_workspace" || true
+          sudo rm -rf "$BASE_DIR/workspace/evomaster" || true
 
-  prepare_docker_network:
+  prepare_networks:
     runs-on: manager-runner
-    needs: cleanup_restlerresults
+    needs: cleanup
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup directories
+      - name: Create networks
         run: |
-          mkdir -p $BASE_DIR/services/vampi
-          mkdir -p $BASE_DIR/workspace
-          mkdir -p $BASE_DIR/wuppiefuzz_workspace
-          mkdir -p $HOME/.cargo $HOME/.rustup
+          docker network create --subnet=172.18.0.0/16 "wuppiefuzz_network_$NETWORK_SUFFIX" || true
+          docker network create --subnet=172.19.0.0/16 "evomaster_network_$NETWORK_SUFFIX" || true
+          docker network create --subnet=172.20.0.0/16 "restler_network_$NETWORK_SUFFIX" || true
 
-      - name: Validate Docker Compose Files
+  setup_vampi:
+    runs-on: manager-runner
+    needs: prepare_networks
+    strategy:
+      matrix:
+        instance: [restler, wuppiefuzz, evomaster]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start VAmPI for ${{ matrix.instance }}
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
-          docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
+          docker-compose -f docker-compose.vampi.yml -p vampi_${{ matrix.instance }} up -d vampi-vulnerable-${{ matrix.instance }}
+          sleep 10  # Initial buffer before health check
 
-      - name: Create Docker Networks
+      - name: Health check ${{ matrix.instance }}
         run: |
-          if ! docker network inspect wuppiefuzz_network >/dev/null 2>&1; then
-            docker network create --subnet=172.18.0.0/16 wuppiefuzz_network
-          fi
+          port=$(jq -nr --arg i "${{ matrix.instance }}" \
+            '$i | 
+            if . == "restler" then 5003
+            elif . == "wuppiefuzz" then 5002
+            else 5000 end')
           
-          if ! docker network inspect restler_network >/dev/null 2>&1; then
-            docker network create --subnet=172.20.0.0/16 restler_network
-          fi
-          
-          if ! docker network inspect evomaster_network >/dev/null 2>&1; then
-            docker network create --subnet=172.19.0.0/16 evomaster_network
-          fi
-
-  prepare_vampi:
-    runs-on: manager-runner
-    needs: prepare_docker_network
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Remove Any Existing VAmPI Containers
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml down --remove-orphans || true
-
-      - name: Build VAmPI Images
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: docker-compose -f docker-compose.vampi.yml build --force-rm
-
-  prepare_vampi_evomaster:
-    runs-on: manager-runner
-    needs: prepare_docker_network
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Start Dedicated VAmPI for EvoMaster
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_evomaster up -d --build vampi-vulnerable-evomaster
-      
-      - name: Wait for VAmPI EvoMaster Instance
-        run: |
-          echo "Waiting for VAmPI EvoMaster instance..."
-          for i in {1..30}; do
-            if curl -s http://localhost:${VAMPI_EVOMASTER_PORT}/health >/dev/null; then
-              echo "VAmPI EvoMaster is ready!"
+          for i in {1..15}; do
+            if curl -sSf http://localhost:$port/health; then
+              echo "VAmPI ${{ matrix.instance }} ready"
               break
             fi
-            if [ $i -eq 30 ]; then
-              echo "VAmPI EvoMaster failed to become ready"
-              docker logs vampi_evomaster-vampi-vulnerable-evomaster-1  # Updated container name
-              exit 1
-            fi
-            echo "Waiting for VAmPI EvoMaster... (attempt $i/30)"
-            sleep 2
+            sleep 4
+            echo "Waiting for VAmPI ${{ matrix.instance }}... ($i/15)"
           done
-
-  prepare_wuppiefuzz:
-    runs-on: manager-runner
-    needs: prepare_docker_network
-    steps:
-      - name: Calculate cache key date
-        id: cache-key
-        run: echo "date=$(date '+%Y-%m-%d')" >> $GITHUB_OUTPUT
-
-      - name: Check WuppieFuzz Binary Cache
-        id: cache-binary
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_bin
-          key: wuppiefuzz-binary-${{ steps.cache-key.outputs.date }}
-          restore-keys: |
-            wuppiefuzz-binary-
-
-      - name: Setup Rust
-        if: steps.cache-binary.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Build WuppieFuzz if needed
-        if: steps.cache-binary.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-          git clone https://github.com/TNO-S3/WuppieFuzz.git ${{ env.BASE_DIR }}/wuppiefuzz_temp
-          cd ${{ env.BASE_DIR }}/wuppiefuzz_temp
-          cargo build --release
-          cp target/release/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
-          rm -rf ${{ env.BASE_DIR }}/wuppiefuzz_temp
 
   run_restler:
     runs-on: manager-runner
-    needs: [prepare_vampi, prepare_docker_network]
+    needs: [setup_vampi, prepare_networks]
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Create RESTler Workspace
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/workspace/restler/output
-
-      - name: Start VAmPI RESTler Instance
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_restler up -d vampi-vulnerable-restler
-
-      - name: Wait for VAmPI RESTler
-        run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:${{ env.VAMPI_RESTLER_PORT }}/health; then
-              echo "VAmPI RESTler ready"
-              break
-            fi
-            sleep 2
-          done
-
+      - uses: actions/checkout@v4
       - name: Run RESTler
-        working-directory: ${{ env.BASE_DIR }}/workspace/restler
+        working-directory: ${{ env.BASE_DIR }}/services/restler
+        env:
+          TARGET_HOST: vampi-vulnerable-restler
+          TARGET_PORT: ${{ env.VAMPI_RESTLER_PORT }}
         run: |
-          docker-compose -f ${{ env.BASE_DIR }}/services/restler/docker-compose.restler.yml up --build
-
-      - name: Upload RESTler Results
-        uses: actions/upload-artifact@v4
+          docker-compose -f docker-compose.restler.yml up --build
+      - uses: actions/upload-artifact@v4
         with:
           name: restler-results
           path: ${{ env.BASE_DIR }}/workspace/restler/output
 
   run_wuppiefuzz:
     runs-on: manager-runner
-    needs: [prepare_vampi, prepare_wuppiefuzz]
+    needs: [setup_vampi, prepare_networks]
     steps:
-      - name: Start VAmPI WuppieFuzz Instance
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
+      - uses: actions/checkout@v4
+      - name: Build WuppieFuzz
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_wuppiefuzz up -d vampi-vulnerable-wuppiefuzz
+          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
+          docker build -t wuppiefuzz-builder -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz .
+          docker create -it --name wuppie_temp wuppiefuzz-builder
+          docker cp wuppie_temp:/app/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
+          docker rm wuppie_temp
 
-      - name: Run WuppieFuzz
+      - name: Execute WuppieFuzz
+        working-directory: ${{ env.BASE_DIR }}/services/wuppiefuzz
         run: |
-          ${{ env.BASE_DIR }}/wuppiefuzz_bin/wuppiefuzz fuzz \
-            --openapi-spec=${{ env.BASE_DIR }}/services/vampi/openapi_specs/wuppiefuzz.openapi3.yml \
-            --report-dir=${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports \
-            --timeout=60
-
-      - name: Upload WuppieFuzz Results
-        uses: actions/upload-artifact@v4
+          docker-compose -f docker-compose.wuppiefuzz.yml up --build
+      - uses: actions/upload-artifact@v4
         with:
           name: wuppiefuzz-results
           path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports
 
   run_evomaster:
     runs-on: manager-runner
-    needs: [prepare_vampi_evomaster, prepare_docker_network]
+    needs: [setup_vampi, prepare_networks]
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Build EvoMaster Image
+      - uses: actions/checkout@v4
+      - name: Build EvoMaster
         working-directory: ${{ env.BASE_DIR }}/services/evomaster
-        run: |
-          docker build -t evomaster:latest -f Dockerfile.evomaster .
+        run: docker-compose -f docker-compose.evomaster.yml build
 
       - name: Run EvoMaster
+        working-directory: ${{ env.BASE_DIR }}/services/evomaster
         run: |
-          docker run --rm \
-            --network evomaster_network \
-            -v ${{ env.BASE_DIR }}/workspace/evomaster/results:/evomaster/results \
-            -e SPEC_PATH="/specs/openapi3.yml" \
-            -e OUTPUT_DIR="/evomaster/results" \
-            -e TARGET_URL="http://vampi_evomaster-vampi-vulnerable-1:$VAMPI_EVOMASTER_PORT" \
-            -e TIME_BUDGET="3600" \
-            evomaster:latest
-
-      - name: Upload EvoMaster Results
-        uses: actions/upload-artifact@v4
+          docker-compose -f docker-compose.evomaster.yml up --build
+      - uses: actions/upload-artifact@v4
         with:
           name: evomaster-results
           path: ${{ env.BASE_DIR }}/workspace/evomaster/results
 
-  summarize_results:
+  post_process:
     runs-on: manager-runner
     needs: [run_restler, run_wuppiefuzz, run_evomaster]
     steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: all_results
-
-      - name: List Results
+      - name: Generate summary
         run: |
-          echo "=== RESTler Results ==="
-          ls -la all_results/restler-results || echo "No RESTler results"
+          echo "Security Test Results Summary" > report.md
+          echo "============================" >> report.md
           
-          echo "=== WuppieFuzz Results ==="
-          ls -la all_results/wuppiefuzz-results || echo "No WuppieFuzz results"
+          # RESTler results
+          echo "### RESTler Findings" >> report.md
+          find all_results/restler-results -name 'bug_buckets.json' -exec jq '.bugs[].message' {} + >> report.md || echo "No RESTler findings" >> report.md
           
-          echo "=== EvoMaster Results ==="
-          ls -la all_results/evomaster-results || echo "No EvoMaster results"
+          # WuppieFuzz results
+          echo "### WuppieFuzz Findings" >> report.md
+          find all_results/wuppiefuzz-results -name '*.json' -exec jq '.vulnerabilities[]?.description' {} + >> report.md || echo "No WuppieFuzz findings" >> report.md
+          
+          # EvoMaster results
+          echo "### EvoMaster Findings" >> report.md
+          find all_results/evomaster-results -name '*.txt' -exec cat {} + >> report.md || echo "No EvoMaster findings" >> report.md
+          
+          cat report.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: report.md
 
-      - name: Cleanup Docker
-        if: always()
+  cleanup_final:
+    runs-on: manager-runner
+    needs: post_process
+    if: always()
+    steps:
+      - name: Remove networks
         run: |
-          docker container prune -f
-          docker network prune -f
-          docker image prune -af
+          docker network rm "wuppiefuzz_network_$NETWORK_SUFFIX" || true
+          docker network rm "evomaster_network_$NETWORK_SUFFIX" || true
+          docker network rm "restler_network_$NETWORK_SUFFIX" || true
+      - name: Prune system
+        run: |
+          docker system prune -af
+          docker volume prune -f

@@ -5,22 +5,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.restler
-    container_name: restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
-      RUN_FUZZ_LEAN: "true"
-      FUZZ_LEAN_TIME_BUDGET: "0.05"
-      RUN_FUZZ: "true"
-      FUZZ_TIME_BUDGET: "0.25"
-      TARGET_IP: ${TARGET_HOST:-vampi-vulnerable-restler}
-      TARGET_PORT: ${TARGET_PORT:-5000}
+      TARGET_IP: ${TARGET_HOST}
+      TARGET_PORT: ${TARGET_PORT}
     volumes:
-      - ./openapi3.yml:/workspace/openapi3.yml:ro
-      - ./output:/workspace/output
+      - ${BASE_DIR}/services/vampi/openapi_specs/openapi3.yml:/workspace/spec.yml:ro
+      - ${BASE_DIR}/workspace/restler/output:/workspace/output
     networks:
       - restler_network
 
 networks:
   restler_network:
-    name: restler_network
-    driver: bridge
+    external: true
+    name: restler_network_${NETWORK_SUFFIX}
