@@ -1,22 +1,17 @@
-vampi-vulnerable-evomaster:
-  build:
-    context: .
-    dockerfile: ./Dockerfile
-  container_name: vampi-vulnerable-evomaster
-  environment:
-    - APP_ENV=development
-    - APP_DEBUG=1
-    - vulnerable=1
+version: "3"
+services:
+ vampi-secure:
+  build: ./
+  container_name: vampi-secure
   ports:
-    - "${VAMPI_EVOMASTER_PORT}:5000"  # Maps host port 5000 to container port 5000
-  depends_on:
-    mongo:
-      condition: service_healthy
-  networks:
-    - evomaster_network
-  healthcheck:
-    test: curl -f http://localhost:5000/health || exit 1
-    interval: 10s
-    timeout: 5s
-    retries: 3
-    start_period: 30s
+   - 5001:5000
+  environment:
+   - vulnerable=0
+
+ vampi-vulnerable:
+  build: ./
+  container_name: vampi-vulnerable
+  ports:
+   - 5002:5000
+  environment:
+   - vulnerable=1
