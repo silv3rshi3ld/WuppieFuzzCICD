@@ -37,42 +37,44 @@ jobs:
   swarm_init:
     runs-on: [self-hosted, manager-runner]
     outputs:
-      swarm_token: ${{ steps.get-token.outputs.token }}
-      manager_ip: ${{ steps.get-ip.outputs.ip }}
+      swarm_token: ${{ steps.get-credentials.outputs.token }}
+      manager_ip: ${{ steps.get-credentials.outputs.ip }}
     steps:
       - uses: actions/checkout@v4
-      - name: Login to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Initialize Swarm
         run: |
-          # Cleanup existing swarm
           docker swarm leave --force 2>/dev/null || true
           sleep 5
-
-          # Initialize new swarm
-          HOST_IP=$(ip -4 addr show ens18 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+          
+          # Get IP using cloud-init (works for most cloud providers)
+          HOST_IP=$(cloud-init query ds.meta_data.local-ipv4 || hostname -I | awk '{print $1}')
+          
           docker swarm init \
             --advertise-addr ${HOST_IP}:2377 \
             --default-addr-pool 10.30.0.0/16
-
-          # Store swarm tokens
+          
           docker swarm join-token -q worker > swarm_token.txt
           echo $HOST_IP > manager_ip.txt
 
-      - name: Extract swarm token
-        id: get-token
-        run: echo "token=$(cat swarm_token.txt)" >> $GITHUB_OUTPUT
-      - name: Get manager IP
-        id: get-ip
-        run: echo "ip=$(cat manager_ip.txt)" >> $GITHUB_OUTPUT
+      - name: Get Swarm Credentials
+        id: get-credentials
+        run: |
+          echo "token=$(cat swarm_token.txt)" >> $GITHUB_OUTPUT
+          echo "ip=$(cat manager_ip.txt)" >> $GITHUB_OUTPUT
+
+  swarm_join:
+    needs: swarm_init
+    runs-on: [self-hosted, worker-runner]
+    steps:
+      - name: Join Swarm Cluster
+        run: |
+          docker swarm leave --force 2>/dev/null || true
+          docker swarm join \
+            --token ${{ needs.swarm_init.outputs.swarm_token }} \
+            ${{ needs.swarm_init.outputs.manager_ip }}:2377
 
   build_images:
-    needs: swarm_init
+    needs: [swarm_init, swarm_join]
     runs-on: [self-hosted, manager-runner]
     outputs:
       wuppie_commit: ${{ steps.wuppie-commit.outputs.commit_hash }}
@@ -138,34 +140,8 @@ jobs:
             -f services/evomaster/Dockerfile.evomaster \
             services/evomaster
 
-  swarm_join:
-    needs: [swarm_init, build_images]
-    runs-on: [self-hosted, worker-runner]
-    steps:
-      - name: GHCR Login
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pre-pull Images with Retry
-        run: |
-          for i in {1..3}; do
-            docker pull ${{ env.GHCR_NAMESPACE }}/vampi:${{ github.run_id }} && break
-            sleep $((i * 15))
-          done
-          docker image prune -f
-
-      - name: Join Swarm
-        run: |
-          docker swarm leave --force 2>/dev/null || true
-          docker swarm join \
-            --token ${{ needs.swarm_init.outputs.swarm_token }} \
-            ${{ needs.swarm_init.outputs.manager_ip }}:2377
-
   prepare_environment:
-    needs: [build_images, swarm_join]
+    needs: build_images
     runs-on: [self-hosted, manager-runner]
     steps:
       - name: Create Network
