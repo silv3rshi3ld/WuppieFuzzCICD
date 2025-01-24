@@ -86,8 +86,8 @@ jobs:
       - name: Start Dedicated VAmPI for EvoMaster
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
-          docker-compose -f docker-compose.vampi.yml -p vampi_evomaster up -d --build
-          
+          docker-compose -f docker-compose.vampi.yml -p vampi_evomaster up -d --build vampi-vulnerable-evomaster
+      
       - name: Wait for VAmPI EvoMaster Instance
         run: |
           echo "Waiting for VAmPI EvoMaster instance..."
@@ -98,7 +98,7 @@ jobs:
             fi
             if [ $i -eq 30 ]; then
               echo "VAmPI EvoMaster failed to become ready"
-              docker logs vampi_evomaster-vampi-vulnerable-1
+              docker logs vampi_evomaster-vampi-vulnerable-evomaster-1  # Updated container name
               exit 1
             fi
             echo "Waiting for VAmPI EvoMaster... (attempt $i/30)"
