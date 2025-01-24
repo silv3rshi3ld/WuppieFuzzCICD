@@ -16,8 +16,9 @@ services:
       - ./reports:/wuppiefuzz/reports
       - ../../openapi/openapi3.yml:/workspace/openapi3.yml:ro
     networks:
-      - cicd_network
+      - wuppiefuzz_network
 
 networks:
-  cicd_network:
-    external: true
+  wuppiefuzz_network:
+    name: wuppiefuzz_network
+    driver: bridge

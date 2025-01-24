@@ -12,7 +12,6 @@ permissions:
   contents: read
 
 env:
-  DOCKER_NETWORK_NAME: cicd_network
   VAMPI_RESTLER_PORT: 5003
   VAMPI_WUPPIEFUZZ_PORT: 5002
   VAMPI_EVOMASTER_PORT: 5000
@@ -48,14 +47,16 @@ jobs:
           docker-compose -f $BASE_DIR/services/vampi/docker-compose.vampi.yml config -q
           docker-compose -f $BASE_DIR/services/restler/docker-compose.restler.yml config -q
 
-      - name: Check and create cicd_network
+      - name: Create Docker Networks
         run: |
-          if ! docker network inspect $DOCKER_NETWORK_NAME >/dev/null 2>&1; then
-            docker network create --subnet=172.18.0.0/16 $DOCKER_NETWORK_NAME
+          if ! docker network inspect wuppiefuzz_network >/dev/null 2>&1; then
+            docker network create --subnet=172.18.0.0/16 wuppiefuzz_network
           fi
-
-      - name: Check and create evomaster_network
-        run: |
+          
+          if ! docker network inspect restler_network >/dev/null 2>&1; then
+            docker network create --subnet=172.20.0.0/16 restler_network
+          fi
+          
           if ! docker network inspect evomaster_network >/dev/null 2>&1; then
             docker network create --subnet=172.19.0.0/16 evomaster_network
           fi
