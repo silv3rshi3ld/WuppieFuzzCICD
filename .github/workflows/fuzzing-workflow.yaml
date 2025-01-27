@@ -20,13 +20,16 @@ on:
 
 env:
   STACK_PREFIX: fuzz-${{ github.run_id }}
-  NETWORK_NAME: fuzz-net-${{ github.run_id }}
-  VOLUME_NAME: results-${{ github.run_id }}
+  RESULTS_VOLUME: results-${{ github.run_id }}
   CORPUS_DIR: ./corpus
   OPENAPI_SPEC: openapi3.yml
   BUILDX_BUILDER: github-runner-builder
   WUPPIEFUZZ_REPO: "https://github.com/TNO-S3/WuppieFuzz.git"
   GHCR_NAMESPACE: "ghcr.io/silv3rshi3ld"
+  OPENAPI_CONFIG: openapi-config-${{ github.run_id }}
+  RESTLER_TIME: ${{ github.event.inputs.restler_time || 1 }}
+  WUPPIE_TIME: ${{ github.event.inputs.wuppie_time || 60 }}
+  EVOMASTER_TIME: ${{ github.event.inputs.evomaster_time || 10 }}
 
 permissions:
   contents: read
@@ -60,6 +63,7 @@ jobs:
         run: |
           echo "token=$(cat swarm_token.txt)" >> $GITHUB_OUTPUT
           echo "ip=$(cat manager_ip.txt)" >> $GITHUB_OUTPUT
+
   swarm_join:
     needs: swarm_init
     runs-on: [self-hosted, worker-runner]
@@ -70,6 +74,7 @@ jobs:
           docker swarm join \
             --token ${{ needs.swarm_init.outputs.swarm_token }} \
             ${{ needs.swarm_init.outputs.manager_ip }}:2377
+
   build_images:
     needs: [swarm_init, swarm_join]
     runs-on: [self-hosted, manager-runner]
@@ -81,22 +86,27 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      
       - name: Setup Buildx
         run: |
           docker buildx create --name ${{ env.BUILDX_BUILDER }} --use
           docker buildx inspect --bootstrap
+      
       - name: Get WuppieFuzz Commit
         id: wuppie-commit
         run: |
           COMMIT_HASH=$(git ls-remote ${{ env.WUPPIEFUZZ_REPO }} HEAD | cut -f1)
           echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+      
       - name: Prepare OpenAPI Specs
         run: |
           mkdir -p services/{vampi,restler,evomaster}/openapi_specs
           cp services/vampi/openapi_specs/openapi3.yml services/restler/openapi_specs/
           cp services/vampi/openapi_specs/openapi3.yml services/evomaster/openapi_specs/
-      - name: Build VAmPI
+      
+      - name: Build Images
         run: |
+          # Build VAmPI
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ env.GHCR_NAMESPACE }}/vampi:${{ github.run_id }} \
@@ -105,10 +115,8 @@ jobs:
             --push \
             -f services/vampi/Dockerfile \
             services/vampi
-          echo "Waiting 15 seconds for registry propagation..."
-          sleep 15
-      - name: Build WuppieFuzz
-        run: |
+
+          # Build WuppieFuzz
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:${{ steps.wuppie-commit.outputs.commit_hash }} \
@@ -116,8 +124,8 @@ jobs:
             --push \
             -f services/wuppiefuzz/Dockerfile.wuppiefuzz \
             .
-      - name: Build RESTler
-        run: |
+
+          # Build RESTler
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ env.GHCR_NAMESPACE }}/restler:latest \
@@ -125,8 +133,8 @@ jobs:
             --push \
             -f services/restler/Dockerfile.restler \
             services/restler
-      - name: Build EvoMaster
-        run: |
+
+          # Build EvoMaster
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ env.GHCR_NAMESPACE }}/evomaster:latest \
@@ -134,119 +142,52 @@ jobs:
             --push \
             -f services/evomaster/Dockerfile.evomaster \
             services/evomaster
-  prepare_environment:
+
+  deploy_stack:
     needs: build_images
     runs-on: [self-hosted, manager-runner]
     steps:
-      - name: Create Network
-        run: docker network create --driver overlay ${{ env.NETWORK_NAME }} || true
-
-      - name: Setup Shared Resources
-        run: |
-          mkdir -p ${{ env.CORPUS_DIR }}
-          echo "admin:admin" > ${{ env.CORPUS_DIR }}/auth.yaml
-          docker volume create ${{ env.VOLUME_NAME }}
-          docker config create openapi-config services/vampi/openapi_specs/openapi3.yml
-  deploy_services:
-    needs: prepare_environment
-    runs-on: [self-hosted, manager-runner]
-    strategy:
-      matrix:
-        tool: [restler, wuppiefuzz, evomaster]
-    steps:
+      - uses: actions/checkout@v4
+      
       - name: Log in to GitHub Container Registry
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Verify Image Availability
+
+      - name: Setup Environment
         run: |
-          docker pull ${{ env.GHCR_NAMESPACE }}/vampi:${{ github.run_id }}
-          docker image inspect ${{ env.GHCR_NAMESPACE }}/vampi:${{ github.run_id }}
-      - name: Deploy Service Stack
-        env:
-          SERVICE_NAME: ${{ matrix.tool }}-fuzzer
+          # Create corpus directory and auth file
+          mkdir -p ${{ env.CORPUS_DIR }}
+          echo "admin:admin" > ${{ env.CORPUS_DIR }}/auth.yaml
+          
+          # Create Docker config with OpenAPI spec
+          docker config create ${{ env.OPENAPI_CONFIG }} services/vampi/openapi_specs/openapi3.yml
+
+      - name: Deploy Stack
         run: |
-          # Start VAmPI instance
-          docker service create \
-            --name vampi-${{ matrix.tool }} \
-            --network ${{ env.NETWORK_NAME }} \
-            --with-registry-auth \
-            --constraint "node.role==manager" \
-            --replicas 1 \
-            --health-cmd "curl -f http://localhost:5000/health" \
-            --health-interval 15s \
-            --health-timeout 10s \
-            --health-retries 5 \
-            -e vulnerable=1 \
-            ${{ env.GHCR_NAMESPACE }}/vampi:${{ github.run_id }}
-          # Wait for VAmPI readiness
-          until [ "$(docker service ps vampi-${{ matrix.tool }} --format '{{.CurrentState}}' | grep -c Running)" -eq 1 ]; do
-            sleep 10
-            echo "Waiting for VAmPI-${{ matrix.tool }} to start..."
-          done
-          # Deploy fuzzer
-          case "${{ matrix.tool }}" in
-            restler)
-              docker service create \
-                --name $SERVICE_NAME \
-                --network ${{ env.NETWORK_NAME }} \
-                --with-registry-auth \
-                --config source=openapi-config,target=/openapi3.yml \
-                -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
-                -e FUZZ_TIME_BUDGET="${{ github.event.inputs.restler_time || 1 }}" \
-                --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
-                ${{ env.GHCR_NAMESPACE }}/restler:latest
-              ;;
-            wuppiefuzz)
-              docker service create \
-                --name $SERVICE_NAME \
-                --network ${{ env.NETWORK_NAME }} \
-                --with-registry-auth \
-                --config source=openapi-config,target=/openapi3.yml \
-                -e RUST_LOG=info \
-                -e AUTH_FILE=/corpus/auth.yaml \
-                --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/reports \
-                --mount type=bind,src=${{ github.workspace }}/${{ env.CORPUS_DIR }},dst=/corpus,ro \
-                ${{ env.GHCR_NAMESPACE }}/wuppiefuzz:${{ needs.build_images.outputs.wuppie_commit }} \
-                fuzz \
-                --report \
-                --log-level info \
-                --initial-corpus /corpus \
-                --timeout ${{ github.event.inputs.wuppie_time || 60 }} \
-                --authentication /corpus/auth.yaml \
-                /openapi3.yml
-              ;;
-            evomaster)
-              docker service create \
-                --name $SERVICE_NAME \
-                --network ${{ env.NETWORK_NAME }} \
-                --with-registry-auth \
-                --config source=openapi-config,target=/openapi3.yml \
-                -e TARGET_URL=http://vampi-${{ matrix.tool }}:5000 \
-                -e TIME_BUDGET="${{ github.event.inputs.evomaster_time || 10 }}" \
-                --mount type=volume,src=${{ env.VOLUME_NAME }},dst=/results \
-                ${{ env.GHCR_NAMESPACE }}/evomaster:latest
-              ;;
-          esac
+          docker stack deploy -c services/vampi/docker-compose.yaml ${{ env.STACK_PREFIX }}
+
   monitor_and_collect:
-    needs: deploy_services
+    needs: deploy_stack
     runs-on: [self-hosted, manager-runner]
     timeout-minutes: 120
     steps:
       - name: Monitor Services
         run: |
-          for tool in restler wuppiefuzz evomaster; do
+          for fuzzer in restler wuppiefuzz evomaster; do
             while true; do
-              STATE=$(docker service ps ${tool}-fuzzer --format '{{.CurrentState}}' | head -n1)
+              STATE=$(docker service ps ${{ env.STACK_PREFIX }}_${fuzzer}-fuzzer --format '{{.CurrentState}}' | head -n1)
               [[ "$STATE" == *"Complete"* ]] && break
-              echo "$tool status: $STATE"
+              echo "$fuzzer status: $STATE"
               sleep 30
             done
           done
+
       - name: Package Results
         run: |
           mkdir -p artifacts
-          docker run --rm -v ${{ env.VOLUME_NAME }}:/data -v $PWD/artifacts:/output \
+          docker run --rm -v ${{ env.RESULTS_VOLUME }}:/data -v $PWD/artifacts:/output \
             alpine sh -c "apk add zip && zip -r /output/results-${{ github.run_id }}.zip /data"
+
       - uses: actions/upload-artifact@v4
         with:
           name: fuzzing-results
@@ -257,11 +198,10 @@ jobs:
     if: always()
     runs-on: [self-hosted, manager-runner]
     steps:
-      - name: Remove Swarm Resources
+      - name: Remove Stack and Resources
         run: |
-          docker service rm $(docker service ls -q --filter name=fuzz-) 2>/dev/null || true
-          docker config rm openapi-config 2>/dev/null || true
-          docker network rm ${{ env.NETWORK_NAME }} 2>/dev/null || true
-          docker volume rm ${{ env.VOLUME_NAME }} 2>/dev/null || true
-          docker swarm leave --force 2>/dev/null || true
-          docker buildx rm ${{ env.BUILDX_BUILDER }} 2>/dev/null || true
+          docker stack rm ${{ env.STACK_PREFIX }}
+          docker config rm ${{ env.OPENAPI_CONFIG }}
+          docker volume rm ${{ env.RESULTS_VOLUME }}
+          docker buildx rm ${{ env.BUILDX_BUILDER }}
+          docker swarm leave --force

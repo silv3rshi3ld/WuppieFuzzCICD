@@ -1,16 +1,17 @@
 services:
-  vampi:
-    image: ghcr.io/your-repo/vampi:latest
+  # VAmPI instances
+  vampi-restler:
+    image: ghcr.io/silv3rshi3ld/vampi:latest
     networks:
-      - fuzz-net
+      - restler-net
     environment:
-      - vulnerable=${VULNERABLE:-1}  # Parameterized environment variable
+      - vulnerable=1
     configs:
       - source: openapi-config
         target: /vampi/openapi_specs/api.yml
     deploy:
       mode: replicated
-      replicas: ${REPLICAS:-1}
+      replicas: 1
       update_config:
         parallelism: 1
         delay: 10s
@@ -24,12 +25,145 @@ services:
       retries: 5
       start_period: 2s
 
+  vampi-wuppiefuzz:
+    image: ghcr.io/silv3rshi3ld/vampi:latest
+    networks:
+      - wuppiefuzz-net
+    environment:
+      - vulnerable=1
+    configs:
+      - source: openapi-config
+        target: /vampi/openapi_specs/api.yml
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
+
+  vampi-evomaster:
+    image: ghcr.io/silv3rshi3ld/vampi:latest
+    networks:
+      - evomaster-net
+    environment:
+      - vulnerable=1
+    configs:
+      - source: openapi-config
+        target: /vampi/openapi_specs/api.yml
+    deploy:
+      mode: replicated
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 2s
+
+  # Fuzzers
+  restler-fuzzer:
+    image: ghcr.io/silv3rshi3ld/restler:latest
+    networks:
+      - restler-net
+    configs:
+      - source: openapi-config
+        target: /openapi3.yml
+    environment:
+      - TARGET_URL=http://vampi-restler:5000
+      - FUZZ_TIME_BUDGET=${RESTLER_TIME:-1}
+    volumes:
+      - type: volume
+        source: results
+        target: /results
+    deploy:
+      restart_policy:
+        condition: none
+
+  wuppiefuzz-fuzzer:
+    image: ghcr.io/silv3rshi3ld/wuppiefuzz:latest
+    networks:
+      - wuppiefuzz-net
+    configs:
+      - source: openapi-config
+        target: /openapi3.yml
+    environment:
+      - RUST_LOG=info
+      - AUTH_FILE=/corpus/auth.yaml
+    volumes:
+      - type: volume
+        source: results
+        target: /reports
+      - type: bind
+        source: ./corpus
+        target: /corpus
+        read_only: true
+    command: >
+      fuzz
+      --report
+      --log-level info
+      --initial-corpus /corpus
+      --timeout ${WUPPIE_TIME:-60}
+      --authentication /corpus/auth.yaml
+      /openapi3.yml
+    deploy:
+      restart_policy:
+        condition: none
+
+  evomaster-fuzzer:
+    image: ghcr.io/silv3rshi3ld/evomaster:latest
+    networks:
+      - evomaster-net
+    configs:
+      - source: openapi-config
+        target: /openapi3.yml
+    environment:
+      - TARGET_URL=http://vampi-evomaster:5000
+      - TIME_BUDGET=${EVOMASTER_TIME:-10}
+    volumes:
+      - type: volume
+        source: results
+        target: /results
+    deploy:
+      restart_policy:
+        condition: none
+
 configs:
   openapi-config:
-    external: true  # Config must be created in Swarm first
-    name: openapi-spec
+    external: true
+    name: ${OPENAPI_CONFIG:-openapi-spec}
+
+volumes:
+  results:
+    name: ${RESULTS_VOLUME:-fuzzing-results}
 
 networks:
-  fuzz-net:
-    external: true
-    name: ${DOCKER_NETWORK_NAME:-fuzz-net}
+  restler-net:
+    driver: overlay
+    attachable: true
+    driver_opts:
+      encrypted: "true"
+  wuppiefuzz-net:
+    driver: overlay
+    attachable: true
+    driver_opts:
+      encrypted: "true"
+  evomaster-net:
+    driver: overlay
+    attachable: true
+    driver_opts:
+      encrypted: "true"
