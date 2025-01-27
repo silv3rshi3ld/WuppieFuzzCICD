@@ -1,23 +1,17 @@
-# Stage 1: Builder
-FROM python:3.11-alpine AS builder
-ARG OPENAPI_SPEC=openapi3.yml  # Match actual filename
+FROM python:3.11-alpine as builder
+RUN apk --update add bash nano g++
+COPY ./requirements.txt /vampi/requirements.txt
+WORKDIR /vampi
+RUN pip install -r requirements.txt
 
-RUN apk add --no-cache g++ libffi-dev
+# Build a fresh container, copying across files & compiled parts
+FROM python:3.11-alpine
 COPY . /vampi
 WORKDIR /vampi
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /usr/local/bin /usr/local/bin
+ENV vulnerable=1
+ENV tokentimetolive=60
 
-# Install requirements (preserve existing paths)
-RUN pip install --user -r requirements.txt
-
-# Stage 2: Runtime
-FROM python:3.11-alpine
-RUN apk add --no-cache curl mongodb-tools
-COPY --from=builder /root/.local /root/.local
-COPY --from=builder /vampi /vampi
-WORKDIR /vampi
-ENV PATH=/root/.local/bin:$PATH \
-    vulnerable=1 \
-    tokentimetolive=60 \
-    OPENAPI_SPEC=/vampi/openapi_specs/openapi3.yml 
-
-ENTRYPOINT ["python", "app.py"]
+ENTRYPOINT ["python"]
+CMD ["app.py"]
