@@ -13,24 +13,44 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5002
   VAMPI_EVOMASTER_PORT: 5000
   BASE_DIR: ${{ github.workspace }}
-  NETWORK_SUFFIX: ${{ github.run_id }} # Unique network identifier
 
 jobs:
-  setup_vampi:
+  setup_vampi_restler:
     runs-on: manager-runner
     steps:
       - uses: actions/checkout@v4
-      - name: Start VAmPI instances
+      - name: Start VAmPI-RESTler instance
         working-directory: ${{ env.BASE_DIR }}/services/vampi
         run: |
           docker-compose -f docker-compose.vampi.yml up -d \
-            vampi-evomaster \
-            vampi-restler \ 
+            --project-name vampi-restler \
+            vampi-restler
+
+  setup_vampi_wuppiefuzz:
+    runs-on: manager-runner
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start VAmPI-Wuppie instance
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
+        run: |
+          docker-compose -f docker-compose.vampi.yml up -d \
+            --project-name vampi-wuppie \
             vampi-wuppiefuzz
+
+  setup_vampi_evomaster:
+    runs-on: manager-runner
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start VAmPI-EvoMaster instance
+        working-directory: ${{ env.BASE_DIR }}/services/vampi
+        run: |
+          docker-compose -f docker-compose.vampi.yml up -d \
+            --project-name vampi-evomaster \
+            vampi-evomaster
 
   run_restler:
     runs-on: manager-runner
-    needs: setup_vampi
+    needs: setup_vampi_restler
     steps:
       - uses: actions/checkout@v4
       - name: Run RESTler
@@ -39,13 +59,48 @@ jobs:
           TARGET_HOST: vampi-restler
           TARGET_PORT: ${{ env.VAMPI_RESTLER_PORT }}
         run: |
-          docker-compose -f docker-compose.restler.yml up --build
+          docker-compose -f docker-compose.restler.yml up --build \
+            --project-name restler
       - uses: actions/upload-artifact@v4
         with:
           name: restler-results
           path: ${{ env.BASE_DIR }}/workspace/restler/output
 
-  # Similar updates for run_wuppiefuzz and run_evomaster jobs...
+  run_wuppiefuzz:
+    runs-on: manager-runner
+    needs: setup_vampi_wuppiefuzz
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run WuppieFuzz
+        working-directory: ${{ env.BASE_DIR }}/services/wuppiefuzz
+        env:
+          TARGET_HOST: vampi-wuppiefuzz
+          TARGET_PORT: ${{ env.VAMPI_WUPPIEFUZZ_PORT }}
+        run: |
+          docker-compose -f docker-compose.wuppie.yml up --build \
+            --project-name wuppiefuzz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wuppiefuzz-results
+          path: ${{ env.BASE_DIR }}/workspace/wuppiefuzz/output
+
+  run_evomaster:
+    runs-on: manager-runner
+    needs: setup_vampi_evomaster
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run EvoMaster
+        working-directory: ${{ env.BASE_DIR }}/services/evomaster
+        env:
+          TARGET_HOST: vampi-evomaster
+          TARGET_PORT: ${{ env.VAMPI_EVOMASTER_PORT }}
+        run: |
+          docker-compose -f docker-compose.evomaster.yml up --build \
+            --project-name evomaster
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evomaster-results
+          path: ${{ env.BASE_DIR }}/workspace/evomaster/output
 
   post_process:
     runs-on: manager-runner
@@ -82,10 +137,11 @@ jobs:
     needs: post_process
     if: always()
     steps:
-      - name: Remove containers and networks
+      - name: Remove containers and cleanup
         run: |
           docker-compose -f services/vampi/docker-compose.vampi.yml down -v
           docker-compose -f services/restler/docker-compose.restler.yml down -v
           docker-compose -f services/wuppiefuzz/docker-compose.wuppie.yml down -v
+          docker-compose -f services/evomaster/docker-compose.evomaster.yml down -v
           docker system prune -af
           docker volume prune -f

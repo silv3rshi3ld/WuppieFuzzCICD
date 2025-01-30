@@ -1,26 +1,32 @@
 version: '3.8'
 
 services:
-  vampi-secure:
+  vampi-evomaster:
     build: .
-    container_name: vampi-secure
+    container_name: ${CONTAINER_NAME:-vampi-evomaster}
     ports:
-      - "5001:5000"
-    environment:
-      - vulnerable=0
-    networks:
-      - vampi_network
-
-  vampi-vulnerable:
-    build: .
-    container_name: vampi-vulnerable
-    ports:
-      - "5002:5000"
+      - "${PORT:-5000}:5000"
     environment:
       - vulnerable=1
     networks:
-      - vampi_network
+      - default
 
-networks:
-  vampi_network:
-    name: vampi_network_${NETWORK_SUFFIX}
+  vampi-restler:
+    build: .
+    container_name: ${CONTAINER_NAME:-vampi-restler}
+    ports:
+      - "${PORT:-5003}:5000"
+    environment:
+      - vulnerable=1
+    networks:
+      - default
+
+  vampi-wuppiefuzz:
+    build: .
+    container_name: ${CONTAINER_NAME:-vampi-wuppiefuzz}
+    ports:
+      - "${PORT:-5002}:5000"
+    environment:
+      - vulnerable=1
+    networks:
+      - default

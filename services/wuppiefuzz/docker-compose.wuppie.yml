@@ -2,19 +2,20 @@ version: '3.8'
 
 services:
   wuppiefuzz:
-    image: rust:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.wuppiefuzz
+    environment:
+      TARGET_HOST: ${TARGET_HOST:-vampi-wuppiefuzz}
+      TARGET_PORT: ${TARGET_PORT:-5002}
     volumes:
-      - ${BASE_DIR}/wuppiefuzz_bin:/app
-      - ${BASE_DIR}/services/vampi/openapi_specs:/specs
-      - ${BASE_DIR}/wuppiefuzz_workspace:/workspace
+      - ${BASE_DIR}/services/vampi/openapi_specs:/specs:ro
+      - ${BASE_DIR}/workspace/wuppiefuzz/output:/workspace/output
     command: >-
       sh -c "./wuppiefuzz fuzz
       --openapi-spec=/specs/wuppiefuzz.openapi3.yml
-      --report-dir=/workspace/reports
+      --target-url=http://$${TARGET_HOST}:$${TARGET_PORT}
+      --report-dir=/workspace/output
       --timeout=60"
     networks:
-      - wuppiefuzz_network
-
-networks:
-  wuppiefuzz_network:
-    name: wuppiefuzz_network_${NETWORK_SUFFIX}
+      - default

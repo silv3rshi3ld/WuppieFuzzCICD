@@ -6,15 +6,13 @@ services:
       context: .
       dockerfile: Dockerfile.evomaster
     volumes:
-      - ${BASE_DIR}/workspace/evomaster/results:/evomaster/results
-      - ${BASE_DIR}/services/vampi/openapi_specs:/specs
+      - ${BASE_DIR}/workspace/evomaster/output:/evomaster/results
+      - ${BASE_DIR}/services/vampi/openapi_specs:/specs:ro
     environment:
-      SPEC_PATH: "/specs/openapi3.yml"
-      TARGET_URL: "http://vampi-evomaster:${VAMPI_EVOMASTER_PORT}"
+      TARGET_HOST: ${TARGET_HOST:-vampi-evomaster}
+      TARGET_PORT: ${TARGET_PORT:-5000}
+      SPEC_PATH: "/specs/wuppiefuzz.openapi3.yml"
+      TARGET_URL: "http://${TARGET_HOST:-vampi-evomaster}:${TARGET_PORT:-5000}"
       TIME_BUDGET: "3600"
     networks:
-      - evomaster_network
-
-networks:
-  evomaster_network:
-    name: evomaster_network_${NETWORK_SUFFIX}
+      - default
