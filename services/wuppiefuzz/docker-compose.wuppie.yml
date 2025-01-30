@@ -7,7 +7,7 @@ services:
       - ${BASE_DIR}/wuppiefuzz_bin:/app
       - ${BASE_DIR}/services/vampi/openapi_specs:/specs
       - ${BASE_DIR}/wuppiefuzz_workspace:/workspace
-    command: >
+    command: >-
       sh -c "./wuppiefuzz fuzz
       --openapi-spec=/specs/wuppiefuzz.openapi3.yml
       --report-dir=/workspace/reports
@@ -17,5 +17,4 @@ services:
 
 networks:
   wuppiefuzz_network:
-    external: true
     name: wuppiefuzz_network_${NETWORK_SUFFIX}

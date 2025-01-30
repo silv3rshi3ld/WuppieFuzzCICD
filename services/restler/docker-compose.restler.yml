@@ -17,5 +17,4 @@ services:
 
 networks:
   restler_network:
-    external: true
     name: restler_network_${NETWORK_SUFFIX}

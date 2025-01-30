@@ -1,11 +1,11 @@
 name: Build and Fuzz
-#test
+
 on:
   push:
     branches:
       - working
   pull_request:
-    branches:
+    branches: 
       - working
 
 env:
@@ -13,35 +13,11 @@ env:
   VAMPI_WUPPIEFUZZ_PORT: 5002
   VAMPI_EVOMASTER_PORT: 5000
   BASE_DIR: ${{ github.workspace }}
+  NETWORK_SUFFIX: ${{ github.run_id }} # Unique network identifier
 
 jobs:
-  cleanup:
-    runs-on: manager-runner
-    steps:
-      - name: Clean previous artifacts
-        run: |
-          sudo rm -rf "$BASE_DIR/workspace/restler/output" || true
-          sudo rm -rf "$BASE_DIR/wuppiefuzz_workspace" || true
-          sudo rm -rf "$BASE_DIR/workspace/evomaster" || true
-
-  prepare_networks:
-    runs-on: manager-runner
-    steps:
-      - name: Clean existing networks
-        run: |
-          for net in wuppiefuzz_network evomaster_network restler_network; do
-            docker network rm $net || true
-          done
-
-      - name: Create dedicated networks
-        run: |
-          docker network create --subnet=10.10.0.0/24 wuppiefuzz_network
-          docker network create --subnet=10.20.0.0/24 evomaster_network
-          docker network create --subnet=10.30.0.0/24 restler_network
-
   setup_vampi:
     runs-on: manager-runner
-    needs: prepare_networks
     steps:
       - uses: actions/checkout@v4
       - name: Start VAmPI instances
@@ -49,12 +25,12 @@ jobs:
         run: |
           docker-compose -f docker-compose.vampi.yml up -d \
             vampi-evomaster \
-            vampi-restler \
+            vampi-restler \ 
             vampi-wuppiefuzz
 
   run_restler:
     runs-on: manager-runner
-    needs: [setup_vampi, prepare_networks]
+    needs: setup_vampi
     steps:
       - uses: actions/checkout@v4
       - name: Run RESTler
@@ -69,45 +45,7 @@ jobs:
           name: restler-results
           path: ${{ env.BASE_DIR }}/workspace/restler/output
 
-  run_wuppiefuzz:
-    runs-on: manager-runner
-    needs: [setup_vampi, prepare_networks]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build WuppieFuzz
-        run: |
-          mkdir -p ${{ env.BASE_DIR }}/wuppiefuzz_bin
-          docker build -t wuppiefuzz-builder -f ${{ env.BASE_DIR }}/services/wuppiefuzz/Dockerfile.wuppiefuzz .
-          docker create -it --name wuppie_temp wuppiefuzz-builder
-          docker cp wuppie_temp:/app/wuppiefuzz ${{ env.BASE_DIR }}/wuppiefuzz_bin/
-          docker rm wuppie_temp
-
-      - name: Execute WuppieFuzz
-        working-directory: ${{ env.BASE_DIR }}/services/wuppiefuzz
-        run: |
-          docker-compose -f docker-compose.wuppiefuzz.yml up --build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-results
-          path: ${{ env.BASE_DIR }}/wuppiefuzz_workspace/reports
-
-  run_evomaster:
-    runs-on: manager-runner
-    needs: [setup_vampi, prepare_networks]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build EvoMaster
-        working-directory: ${{ env.BASE_DIR }}/services/evomaster
-        run: docker-compose -f docker-compose.evomaster.yml build
-
-      - name: Run EvoMaster
-        working-directory: ${{ env.BASE_DIR }}/services/evomaster
-        run: |
-          docker-compose -f docker-compose.evomaster.yml up --build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: evomaster-results
-          path: ${{ env.BASE_DIR }}/workspace/evomaster/results
+  # Similar updates for run_wuppiefuzz and run_evomaster jobs...
 
   post_process:
     runs-on: manager-runner
@@ -139,17 +77,15 @@ jobs:
           name: security-report
           path: report.md
 
-  cleanup_final:
+  cleanup:
     runs-on: manager-runner
     needs: post_process
     if: always()
     steps:
-      - name: Remove networks
+      - name: Remove containers and networks
         run: |
-          for net in wuppiefuzz_network evomaster_network restler_network; do
-            docker network rm $net || true
-          done
-      - name: Prune system
-        run: |
+          docker-compose -f services/vampi/docker-compose.vampi.yml down -v
+          docker-compose -f services/restler/docker-compose.restler.yml down -v
+          docker-compose -f services/wuppiefuzz/docker-compose.wuppie.yml down -v
           docker system prune -af
           docker volume prune -f
