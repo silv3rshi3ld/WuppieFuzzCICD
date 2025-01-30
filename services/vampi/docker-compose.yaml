@@ -90,6 +90,8 @@ services:
       - type: volume
         source: results
         target: /results
+        volume:
+          nocopy: true
     deploy:
       restart_policy:
         condition: none
@@ -108,10 +110,12 @@ services:
       - type: volume
         source: results
         target: /reports
-      - type: bind
-        source: ./corpus
+      - type: volume
+        source: corpus
         target: /corpus
         read_only: true
+        volume:
+          nocopy: true
     command: >
       fuzz
       --report
@@ -150,6 +154,18 @@ configs:
 volumes:
   results:
     name: ${RESULTS_VOLUME:-fuzzing-results}
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/docker/fuzzing-results
+  corpus:
+    name: ${CORPUS_VOLUME:-vampi-corpus}
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/corpus
 
 networks:
   restler-net:
