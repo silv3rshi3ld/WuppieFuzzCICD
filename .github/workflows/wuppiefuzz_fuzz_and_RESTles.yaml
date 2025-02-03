@@ -19,8 +19,9 @@ jobs:
         run: docker compose -f services/evomaster/docker-compose.evomaster.yml up -d --build
 
       # 3. Wait for VAmPI to initialize
-      - name: Wait for VAmPI to Initialize
-        run: sleep 10
+      - name: Wait for VAmPI to be healthy
+        run: |
+          timeout 30s bash -c 'until docker container inspect vampi-evomaster --format "{{.State.Health.Status}}" | grep -q healthy; do sleep 1; done'
 
       # 4. Run EvoMaster using the GitHub Action
       - name: Run EvoMaster Action
@@ -29,7 +30,7 @@ jobs:
           args: >-
             --writeWFCReport true
             --blackBox true
-            --bbSwaggerUrl http://localhost:5000/openapi.json
+            --bbSwaggerUrl http://vampi-evomaster:5000/openapi.json
             --maxTime 20s
             --showProgress false
           failOnErrors: "true"
