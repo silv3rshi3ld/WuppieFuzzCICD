@@ -58,7 +58,7 @@ jobs:
             --log-level info \
             --initial-corpus corpus_directory \
             --timeout 60 \
-            ../services/vampi/openapi_specs/wuppiefuzz.openapi3.yml
+            ../services/vampi/openapi_specs/openapi3.yml
 
       # 9. Upload the generated fuzzing reports as an artifact.
       - name: Upload Fuzzing Report
