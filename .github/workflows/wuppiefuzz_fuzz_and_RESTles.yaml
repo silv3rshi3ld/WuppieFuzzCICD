@@ -1,4 +1,4 @@
-name: Fuzz VAmPI with WuppieFuzz
+name: Fuzz VAmPI with WuppieFuzz and EvoMaster
 
 on:
   push:
@@ -7,6 +7,46 @@ on:
     branches: [ Less-dependent-build ]
 
 jobs:
+  evomaster:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4.2.2
+
+      # 2. Start VAmPI with Docker Compose for EvoMaster
+      - name: Start Docker Compose for EvoMaster
+        run: docker compose -f services/evomaster/docker-compose.evomaster.yml up -d --build
+
+      # 3. Wait for VAmPI to initialize
+      - name: Wait for VAmPI to Initialize
+        run: sleep 10
+
+      # 4. Run EvoMaster using the GitHub Action
+      - name: Run EvoMaster Action
+        uses: webfuzzing/evomaster-action@v1.0.0
+        with:
+          args: >-
+            --writeWFCReport true
+            --blackBox true
+            --bbSwaggerUrl http://localhost:8080/v3/api-docs
+            --maxTime 20s
+            --showProgress false
+          failOnErrors: "true"
+
+      # 5. Upload EvoMaster-generated files as an artifact
+      - name: Upload EvoMaster Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evomaster-results
+          path: ./generated_tests
+
+      # 6. Shut down Docker Compose to stop VAmPI
+      - name: Stop Docker Compose for EvoMaster
+        if: always()
+        run: docker compose -f services/evomaster/docker-compose.evomaster.yml down
+
   fuzz:
     runs-on: ubuntu-latest
 

@@ -1,20 +1,9 @@
-version: '3.8'
-
+version: "3"
 services:
-  evomaster:
-    build:
-      context: .
-      dockerfile: Dockerfile.evomaster
-    volumes:
-      - ${BASE_DIR}/workspace/evomaster/results:/evomaster/results
-      - ${BASE_DIR}/services/vampi/openapi_specs:/specs
+  vampi:
+    build: ../vampi
+    container_name: vampi-evomaster
+    ports:
+      - 8080:5000
     environment:
-      SPEC_PATH: "/specs/openapi3.yml"
-      TARGET_URL: "http://vampi-evomaster:${VAMPI_EVOMASTER_PORT}"
-      TIME_BUDGET: "3600"
-    networks:
-      - evomaster_network
-
-networks:
-  evomaster_network:
-    name: evomaster_network_${NETWORK_SUFFIX}
+      - vulnerable=1
