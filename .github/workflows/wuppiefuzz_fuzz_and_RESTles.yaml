@@ -14,28 +14,38 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.2.2
 
-      # 2. Start VAmPI with Docker Compose for EvoMaster
+      # 2. Install yq and convert OpenAPI spec
+      - name: Install yq
+        run: |
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Convert OpenAPI spec to JSON
+        run: |
+          yq eval -o=json 'services/vampi/openapi_specs/openapi3.yml' > services/vampi/openapi_specs/openapi.json
+
+      # 3. Start VAmPI with Docker Compose for EvoMaster
       - name: Start Docker Compose for EvoMaster
         run: docker compose -f services/evomaster/docker-compose.evomaster.yml up -d --build
 
-      # 3. Wait for VAmPI to initialize
+      # 4. Wait for VAmPI to initialize
       - name: Wait for VAmPI to be healthy
         run: |
           timeout 30s bash -c 'until docker container inspect vampi-evomaster --format "{{.State.Health.Status}}" | grep -q healthy; do sleep 1; done'
 
-      # 4. Run EvoMaster using the GitHub Action
+      # 5. Run EvoMaster using the GitHub Action
       - name: Run EvoMaster Action
         uses: webfuzzing/evomaster-action@v1.0.0
         with:
           args: >-
             --writeWFCReport true
             --blackBox true
-            --bbSwaggerUrl http://vampi-evomaster:5000/openapi.json
+            --bbSwaggerUrl http://vampi-evomaster:5000/openapi_specs/openapi.json
             --maxTime 20s
             --showProgress false
           failOnErrors: "true"
 
-      # 5. Upload EvoMaster-generated files as an artifact
+      # 6. Upload EvoMaster-generated files as an artifact
       - name: Upload EvoMaster Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -43,7 +53,7 @@ jobs:
           name: evomaster-results
           path: ./generated_tests
 
-      # 6. Shut down Docker Compose to stop VAmPI
+      # 7. Shut down Docker Compose to stop VAmPI
       - name: Stop Docker Compose for EvoMaster
         if: always()
         run: docker compose -f services/evomaster/docker-compose.evomaster.yml down
