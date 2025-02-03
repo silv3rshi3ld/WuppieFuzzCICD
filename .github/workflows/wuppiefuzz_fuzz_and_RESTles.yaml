@@ -40,9 +40,12 @@ jobs:
           args: >-
             --writeWFCReport true
             --blackBox true
-            --bbSwaggerUrl http://localhost:5000
+            --bbSwaggerUrl http://localhost:5000/openapi_specs/openapi.json
             --maxTime 20s
             --showProgress false
+            --problemType REST
+            --outputFormat PYTHON_UNITTEST
+            --ratePerMinute 60
           failOnErrors: "true"
 
       # 6. Upload EvoMaster-generated files as an artifact
