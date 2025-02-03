@@ -47,7 +47,7 @@ jobs:
         if: always()
         run: docker compose -f services/evomaster/docker-compose.evomaster.yml down
 
-  fuzz:
+  wuppiefuzz:
     runs-on: ubuntu-latest
 
     steps:
