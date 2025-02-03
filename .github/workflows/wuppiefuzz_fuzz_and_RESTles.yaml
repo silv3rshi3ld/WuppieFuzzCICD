@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz
 
 on:
   push:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
   pull_request:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
 
 jobs:
   fuzz:
@@ -13,23 +13,20 @@ jobs:
     steps:
       # 1. Checkout your repository.
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
       # 2. Run VAmPI via Docker in vulnerable mode.
-      # This pulls the Docker image from Docker Hub and sets the environment variable to ensure the vulnerable parts are active.
       - name: Start VAmPI Container (Vulnerable Mode)
         run: |
           docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
-          # Allow time for the container to initialize
           sleep 10
 
       # 3. Initialize the VAmPI database.
-      # VAmPI requires a call to /createdb to populate its dummy data.
       - name: Initialize VAmPI Database
         run: |
           curl -s http://localhost:5000/createdb
 
-      # 4. Set up the Rust toolchain (required to build WuppieFuzz).
+      # 4. Set up the Rust toolchain.
       - name: Set up Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -47,14 +44,12 @@ jobs:
           cargo build --release
 
       # 7. Generate an initial corpus from the OpenAPI specification.
-      # Assumes that VAmPI’s OpenAPI spec is available at openapi_specs/openapi3.yaml in your repository.
       - name: Generate Initial Corpus for Fuzzing
         run: |
           cd WuppieFuzz
           ./target/release/wuppiefuzz output-corpus --openapi-spec ../openapi_specs/openapi3.yaml corpus_directory
 
       # 8. Run the fuzzing campaign.
-      # If your API requires authentication, you can extend this step to include an authentication file and/or custom headers.
       - name: Run WuppieFuzz Fuzzing Campaign
         run: |
           cd WuppieFuzz
@@ -67,7 +62,7 @@ jobs:
 
       # 9. Upload the generated fuzzing reports as an artifact.
       - name: Upload Fuzzing Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fuzzing-report
           path: WuppieFuzz/reports/
