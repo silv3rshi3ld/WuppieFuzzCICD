@@ -47,7 +47,7 @@ jobs:
       - name: Generate Initial Corpus for Fuzzing
         run: |
           cd WuppieFuzz
-          ./target/release/wuppiefuzz output-corpus --openapi-spec ../services/vampi/openapi_specs/wuppiefuzz.openapi3.yml corpus_directory
+          ./target/release/wuppiefuzz output-corpus --openapi-spec ../services/vampi/openapi_specs/openapi3.yml corpus_directory
 
       # 8. Run the fuzzing campaign.
       - name: Run WuppieFuzz Fuzzing Campaign
