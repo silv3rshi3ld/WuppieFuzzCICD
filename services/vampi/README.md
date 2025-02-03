@@ -23,6 +23,7 @@ A quick rundown of the actions included can be seen in the following table:
 |:----------:|:-----------------------------:|:--------------------------------------------------:|
 |     GET    |           /createdb           | Creates and populates the database with dummy data |
 |     GET    |               /               |                     VAmPI home                     |
+|     GET    |               /me             |           Displays the user that is logged in       |
 |     GET    |           /users/v1           |      Displays all users with basic information     |
 |     GET    |        /users/v1/_debug       |         Displays all details for all users         |
 |    POST    |       /users/v1/register      |                  Register new user                 |
@@ -88,6 +89,10 @@ If you would like to alter the timeout of the token created after login or if yo
 
    - In the Dockerfile you will find two environment variables being set, the `ENV vulnerable=1` and the `ENV tokentimetolive=60`. Feel free to change it before running the docker build command.
 
+
+## Frequently asked questions
+ - **There is a database error upon reaching endpoints!**
+   - Make sure to issue a request towards the endpoint `/createdb` in order to populate the database.
 
  [Picture from freepik - www.freepik.com](https://www.freepik.com/vectors/party)
 

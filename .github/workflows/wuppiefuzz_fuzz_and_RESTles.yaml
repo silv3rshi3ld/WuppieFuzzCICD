@@ -1,91 +1,73 @@
-name: Build and Fuzz
+name: Fuzz VAmPI with WuppieFuzz
 
 on:
   push:
-    branches:
-      - working
+    branches: [ main ]
   pull_request:
-    branches: 
-      - working
-
-env:
-  VAMPI_RESTLER_PORT: 5003
-  VAMPI_WUPPIEFUZZ_PORT: 5002
-  VAMPI_EVOMASTER_PORT: 5000
-  BASE_DIR: ${{ github.workspace }}
-  NETWORK_SUFFIX: ${{ github.run_id }} # Unique network identifier
+    branches: [ main ]
 
 jobs:
-  setup_vampi:
-    runs-on: manager-runner
-    steps:
-      - uses: actions/checkout@v4
-      - name: Start VAmPI instances
-        working-directory: ${{ env.BASE_DIR }}/services/vampi
-        run: |
-          docker-compose -f docker-compose.vampi.yml up -d \
-            vampi-evomaster \
-            vampi-restler \ 
-            vampi-wuppiefuzz
+  fuzz:
+    runs-on: ubuntu-latest
 
-  run_restler:
-    runs-on: manager-runner
-    needs: setup_vampi
     steps:
-      - uses: actions/checkout@v4
-      - name: Run RESTler
-        working-directory: ${{ env.BASE_DIR }}/services/restler
-        env:
-          TARGET_HOST: vampi-restler
-          TARGET_PORT: ${{ env.VAMPI_RESTLER_PORT }}
+      # 1. Checkout your repository.
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # 2. Run VAmPI via Docker in vulnerable mode.
+      # This pulls the Docker image from Docker Hub and sets the environment variable to ensure the vulnerable parts are active.
+      - name: Start VAmPI Container (Vulnerable Mode)
         run: |
-          docker-compose -f docker-compose.restler.yml up --build
-      - uses: actions/upload-artifact@v4
+          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
+          # Allow time for the container to initialize
+          sleep 10
+
+      # 3. Initialize the VAmPI database.
+      # VAmPI requires a call to /createdb to populate its dummy data.
+      - name: Initialize VAmPI Database
+        run: |
+          curl -s http://localhost:5000/createdb
+
+      # 4. Set up the Rust toolchain (required to build WuppieFuzz).
+      - name: Set up Rust Toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          name: restler-results
-          path: ${{ env.BASE_DIR }}/workspace/restler/output
+          toolchain: stable
+          override: true
 
-  # Similar updates for run_wuppiefuzz and run_evomaster jobs...
+      # 5. Clone the WuppieFuzz repository.
+      - name: Clone WuppieFuzz
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
-  post_process:
-    runs-on: manager-runner
-    needs: [run_restler, run_wuppiefuzz, run_evomaster]
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: all_results
-      - name: Generate summary
+      # 6. Build WuppieFuzz.
+      - name: Build WuppieFuzz
         run: |
-          echo "Security Test Results Summary" > report.md
-          echo "============================" >> report.md
-          
-          # RESTler results
-          echo "### RESTler Findings" >> report.md
-          find all_results/restler-results -name 'bug_buckets.json' -exec jq '.bugs[].message' {} + >> report.md || echo "No RESTler findings" >> report.md
-          
-          # WuppieFuzz results
-          echo "### WuppieFuzz Findings" >> report.md
-          find all_results/wuppiefuzz-results -name '*.json' -exec jq '.vulnerabilities[]?.description' {} + >> report.md || echo "No WuppieFuzz findings" >> report.md
-          
-          # EvoMaster results
-          echo "### EvoMaster Findings" >> report.md
-          find all_results/evomaster-results -name '*.txt' -exec cat {} + >> report.md || echo "No EvoMaster findings" >> report.md
-          
-          cat report.md
-      - uses: actions/upload-artifact@v4
-        with:
-          name: security-report
-          path: report.md
+          cd WuppieFuzz
+          cargo build --release
 
-  cleanup:
-    runs-on: manager-runner
-    needs: post_process
-    if: always()
-    steps:
-      - name: Remove containers and networks
+      # 7. Generate an initial corpus from the OpenAPI specification.
+      # Assumes that VAmPI’s OpenAPI spec is available at openapi_specs/openapi3.yaml in your repository.
+      - name: Generate Initial Corpus for Fuzzing
         run: |
-          docker-compose -f services/vampi/docker-compose.vampi.yml down -v
-          docker-compose -f services/restler/docker-compose.restler.yml down -v
-          docker-compose -f services/wuppiefuzz/docker-compose.wuppie.yml down -v
-          docker system prune -af
-          docker volume prune -f
+          cd WuppieFuzz
+          ./target/release/wuppiefuzz output-corpus --openapi-spec ../openapi_specs/openapi3.yaml corpus_directory
+
+      # 8. Run the fuzzing campaign.
+      # If your API requires authentication, you can extend this step to include an authentication file and/or custom headers.
+      - name: Run WuppieFuzz Fuzzing Campaign
+        run: |
+          cd WuppieFuzz
+          ./target/release/wuppiefuzz fuzz \
+            --report \
+            --log-level info \
+            --initial-corpus corpus_directory \
+            --timeout 60 \
+            ../openapi_specs/openapi3.yaml
+
+      # 9. Upload the generated fuzzing reports as an artifact.
+      - name: Upload Fuzzing Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-report
+          path: WuppieFuzz/reports/
