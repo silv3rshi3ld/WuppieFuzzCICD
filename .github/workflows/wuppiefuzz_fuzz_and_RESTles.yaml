@@ -7,47 +7,46 @@ on:
     branches: [ Less-dependent-build ]
 
 jobs:
-  evomaster:
+  whitebox:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repository
+      # 1. Checkout the repository.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Start VAmPI with Docker
-      - name: Start VAmPI Container
-        run: |
-          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
-          sleep 10
-
-      # 3. Initialize VAmPI Database
-      - name: Initialize VAmPI Database
-        run: |
-          curl -s http://localhost:5000/createdb
-
-      # 4. Set up Java
+      # 2. Set up Java (using Temurin Java 11; adjust if necessary).
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '11'
 
-      # 5. Download and Run EvoMaster
-      - name: Download and Run EvoMaster
+      # 3. Build the SUT and the white-box driver.
+      - name: Build SUT and Whitebox Driver
+        run: mvn clean package
+
+      # 4. Start the white-box SUT driver.
+      #    Your driver jar (e.g., target/your-sut-driver.jar) should start your instrumented SUT,
+      #    open a controller server (by default on port 40100) and expose the API schema.
+      - name: Start Whitebox SUT Driver
         run: |
-          # Download EvoMaster
-          curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
-          
-          # Run EvoMaster in black-box mode
+          nohup java -jar target/your-sut-driver.jar &
+          # Allow time for the SUT to start and be instrumented.
+          sleep 10
+
+      # 5. Run EvoMaster in white-box mode.
+      #    Do not use --blackBox nor --bbSwaggerUrl. Instead, specify the SUT controller host/port,
+      #    and set a valid output format (e.g., JAVA_JUNIT_5).
+      - name: Run EvoMaster in Whitebox Mode
+        run: |
           java -jar evomaster.jar \
-            --blackBox true \
-            --bbSwaggerUrl http://localhost:5000/openapi_specs/openapi3.yml \
-            --outputFormat PYTHON \
             --maxTime 1h \
             --outputFolder generated_tests \
-            --ratePerMinute 60
+            --sutControllerHost localhost \
+            --sutControllerPort 40100 \
+            --outputFormat JAVA_JUNIT_5
 
-      # 6. Upload EvoMaster-generated files as an artifact
+      # 6. Upload EvoMaster-generated test files as an artifact.
       - name: Upload EvoMaster Results
         uses: actions/upload-artifact@v4
         with:
