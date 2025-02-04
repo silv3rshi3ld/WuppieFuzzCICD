@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz and EvoMaster
 
 on:
   push:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
   pull_request:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
 
 jobs:
   evomaster:
@@ -12,7 +12,7 @@ jobs:
     steps:
       # 1. Checkout repository
       - name: Checkout Repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
       # 2. Set up Java
       - name: Set up Java
@@ -21,44 +21,35 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
-      # 3. Build EvoMaster Driver
-      - name: Build EvoMaster Driver
-        run: |
-          cd services/evomaster
-          mvn clean package
+      # 3. Build SUT and Driver
+      - name: Build SUT and Driver
+        run: mvn clean package
 
-      # 4. Download EvoMaster
+      # 4. Start the SUT Driver
+      - name: Start SUT Driver
+        run: |
+          nohup java -jar target/your-sut-driver.jar &
+          sleep 10
+
+      # 5. Download and Run EvoMaster
       - name: Download EvoMaster
         run: |
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
 
-      # 5. Start EvoMaster Driver
-      - name: Start EvoMaster Driver
-        run: |
-          cd services/evomaster
-          java -jar target/vampi-evomaster-driver-1.0-SNAPSHOT.jar &
-          sleep 10
-
-      # 6. Run EvoMaster White-Box Testing
-      - name: Run EvoMaster
+      - name: Run EvoMaster White-Box Testing
         run: |
           java -jar evomaster.jar \
-            --configPath services/evomaster/evomaster.yml \
-            --outputFormat PYTHON_UNITTEST \
-            --outputFolder generated_tests
+            --maxTime 1h \
+            --outputFolder generated_tests \
+            --sutControllerHost localhost \
+            --sutControllerPort 40100
 
-      # 7. Upload EvoMaster-generated files as an artifact
+      # 6. Upload EvoMaster-generated files as an artifact
       - name: Upload EvoMaster Results
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: evomaster-results
-          path: ./generated_tests
-
-      # 8. Shut down Docker Compose to stop VAmPI
-      - name: Stop Docker Compose for EvoMaster
-        if: always()
-        run: docker compose -f services/evomaster/docker-compose.evomaster.yml down
+          path: generated_tests
 
   wuppiefuzz:
     runs-on: ubuntu-latest
