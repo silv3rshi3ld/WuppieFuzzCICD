@@ -42,7 +42,7 @@ jobs:
           java -jar evomaster.jar \
             --blackBox true \
             --bbSwaggerUrl http://localhost:5000/openapi_specs/openapi3.yml \
-            --outputFormat PYTHON_PYTEST \
+            --outputFormat PYTHON \
             --maxTime 1h \
             --outputFolder generated_tests \
             --ratePerMinute 60
