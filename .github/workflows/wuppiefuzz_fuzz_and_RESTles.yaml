@@ -1,4 +1,4 @@
-name: Fuzz VAmPI with WuppieFuzz and EvoMaster
+name: Fuzz VAmPI with WuppieFuzz and EvoMaster (Blackbox Mode)
 
 on:
   push:
@@ -7,42 +7,53 @@ on:
     branches: [Less-dependent-build]
 
 jobs:
-  evomaster-whitebox:
+  evomaster:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repository
+      # 1. Checkout the repository.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Set up Java (using Temurin Java 11)
+      # 2. Start VAmPI Container using Docker.
+      #    (VAmPI is a Flask application that you run via Docker.)
+      - name: Start VAmPI Container
+        run: |
+          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
+          # Wait for the container to be fully up.
+          sleep 10
+
+      # 3. Initialize VAmPI Database.
+      - name: Initialize VAmPI Database
+        run: |
+          curl -s http://localhost:5000/createdb
+
+      # 4. Set up Java (using Temurin Java 11).
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '11'
 
-      # 3. Start the white-box SUT driver (prebuilt driver JAR).
-      #    Your driver should start your instrumented Vampi SUT, open the controller server (default port 40100)
-      #    and expose the API schema.
-      - name: Start Whitebox SUT Driver
+      # 5. Download EvoMaster jar.
+      - name: Download EvoMaster
         run: |
-          nohup java -jar services/vampi/your-sut-driver.jar &
-          # Allow time for the SUT to start and instrument itself.
-          sleep 10
+          curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
 
-      # 4. Run EvoMaster in white-box mode.
-      #    Here we override the API schema location to point to the local OpenAPI file.
-      - name: Run EvoMaster in Whitebox Mode
+      # 6. Run EvoMaster in black-box mode.
+      #    Since Vampi does not publish its OpenAPI spec automatically,
+      #    we assume you have manually created an OpenAPI file describing the endpoints,
+      #    and it is stored at services/vampi/openapi_specs/openapi3.yml.
+      - name: Run EvoMaster in Blackbox Mode
         run: |
           java -jar evomaster.jar \
+            --blackBox true \
+            --bbSwaggerUrl services/vampi/openapi_specs/openapi3.yml \
+            --outputFormat PYTHON_UNITTEST \
             --maxTime 1h \
             --outputFolder generated_tests \
-            --sutControllerHost localhost \
-            --sutControllerPort 40100 \
-            --overrideOpenAPIUrl services/vampi/openapi_specs/openapi3.yml \
-            --outputFormat JAVA_JUNIT_5
+            --ratePerMinute 60
 
-      # 5. Upload EvoMaster-generated tests as an artifact.
+      # 7. Upload the EvoMaster-generated tests as an artifact.
       - name: Upload EvoMaster Results
         uses: actions/upload-artifact@v4
         with:
@@ -52,17 +63,17 @@ jobs:
   wuppiefuzz:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout repository
+      # 1. Checkout repository.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Start Vampi container (vulnerable mode) using Docker.
+      # 2. Start VAmPI Container (Vulnerable Mode) using Docker.
       - name: Start VAmPI Container (Vulnerable Mode)
         run: |
           docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
           sleep 10
 
-      # 3. Initialize Vampi database.
+      # 3. Initialize VAmPI Database.
       - name: Initialize VAmPI Database
         run: |
           curl -s http://localhost:5000/createdb
@@ -75,7 +86,7 @@ jobs:
           override: true
 
       # 5. Clone the WuppieFuzz repository.
-      - name: Clone WuppieFuzz
+      - name: Clone WuppieFuzz Repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
       # 6. Build WuppieFuzz.
