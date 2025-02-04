@@ -103,7 +103,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Restler Docker Image
-        # Use the repository root as the build context and specify the Dockerfile location.
         run: docker build -f services/restler/Dockerfile.restler -t restler-fuzzer .
 
       - name: Run Restler Fuzzing via Docker Compose

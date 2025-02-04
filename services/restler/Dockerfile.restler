@@ -12,20 +12,19 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone Restler source code into /restler
+# Clone Restler source code into /restler and build it
 WORKDIR /restler
 RUN git clone https://github.com/microsoft/restler-fuzzer.git .
-
-# Build Restler using the provided Python script
 RUN python3 ./build-restler.py --dest_dir /restler_bin
 
-# Stage 2: Create runtime image (using a lightweight base)
+# Stage 2: Create runtime image
 FROM python:3.8-slim
 
-# Install runtime dependencies
+# Install runtime dependencies including git (needed for cloning configuration files)
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the Restler binaries from the builder stage
@@ -40,14 +39,14 @@ RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicatio
 # Set the working directory for Restler operations
 WORKDIR /workspace
 
-# Create necessary directories
+# Create FuzzLean directory in workspace
 RUN mkdir -p /workspace/FuzzLean
 
 # Copy Restler configuration files and entrypoint script
-# (Assuming your entrypoint script is in services/restler/config/entrypoint.sh)
+# (Assuming your entrypoint script is located at services/restler/config/entrypoint.sh in your repo)
 COPY ./services/restler/config /service/config
 
-# Ensure the entrypoint script is executable and fix line endings.
+# Ensure the entrypoint script is executable and fix line endings
 RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
 
 # Set the entrypoint
