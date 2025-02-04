@@ -3,8 +3,8 @@ version: '3.8'
 services:
   restler:
     build:
-      context: .
-      dockerfile: Dockerfile.restler
+      context: ../..
+      dockerfile: services/restler/Dockerfile.restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
       TARGET_IP: ${TARGET_HOST}
