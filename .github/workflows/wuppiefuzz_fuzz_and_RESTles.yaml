@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz and EvoMaster
 
 on:
   push:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
   pull_request:
-    branches: [ Less-dependent-build ]
+    branches: [ main ]
 
 jobs:
   evomaster:
@@ -14,24 +14,144 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Set up Java
+      # 2. Start VAmPI with Docker
+      - name: Start VAmPI Container
+        run: |
+          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
+          sleep 10
+
+      # 3. Initialize VAmPI Database
+      - name: Initialize VAmPI Database
+        run: |
+          curl -s http://localhost:5000/createdb
+
+      # 4. Set up Java and Build Driver
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # 3. Build SUT and Driver
-      - name: Build SUT and Driver
-        run: mvn clean package
-
-      # 4. Start the SUT Driver
-      - name: Start SUT Driver
+      - name: Create EvoMaster Driver
         run: |
-          nohup java -jar target/your-sut-driver.jar &
+          mkdir -p evomaster-driver/src/main/java/org/vampi
+          cat > evomaster-driver/pom.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.vampi</groupId>
+              <artifactId>evomaster-driver</artifactId>
+              <version>1.0-SNAPSHOT</version>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.evomaster</groupId>
+                      <artifactId>evomaster-client-java-controller</artifactId>
+                      <version>3.4.0</version>
+                  </dependency>
+              </dependencies>
+              <build>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-shade-plugin</artifactId>
+                          <version>3.5.1</version>
+                          <executions>
+                              <execution>
+                                  <phase>package</phase>
+                                  <goals>
+                                      <goal>shade</goal>
+                                  </goals>
+                                  <configuration>
+                                      <transformers>
+                                          <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                              <mainClass>org.vampi.VAmPIDriver</mainClass>
+                                          </transformer>
+                                      </transformers>
+                                  </configuration>
+                              </execution>
+                          </executions>
+                      </plugin>
+                  </plugins>
+              </build>
+              <properties>
+                  <maven.compiler.source>11</maven.compiler.source>
+                  <maven.compiler.target>11</maven.compiler.target>
+              </properties>
+          </project>
+          EOF
+
+          cat > evomaster-driver/src/main/java/org/vampi/VAmPIDriver.java << 'EOF'
+          package org.vampi;
+
+          import org.evomaster.client.java.controller.EmbeddedSutController;
+          import org.evomaster.client.java.controller.api.dto.AuthenticationDto;
+          import org.evomaster.client.java.controller.api.dto.SutInfoDto;
+          import org.evomaster.client.java.controller.problem.ProblemInfo;
+          import org.evomaster.client.java.controller.problem.RestProblem;
+
+          import java.util.List;
+
+          public class VAmPIDriver extends EmbeddedSutController {
+              public static void main(String[] args) {
+                  VAmPIDriver controller = new VAmPIDriver();
+                  controller.startSut();
+              }
+
+              @Override
+              public String startSut() {
+                  return "http://localhost:5000";
+              }
+
+              @Override
+              public void stopSut() {}
+
+              @Override
+              public String getPackagePrefixesToCover() {
+                  return "org.vampi.";
+              }
+
+              @Override
+              public void resetStateOfSUT() {
+                  // Reset database
+                  try {
+                      Runtime.getRuntime().exec("curl -s http://localhost:5000/createdb");
+                  } catch (Exception e) {
+                      e.printStackTrace();
+                  }
+              }
+
+              @Override
+              public List<AuthenticationDto> getInfoForAuthentication() {
+                  return null;
+              }
+
+              @Override
+              public ProblemInfo getProblemInfo() {
+                  return new RestProblem(
+                      "http://localhost:5000/openapi_specs/openapi3.yml"
+                  );
+              }
+
+              @Override
+              public SutInfoDto.OutputFormat getPreferredOutputFormat() {
+                  return SutInfoDto.OutputFormat.PYTHON_UNITTEST;
+              }
+          }
+          EOF
+
+      - name: Build Driver
+        run: |
+          cd evomaster-driver
+          mvn clean package
+
+      # 5. Start Driver and Download EvoMaster
+      - name: Start Driver
+        run: |
+          nohup java -jar evomaster-driver/target/evomaster-driver-1.0-SNAPSHOT.jar &
           sleep 10
 
-      # 5. Download and Run EvoMaster
       - name: Download EvoMaster
         run: |
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
@@ -57,7 +177,7 @@ jobs:
     steps:
       # 1. Checkout your repository.
       - name: Checkout Repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
       # 2. Run VAmPI via Docker in vulnerable mode.
       - name: Start VAmPI Container (Vulnerable Mode)
