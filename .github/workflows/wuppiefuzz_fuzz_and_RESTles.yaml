@@ -32,17 +32,86 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
-      # 5. Download and Start Tools
-      - name: Download and Start Tools
+      # 5. Download and Setup Tools
+      - name: Download and Setup Tools
         run: |
           # Download EvoMaster
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
           
-          # Download pre-built driver
-          curl -L -o driver.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster-client-java-controller-3.4.0.jar
+          # Download controller library
+          curl -L -o evomaster-controller.jar https://repo1.maven.org/maven2/org/evomaster/evomaster-client-java-controller/3.4.0/evomaster-client-java-controller-3.4.0.jar
           
-          # Start the driver
-          nohup java -jar driver.jar --sutControllerName VAmPI --outputFormat PYTHON_UNITTEST --sutUrl http://localhost:5000 --resetPath /createdb --openApiPath /openapi_specs/openapi3.yml &
+          # Create driver directory
+          mkdir -p driver/org/vampi
+          
+          # Create driver class
+          cat > driver/org/vampi/VAmPIDriver.java << 'EOF'
+          package org.vampi;
+          
+          import org.evomaster.client.java.controller.EmbeddedSutController;
+          import org.evomaster.client.java.controller.api.dto.AuthenticationDto;
+          import org.evomaster.client.java.controller.api.dto.SutInfoDto;
+          import org.evomaster.client.java.controller.problem.ProblemInfo;
+          import org.evomaster.client.java.controller.problem.RestProblem;
+          import java.util.List;
+          
+          public class VAmPIDriver extends EmbeddedSutController {
+              public static void main(String[] args) {
+                  int port = 40100;
+                  if (args.length > 0) {
+                      port = Integer.parseInt(args[0]);
+                  }
+                  VAmPIDriver controller = new VAmPIDriver();
+                  controller.setControllerPort(port);
+                  controller.startTheControllerServer();
+              }
+          
+              @Override
+              public String startSut() {
+                  return "http://localhost:5000";
+              }
+          
+              @Override
+              public void stopSut() {}
+          
+              @Override
+              public String getPackagePrefixesToCover() {
+                  return "org.vampi";
+              }
+          
+              @Override
+              public void resetStateOfSUT() {
+                  try {
+                      Runtime.getRuntime().exec("curl -s http://localhost:5000/createdb");
+                      Thread.sleep(1000); // Wait for reset to complete
+                  } catch (Exception e) {
+                      e.printStackTrace();
+                  }
+              }
+          
+              @Override
+              public List<AuthenticationDto> getInfoForAuthentication() {
+                  return null;
+              }
+          
+              @Override
+              public ProblemInfo getProblemInfo() {
+                  return new RestProblem("http://localhost:5000/openapi_specs/openapi3.yml");
+              }
+          
+              @Override
+              public SutInfoDto.OutputFormat getPreferredOutputFormat() {
+                  return SutInfoDto.OutputFormat.PYTHON_UNITTEST;
+              }
+          }
+          EOF
+          
+          # Compile driver
+          javac -cp evomaster-controller.jar driver/org/vampi/VAmPIDriver.java
+          
+          # Start driver
+          cd driver
+          nohup java -cp ".:../evomaster-controller.jar" org.vampi.VAmPIDriver 40100 &
           sleep 10
 
       - name: Run EvoMaster White-Box Testing
