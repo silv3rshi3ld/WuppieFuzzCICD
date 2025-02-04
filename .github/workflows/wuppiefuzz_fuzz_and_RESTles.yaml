@@ -40,7 +40,7 @@ jobs:
           args: >-
             --writeWFCReport true
             --blackBox true
-            --bbSwaggerUrl http://localhost:5000/openapi_specs/openapi.json
+            --bbSwaggerUrl http://localhost:5000/openapi.json
             --maxTime 20s
             --showProgress false
             --problemType REST
