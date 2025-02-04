@@ -17,14 +17,15 @@ WORKDIR /restler
 RUN git clone https://github.com/microsoft/restler-fuzzer.git .
 RUN python3 ./build-restler.py --dest_dir /restler_bin
 
-# Stage 2: Create runtime image
-FROM python:3.8-slim
+# Stage 2: Create runtime image with .NET SDK and Python
+FROM mcr.microsoft.com/dotnet/sdk:8.0
 
-# Install runtime dependencies including git (needed for cloning configuration files)
+# Install Python and other dependencies
 RUN apt-get update && apt-get install -y \
-    apt-transport-https \
-    curl \
+    python3 \
+    python3-pip \
     git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the Restler binaries from the builder stage
