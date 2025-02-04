@@ -49,11 +49,11 @@ jobs:
           package org.vampi;
           
           import org.evomaster.client.java.controller.EmbeddedSutController;
-          import org.evomaster.client.java.controller.api.dto.AuthenticationDto;
           import org.evomaster.client.java.controller.api.dto.SutInfoDto;
           import org.evomaster.client.java.controller.problem.ProblemInfo;
           import org.evomaster.client.java.controller.problem.RestProblem;
           import java.util.List;
+          import java.util.Arrays;
           
           public class VAmPIDriver extends EmbeddedSutController {
               public static void main(String[] args) {
@@ -90,18 +90,32 @@ jobs:
               }
           
               @Override
-              public List<AuthenticationDto> getInfoForAuthentication() {
+              public boolean isSutRunning() {
+                  try {
+                      Process p = Runtime.getRuntime().exec("curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/");
+                      int exitCode = p.waitFor();
+                      return exitCode == 0;
+                  } catch (Exception e) {
+                      return false;
+                  }
+              }
+          
+              @Override
+              public List<String> getInfoForAuthentication() {
                   return null;
               }
           
               @Override
               public ProblemInfo getProblemInfo() {
-                  return new RestProblem("http://localhost:5000/openapi_specs/openapi3.yml");
+                  return new RestProblem(
+                      "http://localhost:5000/openapi_specs/openapi3.yml",
+                      Arrays.asList("http://localhost:5000")
+                  );
               }
           
               @Override
               public SutInfoDto.OutputFormat getPreferredOutputFormat() {
-                  return SutInfoDto.OutputFormat.PYTHON_UNITTEST;
+                  return SutInfoDto.OutputFormat.PYTHON_PYTEST;
               }
           }
           EOF
