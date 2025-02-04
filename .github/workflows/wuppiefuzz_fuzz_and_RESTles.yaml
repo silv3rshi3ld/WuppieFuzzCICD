@@ -102,8 +102,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Start VAmPI Container
+        run: |
+          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
+          sleep 10
+
+      - name: Initialize VAmPI Database
+        run: curl -s http://localhost:5000/createdb
+
       - name: Build Restler Docker Image
         run: docker build -f services/restler/Dockerfile.restler -t restler-fuzzer .
+
+      - name: Prepare Restler Environment
+        run: |
+          mkdir -p services/restler/output
+          chmod -R 777 services/restler/output
 
       - name: Run Restler Fuzzing via Docker Compose
         working-directory: services/restler
@@ -112,7 +125,9 @@ jobs:
           TARGET_PORT: 5000
           BASE_DIR: ${{ github.workspace }}
           NETWORK_SUFFIX: ${{ github.run_id }}
-        run: docker compose up --abort-on-container-exit
+        run: |
+          docker compose up --abort-on-container-exit
+          ls -la output || true
 
       - name: Upload Restler Results
         uses: actions/upload-artifact@v4

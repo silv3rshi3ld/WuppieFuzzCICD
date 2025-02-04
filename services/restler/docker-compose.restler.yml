@@ -9,10 +9,12 @@ services:
       RESTLER_TELEMETRY_OPTOUT: "1"
       TARGET_IP: ${TARGET_HOST}
       TARGET_PORT: ${TARGET_PORT}
+      RUN_FUZZ_LEAN: "true"
+      RUN_FUZZ: "false"
+      FUZZ_LEAN_TIME_BUDGET: "0.1"
     volumes:
       - ${BASE_DIR}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      - ${BASE_DIR}/workspace/restler/output:/workspace/output
-
+      - ./output:/workspace/output
     networks:
       - restler_network
 
