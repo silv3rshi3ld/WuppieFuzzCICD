@@ -10,27 +10,34 @@ jobs:
   evomaster:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout repository.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 2. Start VAmPI Container using Docker.
       - name: Start VAmPI Container
         run: |
           docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
           sleep 10
 
+      # 3. Initialize VAmPI Database.
       - name: Initialize VAmPI Database
         run: curl -s http://localhost:5000/createdb
 
+      # 4. Set up Java (using Temurin Java 11).
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: '11'
 
+      # 5. Download EvoMaster jar.
       - name: Download EvoMaster
         run: |
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
 
+      # 6. Run EvoMaster in Blackbox Mode.
+      #    Point to the local OpenAPI file (using the relative path).
       - name: Run EvoMaster in Blackbox Mode
         run: |
           java -jar evomaster.jar \
@@ -41,6 +48,7 @@ jobs:
             --outputFolder generated_tests \
             --ratePerMinute 60
 
+      # 7. Upload the EvoMaster-generated tests as an artifact.
       - name: Upload EvoMaster Results
         uses: actions/upload-artifact@v4
         with:
@@ -50,36 +58,44 @@ jobs:
   wuppiefuzz:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout repository.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 2. Start VAmPI Container (Vulnerable Mode).
       - name: Start VAmPI Container (Vulnerable Mode)
         run: |
           docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
           sleep 10
 
+      # 3. Initialize VAmPI Database.
       - name: Initialize VAmPI Database
         run: curl -s http://localhost:5000/createdb
 
+      # 4. Set up the Rust toolchain.
       - name: Set up Rust Toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
 
+      # 5. Clone the WuppieFuzz repository.
       - name: Clone WuppieFuzz Repository
         run: git clone https://github.com/TNO-S3/WuppieFuzz.git
 
+      # 6. Build WuppieFuzz.
       - name: Build WuppieFuzz
         run: |
           cd WuppieFuzz
           cargo build --release
 
+      # 7. Generate an initial corpus from the local OpenAPI specification.
       - name: Generate Initial Corpus for Fuzzing
         run: |
           cd WuppieFuzz
           ./target/release/wuppiefuzz output-corpus --openapi-spec ../services/vampi/openapi_specs/openapi3.yml corpus_directory
 
+      # 8. Run the WuppieFuzz fuzzing campaign.
       - name: Run WuppieFuzz Fuzzing Campaign
         run: |
           cd WuppieFuzz
@@ -90,6 +106,7 @@ jobs:
             --timeout 60 \
             ../services/vampi/openapi_specs/openapi3.yml
 
+      # 9. Upload the generated fuzzing reports as an artifact.
       - name: Upload Fuzzing Report
         uses: actions/upload-artifact@v4
         with:
@@ -102,14 +119,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 1. Build the Restler Docker image.
+      #    Use the repository root as the build context and specify the Dockerfile path.
       - name: Build Restler Docker Image
-        working-directory: services/restler
-        run: docker build -t restler-fuzzer -f Dockerfile.restler .
+        run: docker build -f services/restler/Dockerfile.restler -t restler-fuzzer .
 
+      # 2. Run Restler via Docker Compose.
+      #    Ensure your docker-compose file maps the local OpenAPI file correctly.
       - name: Run Restler Fuzzing via Docker Compose
         working-directory: services/restler
         run: docker-compose up --abort-on-container-exit
 
+      # 3. Upload Restler results.
       - name: Upload Restler Results
         uses: actions/upload-artifact@v4
         with:
