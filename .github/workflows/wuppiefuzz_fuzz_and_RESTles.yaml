@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz and EvoMaster
 
 on:
   push:
-    branches: [ main ]
+    branches: [ Less-dependent-build ]
   pull_request:
-    branches: [ main ]
+    branches: [ Less-dependent-build ]
 
 jobs:
   evomaster:
