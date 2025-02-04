@@ -102,20 +102,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Build the Restler Docker image.
       - name: Build Restler Docker Image
         working-directory: services/restler
         run: docker build -t restler-fuzzer -f Dockerfile.restler .
 
-      # Run docker-compose to start Restler fuzzer.
-      # Ensure your docker-compose.yml in services/restler has the volume mapping adjusted:
-      # Map the local OpenAPI file to /workspace/openapi3.yml.
       - name: Run Restler Fuzzing via Docker Compose
         working-directory: services/restler
-        run: |
-          docker-compose up --abort-on-container-exit
+        run: docker-compose up --abort-on-container-exit
 
-      # Upload Restler output.
       - name: Upload Restler Results
         uses: actions/upload-artifact@v4
         with:

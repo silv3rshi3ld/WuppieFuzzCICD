@@ -7,11 +7,11 @@ services:
       dockerfile: Dockerfile.restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
-      TARGET_IP: "127.0.0.1"
-      TARGET_PORT: "5000"
+      TARGET_IP: ${TARGET_HOST}
+      TARGET_PORT: ${TARGET_PORT}
     volumes:
-    - ${BASE_DIR}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-    - ${BASE_DIR}/workspace/restler/output:/workspace/output
+      - ${BASE_DIR}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      - ${BASE_DIR}/workspace/restler/output:/workspace/output
     networks:
       - restler_network
 

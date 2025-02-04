@@ -1,27 +1,40 @@
-FROM python:3.8-slim
+# Stage 1: Build Restler using the official .NET SDK image
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS builder
 
-# Install dependencies
+# Install Python3, pip, and other dependencies
 RUN apt-get update && apt-get install -y \
-    wget \
-    apt-transport-https \
+    python3 \
+    python3-pip \
     git \
     curl \
     build-essential \
     libssl-dev \
-    && wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && apt-get update \
-    && apt-get install -y dotnet-sdk-6.0 \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone the official Restler repository
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
+# Clone Restler source code into /restler
+WORKDIR /restler
+RUN git clone https://github.com/microsoft/restler-fuzzer.git .
 
 # Build Restler using the provided Python script
-WORKDIR /restler
-RUN python ./build-restler.py --dest_dir /restler_bin
+RUN python3 ./build-restler.py --dest_dir /restler_bin
 
-# Install RESTler dependencies
+# Stage 2: Create runtime image (you can base on python:3.8-slim or similar)
+FROM python:3.8-slim
+
+# Install any runtime dependencies (if needed)
+RUN apt-get update && apt-get install -y \
+    apt-transport-https \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the Restler binaries from the builder stage
+COPY --from=builder /restler_bin /restler_bin
+
+# Clone the Restler repository (if needed for configuration files)
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
+
+# Install RESTler Python dependencies
 RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
 # Set the working directory
@@ -30,12 +43,12 @@ WORKDIR /workspace
 # Create FuzzLean directory in workspace
 RUN mkdir -p /workspace/FuzzLean
 
-# Copy Restler configuration files and entrypoint
-COPY ./config /service/config
+# Copy your Restler configuration files and entrypoint script
+# (Assuming your entrypoint.sh is in services/restler/config/entrypoint.sh)
+COPY ./services/restler/config /service/config
 
-# Ensure the entrypoint is executable
-RUN chmod +x /service/config/entrypoint.sh && \
-    sed -i 's/\r$//g' /service/config/entrypoint.sh
+# Ensure the entrypoint is executable and fix any line-ending issues.
+RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
 
 # Set the entrypoint
 ENTRYPOINT ["/service/config/entrypoint.sh"]
