@@ -25,116 +25,27 @@ jobs:
         run: |
           curl -s http://localhost:5000/createdb
 
-      # 4. Set up Java and Download Tools
+      # 4. Set up Java
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # 5. Download and Setup Tools
-      - name: Download and Setup Tools
+      # 5. Download and Run EvoMaster
+      - name: Download and Run EvoMaster
         run: |
           # Download EvoMaster
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
           
-          # Download controller library
-          curl -L -o evomaster-controller.jar https://repo1.maven.org/maven2/org/evomaster/evomaster-client-java-controller/3.4.0/evomaster-client-java-controller-3.4.0.jar
-          
-          # Create driver directory
-          mkdir -p driver/org/vampi
-          
-          # Create driver class
-          cat > driver/org/vampi/VAmPIDriver.java << 'EOF'
-          package org.vampi;
-          
-          import org.evomaster.client.java.controller.EmbeddedSutController;
-          import org.evomaster.client.java.controller.api.dto.SutInfoDto;
-          import org.evomaster.client.java.controller.problem.ProblemInfo;
-          import org.evomaster.client.java.controller.problem.RestProblem;
-          import java.util.List;
-          import java.util.Arrays;
-          
-          public class VAmPIDriver extends EmbeddedSutController {
-              public static void main(String[] args) {
-                  int port = 40100;
-                  if (args.length > 0) {
-                      port = Integer.parseInt(args[0]);
-                  }
-                  VAmPIDriver controller = new VAmPIDriver();
-                  controller.setControllerPort(port);
-                  controller.startTheControllerServer();
-              }
-          
-              @Override
-              public String startSut() {
-                  return "http://localhost:5000";
-              }
-          
-              @Override
-              public void stopSut() {}
-          
-              @Override
-              public String getPackagePrefixesToCover() {
-                  return "org.vampi";
-              }
-          
-              @Override
-              public void resetStateOfSUT() {
-                  try {
-                      Runtime.getRuntime().exec("curl -s http://localhost:5000/createdb");
-                      Thread.sleep(1000); // Wait for reset to complete
-                  } catch (Exception e) {
-                      e.printStackTrace();
-                  }
-              }
-          
-              @Override
-              public boolean isSutRunning() {
-                  try {
-                      Process p = Runtime.getRuntime().exec("curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/");
-                      int exitCode = p.waitFor();
-                      return exitCode == 0;
-                  } catch (Exception e) {
-                      return false;
-                  }
-              }
-          
-              @Override
-              public List<String> getInfoForAuthentication() {
-                  return null;
-              }
-          
-              @Override
-              public ProblemInfo getProblemInfo() {
-                  return new RestProblem(
-                      "http://localhost:5000/openapi_specs/openapi3.yml",
-                      Arrays.asList("http://localhost:5000")
-                  );
-              }
-          
-              @Override
-              public SutInfoDto.OutputFormat getPreferredOutputFormat() {
-                  return SutInfoDto.OutputFormat.PYTHON_PYTEST;
-              }
-          }
-          EOF
-          
-          # Compile driver
-          javac -cp evomaster-controller.jar driver/org/vampi/VAmPIDriver.java
-          
-          # Start driver
-          cd driver
-          nohup java -cp ".:../evomaster-controller.jar" org.vampi.VAmPIDriver 40100 &
-          sleep 10
-
-      - name: Run EvoMaster White-Box Testing
-        run: |
+          # Run EvoMaster in black-box mode
           java -jar evomaster.jar \
+            --blackBox true \
+            --bbSwaggerUrl http://localhost:5000/openapi_specs/openapi3.yml \
+            --outputFormat PYTHON_PYTEST \
             --maxTime 1h \
             --outputFolder generated_tests \
-            --sutControllerHost localhost \
-            --sutControllerPort 40100
+            --ratePerMinute 60
 
       # 6. Upload EvoMaster-generated files as an artifact
       - name: Upload EvoMaster Results
