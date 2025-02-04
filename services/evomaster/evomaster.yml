@@ -1,0 +1,15 @@
+# EvoMaster Configuration File
+testTimeoutInSeconds: 60
+maxTimeInSeconds: 3600  # 1 hour
+blackBox: false  # Using white-box testing
+outputFormat: PYTHON_UNITTEST
+testSuiteFileName: "test_vampi"
+maxLengthOfTests: 100
+ratePerMinute: 60
+
+# White-box configuration
+sutControllerHost: "localhost"
+sutControllerPort: 40100
+
+# Output configuration
+outputFolder: "generated_tests"

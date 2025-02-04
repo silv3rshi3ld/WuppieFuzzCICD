@@ -14,36 +14,40 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.2.2
 
-      # 2. Start VAmPI with Docker Compose for EvoMaster
-      - name: Start Docker Compose for EvoMaster
-        run: docker compose -f services/evomaster/docker-compose.evomaster.yml up -d --build
-
-      # 3. Wait for VAmPI to initialize
-      - name: Wait for VAmPI to be healthy
-        run: |
-          timeout 30s bash -c 'until docker container inspect vampi-evomaster --format "{{.State.Health.Status}}" | grep -q healthy; do sleep 1; done'
-
-      # 4. Set up Java and run EvoMaster
+      # 2. Set up Java
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
+      # 3. Build EvoMaster Driver
+      - name: Build EvoMaster Driver
+        run: |
+          cd services/evomaster
+          mvn clean package
+
+      # 4. Download EvoMaster
       - name: Download EvoMaster
         run: |
-          curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v3.4.0/evomaster.jar
+          curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
 
+      # 5. Start EvoMaster Driver
+      - name: Start EvoMaster Driver
+        run: |
+          cd services/evomaster
+          java -jar target/vampi-evomaster-driver-1.0-SNAPSHOT.jar &
+          sleep 10
+
+      # 6. Run EvoMaster White-Box Testing
       - name: Run EvoMaster
         run: |
           java -jar evomaster.jar \
-            --configPath services/vampi/openapi_specs/openapi3.yml \
-            --maxTime 20s \
-            --showProgress false \
+            --configPath services/evomaster/evomaster.yml \
             --outputFormat PYTHON_UNITTEST \
-            --ratePerMinute 60
+            --outputFolder generated_tests
 
-      # 5. Upload EvoMaster-generated files as an artifact
+      # 7. Upload EvoMaster-generated files as an artifact
       - name: Upload EvoMaster Results
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,7 +55,7 @@ jobs:
           name: evomaster-results
           path: ./generated_tests
 
-      # 6. Shut down Docker Compose to stop VAmPI
+      # 8. Shut down Docker Compose to stop VAmPI
       - name: Stop Docker Compose for EvoMaster
         if: always()
         run: docker compose -f services/evomaster/docker-compose.evomaster.yml down
