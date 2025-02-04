@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz and EvoMaster
 
 on:
   push:
-    branches: [ Less-dependent-build]
+    branches: [ Less-dependent-build ]
   pull_request:
-    branches: [ Less-dependent-build]
+    branches: [ Less-dependent-build ]
 
 jobs:
   evomaster:
@@ -25,136 +25,25 @@ jobs:
         run: |
           curl -s http://localhost:5000/createdb
 
-      # 4. Set up Java and Build Driver
+      # 4. Set up Java and Download Tools
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      - name: Create EvoMaster Driver
+      # 5. Download and Start Tools
+      - name: Download and Start Tools
         run: |
-          mkdir -p evomaster-driver/src/main/java/org/vampi
-          cat > evomaster-driver/pom.xml << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <project xmlns="http://maven.apache.org/POM/4.0.0"
-                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.vampi</groupId>
-              <artifactId>evomaster-driver</artifactId>
-              <version>1.0-SNAPSHOT</version>
-              <dependencies>
-                  <dependency>
-                      <groupId>org.evomaster</groupId>
-                      <artifactId>evomaster-client-java-controller</artifactId>
-                      <version>3.4.0</version>
-                  </dependency>
-              </dependencies>
-              <build>
-                  <plugins>
-                      <plugin>
-                          <groupId>org.apache.maven.plugins</groupId>
-                          <artifactId>maven-shade-plugin</artifactId>
-                          <version>3.5.1</version>
-                          <executions>
-                              <execution>
-                                  <phase>package</phase>
-                                  <goals>
-                                      <goal>shade</goal>
-                                  </goals>
-                                  <configuration>
-                                      <transformers>
-                                          <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                              <mainClass>org.vampi.VAmPIDriver</mainClass>
-                                          </transformer>
-                                      </transformers>
-                                  </configuration>
-                              </execution>
-                          </executions>
-                      </plugin>
-                  </plugins>
-              </build>
-              <properties>
-                  <maven.compiler.source>11</maven.compiler.source>
-                  <maven.compiler.target>11</maven.compiler.target>
-              </properties>
-          </project>
-          EOF
-
-          cat > evomaster-driver/src/main/java/org/vampi/VAmPIDriver.java << 'EOF'
-          package org.vampi;
-
-          import org.evomaster.client.java.controller.EmbeddedSutController;
-          import org.evomaster.client.java.controller.api.dto.AuthenticationDto;
-          import org.evomaster.client.java.controller.api.dto.SutInfoDto;
-          import org.evomaster.client.java.controller.problem.ProblemInfo;
-          import org.evomaster.client.java.controller.problem.RestProblem;
-
-          import java.util.List;
-
-          public class VAmPIDriver extends EmbeddedSutController {
-              public static void main(String[] args) {
-                  VAmPIDriver controller = new VAmPIDriver();
-                  controller.startSut();
-              }
-
-              @Override
-              public String startSut() {
-                  return "http://localhost:5000";
-              }
-
-              @Override
-              public void stopSut() {}
-
-              @Override
-              public String getPackagePrefixesToCover() {
-                  return "org.vampi.";
-              }
-
-              @Override
-              public void resetStateOfSUT() {
-                  // Reset database
-                  try {
-                      Runtime.getRuntime().exec("curl -s http://localhost:5000/createdb");
-                  } catch (Exception e) {
-                      e.printStackTrace();
-                  }
-              }
-
-              @Override
-              public List<AuthenticationDto> getInfoForAuthentication() {
-                  return null;
-              }
-
-              @Override
-              public ProblemInfo getProblemInfo() {
-                  return new RestProblem(
-                      "http://localhost:5000/openapi_specs/openapi3.yml"
-                  );
-              }
-
-              @Override
-              public SutInfoDto.OutputFormat getPreferredOutputFormat() {
-                  return SutInfoDto.OutputFormat.PYTHON_UNITTEST;
-              }
-          }
-          EOF
-
-      - name: Build Driver
-        run: |
-          cd evomaster-driver
-          mvn clean package
-
-      # 5. Start Driver and Download EvoMaster
-      - name: Start Driver
-        run: |
-          nohup java -jar evomaster-driver/target/evomaster-driver-1.0-SNAPSHOT.jar &
-          sleep 10
-
-      - name: Download EvoMaster
-        run: |
+          # Download EvoMaster
           curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
+          
+          # Download pre-built driver
+          curl -L -o driver.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster-client-java-controller-3.4.0.jar
+          
+          # Start the driver
+          nohup java -jar driver.jar --sutControllerName VAmPI --outputFormat PYTHON_UNITTEST --sutUrl http://localhost:5000 --resetPath /createdb --openApiPath /openapi_specs/openapi3.yml &
+          sleep 10
 
       - name: Run EvoMaster White-Box Testing
         run: |
