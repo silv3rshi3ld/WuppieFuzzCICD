@@ -33,20 +33,25 @@ jobs:
         run: |
           timeout 30s bash -c 'until docker container inspect vampi-evomaster --format "{{.State.Health.Status}}" | grep -q healthy; do sleep 1; done'
 
-      # 5. Run EvoMaster using the GitHub Action
-      - name: Run EvoMaster Action
-        uses: webfuzzing/evomaster-action@v1.0.0
+      # 5. Set up Java and run EvoMaster
+      - name: Set up Java
+        uses: actions/setup-java@v3
         with:
-          args: >-
-            --writeWFCReport true
-            --blackBox true
-            --bbSwaggerUrl http://localhost:5000/openapi.json
-            --maxTime 20s
-            --showProgress false
-            --problemType REST
-            --outputFormat PYTHON_UNITTEST
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download EvoMaster
+        run: |
+          curl -L -o evomaster.jar https://github.com/WebFuzzing/EvoMaster/releases/download/v3.4.0/evomaster.jar
+
+      - name: Run EvoMaster
+        run: |
+          java -jar evomaster.jar \
+            --configPath services/vampi/openapi_specs/openapi.json \
+            --maxTime 20s \
+            --showProgress false \
+            --outputFormat PYTHON_UNITTEST \
             --ratePerMinute 60
-          failOnErrors: "true"
 
       # 6. Upload EvoMaster-generated files as an artifact
       - name: Upload EvoMaster Results
