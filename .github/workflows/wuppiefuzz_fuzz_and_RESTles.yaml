@@ -107,6 +107,11 @@ jobs:
 
       - name: Run Restler Fuzzing via Docker Compose
         working-directory: services/restler
+        env:
+          TARGET_HOST: localhost
+          TARGET_PORT: 5000
+          BASE_DIR: ${{ github.workspace }}
+          NETWORK_SUFFIX: ${{ github.run_id }}
         run: docker compose up --abort-on-container-exit
 
       - name: Upload Restler Results
