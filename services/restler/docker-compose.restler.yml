@@ -1,14 +1,38 @@
 version: '3.8'
 
 services:
+  vampi:
+    image: erev0s/vampi:latest
+    environment:
+      - vulnerable=1
+    ports:
+      - "5000:5000"
+    networks:
+      - restler_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  init-vampi:
+    image: curlimages/curl:latest
+    command: ["sh", "-c", "sleep 5 && curl -s http://vampi:5000/createdb"]
+    networks:
+      - restler_network
+    depends_on:
+      vampi:
+        condition: service_healthy
+
   restler:
     build:
       context: ../..
       dockerfile: services/restler/Dockerfile.restler
     environment:
       RESTLER_TELEMETRY_OPTOUT: "1"
-      TARGET_IP: ${TARGET_HOST}
-      TARGET_PORT: ${TARGET_PORT}
+      TARGET_IP: "vampi"
+      TARGET_PORT: "5000"
       RUN_FUZZ_LEAN: "true"
       RUN_FUZZ: "false"
       FUZZ_LEAN_TIME_BUDGET: "0.1"
@@ -17,6 +41,9 @@ services:
       - ./output:/workspace/output
     networks:
       - restler_network
+    depends_on:
+      init-vampi:
+        condition: service_completed_successfully
 
 networks:
   restler_network:
