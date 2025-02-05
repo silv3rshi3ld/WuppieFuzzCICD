@@ -10,7 +10,7 @@ services:
     networks:
       - restler_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
       interval: 5s
       timeout: 10s
       retries: 3

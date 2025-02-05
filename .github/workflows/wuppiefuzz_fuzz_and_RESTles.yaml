@@ -99,8 +99,6 @@ jobs:
   restler:
     runs-on: ubuntu-latest
     env:
-      TARGET_IP: localhost
-      TARGET_PORT: 5000
       RUN_FUZZ_LEAN: "true"   # Set to "true" if you want to run fuzz-lean testing
       RUN_FUZZ: "true"        # Set to "true" if you want to run full fuzzing
       BASE_DIR: ${{ github.workspace }}
@@ -114,7 +112,7 @@ jobs:
           mkdir -p services/restler/output
           chmod -R 777 services/restler/output
 
-      - name: Run RESTler Fuzzing
+      - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
