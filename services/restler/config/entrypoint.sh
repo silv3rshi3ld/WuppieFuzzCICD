@@ -4,25 +4,18 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/output /workspace/Compile /workspace/Test /workspace/FuzzLean /workspace/Fuzz
-chmod -R 777 /workspace
+mkdir -p /workspace/output
+chmod 755 /workspace/output
 
 # Change to the workspace directory
 cd /workspace
 
-# Debug: Print working directory and list contents
-pwd
-ls -la
-
-# Debug: Check if OpenAPI file exists and print its contents
+# Debug: Check if OpenAPI file exists
 echo "Checking OpenAPI file..."
 if [ ! -f "/workspace/openapi3.yml" ]; then
     echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
     ls -la /workspace/
     exit 1
-else
-    echo "OpenAPI file found. Contents:"
-    cat /workspace/openapi3.yml
 fi
 
 # Compile API specification
@@ -38,16 +31,9 @@ if [ ! -f "/workspace/Compile/grammar.py" ]; then
     exit 1
 fi
 
-# Display compilation logs with more debug info
+# Display compilation logs
 echo "Compilation logs:"
-echo "Checking Compile directory contents:"
-ls -la /workspace/Compile/
-if [ -f "/workspace/Compile/RestlerCompile.log" ]; then
-    echo "Found compile log. Contents:"
-    cat /workspace/Compile/RestlerCompile.log
-else
-    echo "No compile log found"
-fi
+cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."

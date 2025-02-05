@@ -109,9 +109,8 @@ jobs:
 
       - name: Prepare Environment
         run: |
-          mkdir -p services/restler/{output,Compile,Test,FuzzLean,Fuzz}
-          chmod -R 777 services/restler/
-          ls -la services/restler/
+          mkdir -p services/restler/output
+          chmod -R 777 services/restler/output
 
       - name: Run RESTler and VAmPI
         run: |
@@ -130,4 +129,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: services/restler/output
+          path: workspace/output

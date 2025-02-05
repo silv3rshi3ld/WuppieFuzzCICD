@@ -40,10 +40,6 @@ services:
     volumes:
       - ${BASE_DIR}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
       - ./output:/workspace/output
-      - ./Compile:/workspace/Compile
-      - ./Test:/workspace/Test
-      - ./FuzzLean:/workspace/FuzzLean
-      - ./Fuzz:/workspace/Fuzz
     networks:
       - restler_network
     depends_on:
