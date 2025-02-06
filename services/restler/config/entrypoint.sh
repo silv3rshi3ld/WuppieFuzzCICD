@@ -23,8 +23,7 @@ echo "Compiling API specification..."
 cp /service/config/engine_settings.json /workspace/engine_settings.json
 
 dotnet /restler_bin/restler/Restler.dll compile \
-    --api_spec "/workspace/openapi3.yml" \
-    --settings "/workspace/engine_settings.json"
+    --api_spec "/workspace/openapi3.yml"
 
 # Debug: List compiled files
 echo "Listing /workspace/Compile:"
@@ -35,7 +34,7 @@ echo "Running test phase..."
 dotnet /restler_bin/restler/Restler.dll test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
-    --settings "/workspace/Compile/engine_settings.json" \
+    --settings "/workspace/engine_settings.json" \
     --target_ip "${TARGET_IP}" \
     --target_port "${TARGET_PORT}" \
     --no_ssl
@@ -46,7 +45,7 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     dotnet /restler_bin/restler/Restler.dll fuzz-lean \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/workspace/Compile/engine_settings.json" \
+        --settings "/workspace/engine_settings.json" \
         --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
         --target_ip "${TARGET_IP}" \
         --target_port "${TARGET_PORT}" \
@@ -59,7 +58,7 @@ if [ "${RUN_FUZZ}" = "true" ]; then
     dotnet /restler_bin/restler/Restler.dll fuzz \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/workspace/Compile/engine_settings.json" \
+        --settings "/workspace/engine_settings.json" \
         --time_budget "${FUZZ_TIME_BUDGET}" \
         --target_ip "${TARGET_IP}" \
         --target_port "${TARGET_PORT}" \
