@@ -3,7 +3,7 @@ set -e
 
 # Wait for VAmPI to be ready first
 echo "Waiting for VAmPI to become available..."
-until curl -s -f $TARGET_URL/health >/dev/null; do
+until curl -s -f $TARGET_URL/createdb >/dev/null; do
   echo "VAmPI is not ready yet... retrying in 5s"
   sleep 5
 done
@@ -11,7 +11,12 @@ echo "VAmPI is ready!"
 
 # Convert OpenAPI spec to Restler format (Compile Mode)
 echo "Converting OpenAPI spec to RESTler format..."
-python3.12 /restler/restler/restler.py compile --api_spec "$OPENAPI_SPEC"
+cd /restler/restler
+python restler.py compile --api_spec "$OPENAPI_SPEC"
+
+# Move compiled files to workspace
+mv Compile/grammar.py Compile/engine_settings.json /workspace/
+cd /workspace
 
 # Mode-based execution
 case $MODE in
@@ -21,6 +26,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/test
     ;;
 
@@ -30,6 +37,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/fuzz-lean
     ;;
     
@@ -39,6 +48,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/fuzz
     ;;
     
@@ -50,6 +61,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/test
       
     # Fuzz-lean next
@@ -58,6 +71,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/fuzz-lean
       
     # Full fuzz last
@@ -66,6 +81,8 @@ case $MODE in
       --grammar_file ./grammar.py \
       --settings ./settings.json \
       --target_url $TARGET_URL \
+      --time_budget 1 \
+      --no_ssl \
       --results_dir /workspace/fuzzing_results/fuzz
     ;;
     

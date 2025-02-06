@@ -42,8 +42,13 @@ RUN pip install --no-cache-dir \
 WORKDIR /workspace
 RUN mkdir -p /workspace/fuzzing_results
 
-# Copy entrypoint and config
+# Copy entrypoint, config, and settings
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
+COPY services/restler/config/settings.json /workspace/settings.json
 RUN chmod +x /entrypoint.sh
+
+# Build RESTler
+RUN cd /restler && \
+    python ./build-restler.py --dest /restler/restler
 
 ENTRYPOINT ["/entrypoint.sh"]
