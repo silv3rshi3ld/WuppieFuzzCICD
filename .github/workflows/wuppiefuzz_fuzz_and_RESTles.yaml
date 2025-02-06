@@ -99,8 +99,8 @@ jobs:
   restler:
     runs-on: ubuntu-latest
     env:
-      RUN_FUZZ_LEAN: "true"   # Set to "true" if you want to run fuzz-lean testing
-      RUN_FUZZ: "true"        # Set to "true" if you want to run full fuzzing
+      MODE: "all"  # Run all RESTler modes in sequence
+      # Valid values: test, fuzz-lean, fuzz, all
       BASE_DIR: ${{ github.workspace }}
       NETWORK_SUFFIX: ${{ github.run_id }}
     steps:

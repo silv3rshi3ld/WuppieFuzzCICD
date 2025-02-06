@@ -1,77 +1,62 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
-echo "Starting RESTler Fuzzer..."
+# Convert OpenAPI spec to Restler format (Compile Mode)
+python3.12 /restler/restler/restler.py compile --api_spec "$OPENAPI_SPEC"
 
-# Create and setup output directory
-mkdir -p /workspace/output
-chmod 755 /workspace/output
-
-# Change to workspace directory
-cd /workspace
-
-# Debug: Check if OpenAPI file exists
-echo "Checking OpenAPI file..."
-if [ ! -f "/workspace/openapi3.yml" ]; then
-    echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
-    ls -la /workspace/
-    exit 1
+# Test Mode Validation
+if [ "$MODE" = "test" ] || [ "$MODE" = "all" ]; then
+  echo "Running TEST mode (smoketest)"
+  dotnet /restler/restler/Restler.dll test \
+    --grammar_file ./grammar.py \
+    --settings ./settings.json \
+    --target_url $TARGET_URL \
+    --results_dir /workspace/test_results
 fi
 
-# Step 1: Compile API specification
-echo "Compiling API specification..."
-cp /service/config/engine_settings.json /workspace/engine_settings.json
-
-dotnet /restler_bin/restler/Restler.dll compile \
-    --api_spec "/workspace/openapi3.yml"
-
-# Debug: List compiled files
-echo "Listing /workspace/Compile:"
-ls -la /workspace/Compile/
-
-# Step 2: Run test phase
-echo "Running test phase..."
-dotnet /restler_bin/restler/Restler.dll test \
-    --grammar_file "/workspace/Compile/grammar.py" \
-    --dictionary_file "/workspace/Compile/dict.json" \
-    --settings "/workspace/engine_settings.json" \
-    --target_ip "${TARGET_IP}" \
-    --target_port "${TARGET_PORT}" \
-    --no_ssl
-
-# Step 3: Run fuzz-lean if enabled
-if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
-    echo "Starting fuzz-lean testing..."
-    dotnet /restler_bin/restler/Restler.dll fuzz-lean \
-        --grammar_file "/workspace/Compile/grammar.py" \
-        --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/workspace/engine_settings.json" \
-        --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
-        --target_ip "${TARGET_IP}" \
-        --target_port "${TARGET_PORT}" \
-        --no_ssl
-fi
-
-# Step 4: Run full fuzzing if enabled
-if [ "${RUN_FUZZ}" = "true" ]; then
-    echo "Starting full fuzzing..."
-    dotnet /restler_bin/restler/Restler.dll fuzz \
-        --grammar_file "/workspace/Compile/grammar.py" \
-        --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/workspace/engine_settings.json" \
-        --time_budget "${FUZZ_TIME_BUDGET}" \
-        --target_ip "${TARGET_IP}" \
-        --target_port "${TARGET_PORT}" \
-        --no_ssl
-fi
-
-# Debug: Print debug logs after execution
-echo "Copying results to output directory..."
-for dir in Test FuzzLean Fuzz; do
-    if [ -d "/workspace/${dir}/RestlerResults" ]; then
-        mkdir -p "/workspace/output/${dir}"
-        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
-    fi
+# Wait for VAmPI to be ready
+until curl -s -f $TARGET_URL/health >/dev/null; do
+  echo "Waiting for VAmPI to become available..."
+  sleep 10
 done
 
-echo "RESTler execution completed!"
+# Mode-based execution
+case $MODE in
+  "fuzz-lean")
+    echo "Running FUZZ-LEAN mode"
+    dotnet /restler/restler/Restler.dll fuzz-lean \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url $TARGET_URL \
+      --results_dir /workspace/fuzz_lean_results
+    ;;
+    
+  "fuzz")
+    echo "Running FULL FUZZ mode"
+    dotnet /restler/restler/Restler.dll fuzz \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url $TARGET_URL \
+      --results_dir /workspace/fuzzing_results
+    ;;
+    
+  "all")
+    echo "Running COMPLETE MODE SEQUENCE"
+    # Fuzz-lean first
+    dotnet /restler/restler/Restler.dll fuzz-lean \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url $TARGET_URL \
+      --results_dir /workspace/fuzz_lean_results
+      
+    # Full fuzz after
+    dotnet /restler/restler/Restler.dll fuzz \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url $TARGET_URL \
+      --results_dir /workspace/fuzzing_results
+    ;;
+esac
+
+# Copy results to mounted volume
+cp -r /workspace/*_results/* /results 2>/dev/null || :

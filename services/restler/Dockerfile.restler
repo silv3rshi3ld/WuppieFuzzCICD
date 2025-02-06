@@ -1,65 +1,44 @@
-# Stage 1: Build Restler using the official .NET SDK 8.0 image
+# Stage 1: Build environment
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
 
-# Install Python3, pip, and other dependencies (if needed here)
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    git \
+# Install Python 3.12 and build dependencies
+RUN apt-get update && \
+    apt-get install -y git wget software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get install -y python3.12 python3.12-dev python3.12-venv
+
+# Clone Restler with depth to reduce size
+RUN git clone --depth 1 https://github.com/microsoft/restler-fuzzer /restler
+
+# Stage 2: Runtime environment
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+
+# Install Python 3.12 and runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    jq \
     curl \
-    build-essential \
-    libssl-dev \
-    libicu-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone Restler source code into /restler and build it
-WORKDIR /restler
-RUN git clone https://github.com/microsoft/restler-fuzzer.git .
-RUN python3 ./build-restler.py --dest_dir /restler_bin
+# Copy Restler from builder
+COPY --from=builder /restler /restler
 
-# Stage 2: Create runtime image with .NET SDK and Python
-FROM mcr.microsoft.com/dotnet/sdk:8.0
+# Setup Python environment
+RUN python3.12 -m ensurepip && \
+    pip3.12 install --no-cache-dir \
+    applicationinsights \
+    jsonpickle \
+    requests
 
-# Install Python, pip, and python3-venv along with other dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the Restler binaries from the builder stage
-COPY --from=builder /restler_bin /restler_bin
-
-# Clone the Restler repository (for configuration files if needed)
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
-
-# Create and activate virtual environment
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install RESTler Python dependencies in virtual environment
-RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
-
-# Set the working directory for Restler operations
+# Configure workspace
 WORKDIR /workspace
+RUN mkdir -p /workspace/fuzzing_results
 
-# Create FuzzLean directory in workspace
-RUN mkdir -p /workspace/FuzzLean
+# Copy entrypoint and config
+COPY services/restler/config/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Copy Restler configuration files and entrypoint script
-COPY services/restler/config /service/config
-
-# Add debugging tools
-RUN apt-get update && apt-get install -y \
-    vim \
-    tree \
-    && rm -rf /var/lib/apt/lists/*
-
-# Ensure the entrypoint script is executable and fix line endings
-RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
-
-# Set the entrypoint
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

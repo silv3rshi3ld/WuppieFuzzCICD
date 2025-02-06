@@ -1,52 +1,35 @@
-# No version needed for modern compose files
+version: '3.8'
 
 services:
   vampi:
-    image: erev0s/vampi:latest
-    environment:
-      - vulnerable=1
+    image: vampiserver:latest
     ports:
       - "5000:5000"
     networks:
-      - restler_network
+      - restler-net
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
-      interval: 5s
-      timeout: 10s
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 3
-      start_period: 5s
-
-  init-vampi:
-    image: curlimages/curl:latest
-    command: ["sh", "-c", "sleep 5 && curl -s http://vampi:5000/createdb"]
-    networks:
-      - restler_network
-    depends_on:
-      vampi:
-        condition: service_healthy
 
   restler:
     build:
-      context: ../..
+      context: .
       dockerfile: services/restler/Dockerfile.restler
-    environment:
-      RESTLER_TELEMETRY_OPTOUT: "1"
-      TARGET_IP: "vampi"
-      TARGET_PORT: "5000"
-      RUN_FUZZ_LEAN: "true"
-      RUN_FUZZ: "true"
-      FUZZ_LEAN_TIME_BUDGET: "1.0"
-      FUZZ_TIME_BUDGET: "1.0"
-      DEBUG: "true"  # Added for debugging
-    volumes:
-      - ${BASE_DIR:-..}/services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      - ./output:/workspace/output
-    networks:
-      - restler_network
     depends_on:
-      init-vampi:
-        condition: service_completed_successfully
+      vampi:
+        condition: service_healthy
+    volumes:
+      - ./services/vampi/openapi_specs:/specs
+      - ./fuzzing_results:/workspace/fuzzing_results
+    networks:
+      - restler-net
+    environment:
+      - OPENAPI_SPEC=/specs/openapi3.yml
+      - TARGET_URL=http://vampi:5000
+      - MODE=all  # Run complete mode sequence
 
 networks:
-  restler_network:
-    name: restler_network_${NETWORK_SUFFIX}
+  restler-net:
+    driver: bridge
