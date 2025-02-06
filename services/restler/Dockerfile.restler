@@ -1,65 +1,27 @@
 # Stage 1: Build Restler using the official .NET SDK 8.0 image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
-
-# Manually add deadsnakes repository and install Python3.12 without changing the default python3
-RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/* && \
-    wget -qO - https://keyserver.ubuntu.com/pks/lookup?op=get\&search=0xBA6932366A755776 | apt-key add - && \
-    echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" | tee /etc/apt/sources.list.d/deadsnakes-ppa.list && \
-    apt-get update && \
-    apt-get install -y \
-      python3.12 \
-      python3.12-venv \
-      python3.12-distutils \
-      git \
-      curl \
-      build-essential \
-      libssl-dev \
-      libicu-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /restler
-RUN git clone https://github.com/microsoft/restler-fuzzer.git .
-RUN python3.12 ./build-restler.py --dest_dir /restler_bin
-
-# Stage 2: Create runtime image with .NET SDK and Python
-FROM mcr.microsoft.com/dotnet/sdk:8.0
-
-# Manually add deadsnakes repository and install Python3.12 without changing the default python3
-RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/* && \
-    wget -qO - https://keyserver.ubuntu.com/pks/lookup?op=get\&search=0xBA6932366A755776 | apt-key add - && \
-    echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" | tee /etc/apt/sources.list.d/deadsnakes-ppa.list && \
-    apt-get update && \
-    apt-get install -y \
-      python3.12 \
-      python3.12-venv \
-      python3.12-distutils \
-      git \
-      curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the Restler binaries from the builder stage
-COPY --from=builder /restler_bin /restler_bin
-
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
-
-# Create and activate virtual environment using Python3.12 explicitly
-RUN python3.12 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install RESTler Python dependencies in virtual environment
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 && \
-    pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
-
 WORKDIR /workspace
-RUN mkdir -p /workspace/FuzzLean
+RUN apt-get update && apt-get install -y \
+    git \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-src
+RUN cd /restler-src && python3 ./build-restler.py --dest_dir /restler_bin
 
-COPY ./services/restler/config /service/config
-RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
+# Stage 2: Final runtime image using the .NET ASP.NET 8.0 image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /home/restler
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir requests
+# Copy RESTler build output from the builder stage
+COPY --from=builder /restler_bin /home/restler/
+# Copy RESTler configuration (entrypoint script) to a dedicated directory
+COPY ./services/restler/config /restler_config
+WORKDIR /workspace
+# Set the default command to run the entrypoint script
+ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
