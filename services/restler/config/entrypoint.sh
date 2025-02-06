@@ -27,9 +27,22 @@ head -n 10 /workspace/openapi3.yml || true
 # Compile API specification
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/workspace/openapi3.yml" \
-    --target_ip "${TARGET_IP}" \
-    --target_port "${TARGET_PORT}"
+    --api_spec "/workspace/openapi3.yml"
+
+# Check VAmPI connectivity before proceeding
+echo "Checking VAmPI connectivity..."
+for i in {1..5}; do
+    if curl -s "http://${TARGET_IP}:${TARGET_PORT}/" > /dev/null; then
+        echo "Successfully connected to VAmPI service"
+        break
+    fi
+    if [ $i -eq 5 ]; then
+        echo "Error: Could not connect to VAmPI service after 5 attempts"
+        exit 1
+    fi
+    echo "Attempt $i: Waiting for VAmPI service..."
+    sleep 5
+done
 
 # Verify compilation results
 echo "Checking compilation results..."
@@ -91,21 +104,6 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --target_port "${TARGET_PORT}" \
         --no_ssl
 fi
-
-# Check VAmPI connectivity
-echo "Checking VAmPI connectivity..."
-for i in {1..5}; do
-    if curl -s "http://${TARGET_IP}:${TARGET_PORT}/" > /dev/null; then
-        echo "Successfully connected to VAmPI service"
-        break
-    fi
-    if [ $i -eq 5 ]; then
-        echo "Error: Could not connect to VAmPI service after 5 attempts"
-        exit 1
-    fi
-    echo "Attempt $i: Waiting for VAmPI service..."
-    sleep 5
-done
 
 # Function to check and collect results
 check_results() {
