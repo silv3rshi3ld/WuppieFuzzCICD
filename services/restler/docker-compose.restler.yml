@@ -8,32 +8,22 @@ services:
       - vulnerable=1
     networks:
       - restler-net
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
     command: ["app.py"]  # Use CMD array format to work with ENTRYPOINT
 
   init-vampi:
     image: curlimages/curl:latest
     depends_on:
-      vampi:
-        condition: service_healthy
+      - vampi
     networks:
       - restler-net
-    command: ["sh", "-c", "curl -s http://vampi:5000/createdb"]
+    command: ["sh", "-c", "until curl -s http://vampi:5000/createdb; do sleep 2; done"]
 
   restler:
     build:
       context: ../..
       dockerfile: services/restler/Dockerfile.restler
     depends_on:
-      init-vampi:
-        condition: service_completed_successfully
-      vampi:
-        condition: service_healthy
+      - init-vampi
     volumes:
       - ../../services/vampi/openapi_specs:/specs
       - ./output:/workspace/fuzzing_results
