@@ -1,23 +1,26 @@
 # Stage 1: Build Restler using the official .NET SDK 8.0 image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
 
-# Install Python3.12 (without overriding the default python3) and necessary dependencies
+# Manually add deadsnakes repository and install Python3.12 without changing the default python3
 RUN apt-get update && apt-get install -y \
-    software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
+    software-properties-common \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/* && \
+    wget -qO - https://keyserver.ubuntu.com/pks/lookup?op=get\&search=0xBA6932366A755776 | apt-key add - && \
+    echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" | tee /etc/apt/sources.list.d/deadsnakes-ppa.list && \
     apt-get update && \
     apt-get install -y \
-    python3.12 \
-    python3.12-venv \
-    python3.12-distutils \
-    git \
-    curl \
-    build-essential \
-    libssl-dev \
-    libicu-dev && \
-    rm -rf /var/lib/apt/lists/*
+      python3.12 \
+      python3.12-venv \
+      python3.12-distutils \
+      git \
+      curl \
+      build-essential \
+      libssl-dev \
+      libicu-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Use python3.12 explicitly when building Restler
 WORKDIR /restler
 RUN git clone https://github.com/microsoft/restler-fuzzer.git .
 RUN python3.12 ./build-restler.py --dest_dir /restler_bin
@@ -25,21 +28,29 @@ RUN python3.12 ./build-restler.py --dest_dir /restler_bin
 # Stage 2: Create runtime image with .NET SDK and Python
 FROM mcr.microsoft.com/dotnet/sdk:8.0
 
-# Install Python3.12 (without changing the default python3) and required dependencies
+# Manually add deadsnakes repository and install Python3.12 without changing the default python3
 RUN apt-get update && apt-get install -y \
-    software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
+    software-properties-common \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/* && \
+    wget -qO - https://keyserver.ubuntu.com/pks/lookup?op=get\&search=0xBA6932366A755776 | apt-key add - && \
+    echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu focal main" | tee /etc/apt/sources.list.d/deadsnakes-ppa.list && \
     apt-get update && \
     apt-get install -y \
-    python3.12 \
-    python3.12-venv \
-    python3.12-distutils \
-    git \
-    curl && \
-    rm -rf /var/lib/apt/lists/*
+      python3.12 \
+      python3.12-venv \
+      python3.12-distutils \
+      git \
+      curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Use python3 for general tasks (ensuring Vampi still uses its modern default)
-# Create and activate virtual environment using python3.12 explicitly
+# Copy the Restler binaries from the builder stage
+COPY --from=builder /restler_bin /restler_bin
+
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
+
+# Create and activate virtual environment using Python3.12 explicitly
 RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
@@ -47,12 +58,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 && \
     pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Copy the Restler binaries from builder stage
-COPY --from=builder /restler_bin /restler_bin
-
-# The rest remains unchanged...
 WORKDIR /workspace
 RUN mkdir -p /workspace/FuzzLean
+
 COPY ./services/restler/config /service/config
 RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
-ENTRYPOINT ["/service/config/entrypoint.sh"]
