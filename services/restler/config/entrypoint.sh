@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
-# Convert OpenAPI spec to Restler format (Compile Mode)
+# Convert OpenAPI spec to Restler format
 echo "Converting OpenAPI spec to RESTler format..."
 cd /restler/restler/
-python restler.py compile --api_spec "$OPENAPI_SPEC"
+python ./restler.py compile \
+  --api_spec "$OPENAPI_SPEC" \
+  --set_version 1.0 \
+  --settings /workspace/settings.json
 
 # Move compiled files to workspace
+mkdir -p /workspace/Compile
 cp -r Compile/* /workspace/
 cd /workspace
 
