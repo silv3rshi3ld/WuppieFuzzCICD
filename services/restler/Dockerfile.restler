@@ -1,27 +1,60 @@
 # Stage 1: Build Restler using the official .NET SDK 8.0 image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
-WORKDIR /workspace
-RUN apt-get update && apt-get install -y \
-    git \
-    python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-src
-RUN cd /restler-src && python3 ./build-restler.py --dest_dir /restler_bin
 
-# Stage 2: Final runtime image using the .NET ASP.NET 8.0 image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
-WORKDIR /home/restler
+# Install Python3, pip, and other dependencies (if needed here)
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
+    python3-venv \
+    git \
+    curl \
+    build-essential \
+    libssl-dev \
+    libicu-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone Restler source code into /restler and build it
+WORKDIR /restler
+RUN git clone https://github.com/microsoft/restler-fuzzer.git .
+RUN python3 ./build-restler.py --dest_dir /restler_bin
+
+# Stage 2: Create runtime image with .NET SDK and Python
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+
+# Install Python, pip, and python3-venv along with other dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
     curl \
     && rm -rf /var/lib/apt/lists/*
-RUN pip3 install --no-cache-dir requests
-# Copy RESTler build output from the builder stage
-COPY --from=builder /restler_bin /home/restler/
-# Copy RESTler configuration (entrypoint script) to a dedicated directory
-COPY ./services/restler/config /restler_config
+
+# Copy the Restler binaries from the builder stage
+COPY --from=builder /restler_bin /restler_bin
+
+# Clone the Restler repository (for configuration files if needed)
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
+
+# Create and activate virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install RESTler Python dependencies in virtual environment
+RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
+
+# Set the working directory for Restler operations
 WORKDIR /workspace
-# Set the default command to run the entrypoint script
-ENTRYPOINT ["sh", "/restler_config/entrypoint.sh"]
+
+# Create FuzzLean directory in workspace
+RUN mkdir -p /workspace/FuzzLean
+
+# Copy Restler configuration files and entrypoint script
+# (Assuming your entrypoint script is located at services/restler/config/entrypoint.sh in your repo)
+COPY ./services/restler/config /service/config
+
+# Ensure the entrypoint script is executable and fix line endings
+RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/service/config/entrypoint.sh"]
