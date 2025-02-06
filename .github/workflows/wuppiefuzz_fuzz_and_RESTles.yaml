@@ -47,6 +47,38 @@ jobs:
           name: evomaster-results
           path: generated_tests
 
+  restler-fuzz:
+    runs-on: ubuntu-latest
+    needs: evomaster
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Start VAmPI Container
+        run: |
+          docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
+          sleep 30  # Give more time for initialization
+
+      - name: Initialize VAmPI Database
+        run: curl --retry 5 --retry-delay 10 -s http://localhost:5000/createdb
+
+      - name: Run RESTler Fuzzer
+        run: |
+          docker-compose -f services/restler/docker-compose.restler.yml build
+          docker-compose -f services/restler/docker-compose.restler.yml up \
+            --abort-on-container-exit \
+            --exit-code-from restler \
+            --timeout 1800
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_HTTP_TIMEOUT: 300
+
+      - name: Upload RESTler Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-results
+          path: services/restler/output
+
   wuppiefuzz:
     runs-on: ubuntu-latest
     steps:

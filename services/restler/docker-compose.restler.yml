@@ -8,11 +8,11 @@ services:
     networks:
       - restler-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/ || exit 1"]
+      start_period: 40s
       interval: 10s
       timeout: 5s
       retries: 3
-
   restler:
     build:
       context: ../..
