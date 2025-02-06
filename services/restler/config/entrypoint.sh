@@ -4,159 +4,133 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/output
-chmod 755 /workspace/output
-
-# Copy engine settings
-cp /service/config/engine_settings.json /workspace/
+mkdir -p /workspace/output /workspace/Compile /workspace/Test /workspace/FuzzLean /workspace/Fuzz
+chmod 755 /workspace/output /workspace/Compile /workspace/Test /workspace/FuzzLean /workspace/Fuzz
 
 # Change to the workspace directory
 cd /workspace
 
-# Debug: Check workspace and OpenAPI file
-echo "Checking workspace structure..."
-tree /workspace || true
-
+# Debug: Check if OpenAPI file exists and is readable
 echo "Checking OpenAPI file..."
-if [ ! -f "/workspace/openapi3.yml" ]; then
+echo "Current working directory: $(pwd)"
+echo "Workspace contents:"
+ls -la /workspace/
+echo "OpenAPI file details:"
+if [ -f "/workspace/openapi3.yml" ]; then
+    ls -la /workspace/openapi3.yml
+    echo "File permissions:"
+    stat /workspace/openapi3.yml
+    echo "File contents (first few lines):"
+    head -n 5 /workspace/openapi3.yml
+    # Ensure file is readable
+    chmod 644 /workspace/openapi3.yml
+else
     echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
-    ls -la /workspace/
+    echo "Current directory structure:"
+    find /workspace -type f -ls
     exit 1
 fi
 
-echo "OpenAPI file contents (first 10 lines):"
-head -n 10 /workspace/openapi3.yml || true
+# First generate the config file
+echo "Generating RESTler config..."
+dotnet /restler_bin/restler/Restler.dll generate_config \
+    --specs "/workspace/openapi3.yml" \
+    --output_dir "/workspace/Compile"
 
-# Compile API specification
+# Check config generation status
+CONFIG_STATUS=$?
+if [ $CONFIG_STATUS -ne 0 ]; then
+    echo "Config generation failed with status: $CONFIG_STATUS"
+    echo "Checking workspace directory after failed config generation:"
+    find /workspace -type f -ls
+    exit $CONFIG_STATUS
+fi
+
+# Display generated config
+echo "Generated config file:"
+cat /workspace/Compile/config.json
+
+# Compile using the generated config
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/workspace/openapi3.yml" \
-    --settings "/workspace/engine_settings.json"
+echo "RESTler binary location:"
+ls -la /restler_bin/restler/Restler.dll
 
-# Verify compilation results
-echo "Checking compilation results..."
-if [ ! -d "/workspace/Compile" ]; then
-    echo "Error: Compile directory not created!"
-    exit 1
+echo "Starting compilation..."
+dotnet /restler_bin/restler/Restler.dll compile \
+    "/workspace/Compile/config.json" \
+    --workingDirPath "/workspace/Compile"
+
+# Check compilation exit status
+COMPILE_STATUS=$?
+if [ $COMPILE_STATUS -ne 0 ]; then
+    echo "Compilation failed with status: $COMPILE_STATUS"
+    echo "Checking workspace directory after failed compilation:"
+    find /workspace -type f -ls
+    exit $COMPILE_STATUS
 fi
 
-echo "Compile directory contents:"
-ls -la /workspace/Compile || true
+# Display generated files
+echo "Generated files in Compile directory:"
+ls -la /workspace/Compile/
 
-if [ ! -f "/workspace/Compile/grammar.py" ]; then
+# Verify grammar file exists in Compile directory
+if [ ! -f "/workspace/Compile/RestlerGrammar/grammar.py" ]; then
     echo "Error: Grammar file was not generated!"
-    echo "Compilation logs:"
-    cat /workspace/Compile/RestlerCompile.log || echo "No compile log found"
-    echo "Engine settings:"
-    cat /workspace/Compile/engine_settings.json || echo "No engine settings found"
+    echo "Checking Compile directory contents:"
+    ls -la /workspace/Compile
     exit 1
 fi
 
-echo "Grammar file preview (first 20 lines):"
-head -n 20 /workspace/Compile/grammar.py || true
-
+# Display compilation logs
 echo "Compilation logs:"
-cat /workspace/Compile/RestlerCompile.log || echo "No compile log found"
+cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
-    --grammar_file "/workspace/Compile/grammar.py" \
-    --dictionary_file "/workspace/Compile/dict.json" \
+dotnet /restler_bin/restler/Restler.dll test \
+    --grammar_file "/workspace/Compile/RestlerGrammar/grammar.py" \
+    --dictionary_file "/workspace/Compile/RestlerGrammar/dict.json" \
     --settings "/workspace/Compile/engine_settings.json" \
     --target_ip "${TARGET_IP}" \
     --target_port "${TARGET_PORT}" \
-    --no_ssl
+    --no_ssl \
+    --workingDirPath "/workspace/Test"
 
 # Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
-    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
-        --grammar_file "/workspace/Compile/grammar.py" \
-        --dictionary_file "/workspace/Compile/dict.json" \
+    dotnet /restler_bin/restler/Restler.dll fuzz-lean \
+        --grammar_file "/workspace/Compile/RestlerGrammar/grammar.py" \
+        --dictionary_file "/workspace/Compile/RestlerGrammar/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
         --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
         --target_ip "${TARGET_IP}" \
         --target_port "${TARGET_PORT}" \
-        --no_ssl
+        --no_ssl \
+        --workingDirPath "/workspace/FuzzLean"
 fi
 
 # Run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
-    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \
-        --grammar_file "/workspace/Compile/grammar.py" \
-        --dictionary_file "/workspace/Compile/dict.json" \
+    dotnet /restler_bin/restler/Restler.dll fuzz \
+        --grammar_file "/workspace/Compile/RestlerGrammar/grammar.py" \
+        --dictionary_file "/workspace/Compile/RestlerGrammar/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
         --time_budget "${FUZZ_TIME_BUDGET}" \
         --target_ip "${TARGET_IP}" \
         --target_port "${TARGET_PORT}" \
-        --no_ssl
+        --no_ssl \
+        --workingDirPath "/workspace/Fuzz"
 fi
 
-# Function to check and collect results
-check_results() {
-    local phase=$1
-    echo "Checking ${phase} results..."
-    if [ -d "/workspace/${phase}/RestlerResults" ]; then
-        echo "${phase} results found:"
-        ls -la "/workspace/${phase}/RestlerResults"
-        
-        echo "Copying ${phase} results..."
-        mkdir -p "/workspace/output/${phase}"
-        cp -r "/workspace/${phase}/RestlerResults" "/workspace/output/${phase}/"
-        
-        echo "Network logs for ${phase}:"
-        cat "/workspace/${phase}/RestlerResults/network.txt" || echo "No network logs found"
-        
-        echo "Bug buckets for ${phase}:"
-        cat "/workspace/${phase}/RestlerResults/bug_buckets/bug_buckets.txt" || echo "No bug buckets found"
-    else
-        echo "Warning: No results found for ${phase}"
+# Copy results to output directory
+echo "Copying results to output directory..."
+for dir in Test FuzzLean Fuzz; do
+    if [ -d "/workspace/${dir}/RestlerResults" ]; then
+        mkdir -p "/workspace/output/${dir}"
+        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
     fi
-}
-
-# Check VAmPI connectivity
-echo "Checking VAmPI connectivity..."
-for i in {1..5}; do
-    if curl -s "http://${TARGET_IP}:${TARGET_PORT}/" > /dev/null; then
-        echo "Successfully connected to VAmPI service"
-        break
-    fi
-    if [ $i -eq 5 ]; then
-        echo "Error: Could not connect to VAmPI service after 5 attempts"
-        exit 1
-    fi
-    echo "Attempt $i: Waiting for VAmPI service..."
-    sleep 5
 done
-
-# Copy results and logs
-echo "Collecting results..."
-for phase in Test FuzzLean Fuzz; do
-    check_results $phase
-done
-
-# Create summary report
-echo "Creating summary report..."
-{
-    echo "RESTler Execution Summary"
-    echo "========================"
-    echo "Date: $(date)"
-    echo ""
-    echo "OpenAPI Spec: $(head -n 1 /workspace/openapi3.yml)"
-    echo ""
-    echo "Results Overview:"
-    for phase in Test FuzzLean Fuzz; do
-        echo "${phase}:"
-        if [ -d "/workspace/${phase}/RestlerResults" ]; then
-            echo "- Completed"
-            echo "- Bug buckets: $(find "/workspace/${phase}/RestlerResults/bug_buckets" -type f | wc -l)"
-        else
-            echo "- No results"
-        fi
-    done
-} > "/workspace/output/summary.txt"
 
 echo "RESTler execution completed!"
-echo "Summary report available in /workspace/output/summary.txt"
