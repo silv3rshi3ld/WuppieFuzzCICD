@@ -1,13 +1,13 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "Starting RESTler Fuzzer..."
 
-# Create output directory
+# Create and setup output directory
 mkdir -p /workspace/output
 chmod 755 /workspace/output
 
-# Change to the workspace directory
+# Change to workspace directory
 cd /workspace
 
 # Debug: Check if OpenAPI file exists
@@ -20,14 +20,17 @@ fi
 
 # Step 1: Compile API specification
 echo "Compiling API specification..."
-# Copy engine settings to workspace
 cp /service/config/engine_settings.json /workspace/engine_settings.json
 
 dotnet /restler_bin/restler/Restler.dll compile \
     --api_spec "/workspace/openapi3.yml" \
     --settings "/workspace/engine_settings.json"
 
-# Step 2: Test phase
+# Debug: List compiled files
+echo "Listing /workspace/Compile:"
+ls -la /workspace/Compile/
+
+# Step 2: Run test phase
 echo "Running test phase..."
 dotnet /restler_bin/restler/Restler.dll test \
     --grammar_file "/workspace/Compile/grammar.py" \
@@ -63,7 +66,7 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --no_ssl
 fi
 
-# Copy results to output directory
+# Debug: Print debug logs after execution
 echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
     if [ -d "/workspace/${dir}/RestlerResults" ]; then
