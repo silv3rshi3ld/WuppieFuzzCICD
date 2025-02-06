@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    command: python app.py  # Explicitly set the command to keep container running
+    command: ["app.py"]  # Use CMD array format to work with ENTRYPOINT
 
   init-vampi:
     image: curlimages/curl:latest
