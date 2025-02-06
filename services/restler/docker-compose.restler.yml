@@ -1,6 +1,9 @@
+version: '3.8'
+
 services:
   vampi:
     image: erev0s/vampi:latest
+    container_name: vampi-restler
     ports:
       - "5000:5000"
     environment:
@@ -8,30 +11,31 @@ services:
     networks:
       - restler-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/createdb || exit 1"]
-      start_period: 40s
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
+      start_period: 10s
+    command: python app.py  # Explicitly set the command to keep container running
 
   init-vampi:
     image: curlimages/curl:latest
     depends_on:
       vampi:
-        condition: service_started
+        condition: service_healthy
     networks:
       - restler-net
-    command: ["sh", "-c", "sleep 10 && curl -s http://vampi:5000/createdb"]
+    command: ["sh", "-c", "curl -s http://vampi:5000/createdb"]
 
   restler:
     build:
       context: ../..
       dockerfile: services/restler/Dockerfile.restler
     depends_on:
-      vampi:
-        condition: service_healthy
       init-vampi:
         condition: service_completed_successfully
+      vampi:
+        condition: service_healthy
     volumes:
       - ../../services/vampi/openapi_specs:/specs
       - ./output:/workspace/fuzzing_results
@@ -40,7 +44,7 @@ services:
     environment:
       - OPENAPI_SPEC=/specs/openapi3.yml
       - TARGET_URL=http://vampi:5000
-      - MODE=all  # Run complete mode sequence
+      - MODE=all
 
 networks:
   restler-net:
