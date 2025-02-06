@@ -1,75 +1,58 @@
 # Stage 1: Build Restler using the official .NET SDK 8.0 image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
 
-# Install dependencies and Python 3.12.8 from deadsnakes PPA
-RUN apt-get update && \
-    apt-get install -y software-properties-common && \
+# Install Python3.12 (without overriding the default python3) and necessary dependencies
+RUN apt-get update && apt-get install -y \
+    software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && \
     apt-get install -y \
-        python3.12 \
-        python3.12-venv \
-        python3.12-distutils \
-        git \
-        curl \
-        build-essential \
-        libssl-dev \
-        libicu-dev && \
-    rm -rf /var/lib/apt/lists/* && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+    python3.12 \
+    python3.12-venv \
+    python3.12-distutils \
+    git \
+    curl \
+    build-essential \
+    libssl-dev \
+    libicu-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Verify pip installation for Python 3.12 (install if missing)
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3
-
-# Clone Restler source code into /restler and build it
+# Use python3.12 explicitly when building Restler
 WORKDIR /restler
-RUN git clone https://github.com/microsoft/restler-fuzzer.git . && \
-    python3 ./build-restler.py --dest_dir /restler_bin
+RUN git clone https://github.com/microsoft/restler-fuzzer.git .
+RUN python3.12 ./build-restler.py --dest_dir /restler_bin
 
-# Stage 2: Create runtime image with .NET SDK and Python 3.12.8
+# Stage 2: Create runtime image with .NET SDK and Python
 FROM mcr.microsoft.com/dotnet/sdk:8.0
 
-# Install dependencies and Python 3.12.8 from deadsnakes PPA
-RUN apt-get update && \
-    apt-get install -y software-properties-common && \
+# Install Python3.12 (without changing the default python3) and required dependencies
+RUN apt-get update && apt-get install -y \
+    software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && \
     apt-get install -y \
-        python3.12 \
-        python3.12-venv \
-        python3.12-distutils \
-        git \
-        curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+    python3.12 \
+    python3.12-venv \
+    python3.12-distutils \
+    git \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Verify pip installation for Python 3.12 (install if missing)
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3
-
-# Copy the Restler binaries from the builder stage
-COPY --from=builder /restler_bin /restler_bin
-
-# Clone the Restler repository for configuration files, if needed
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
-
-# Create and activate virtual environment
-RUN python3 -m venv /opt/venv
+# Use python3 for general tasks (ensuring Vampi still uses its modern default)
+# Create and activate virtual environment using python3.12 explicitly
+RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install RESTler Python dependencies in virtual environment
-RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 && \
+    pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Set the working directory for Restler operations
+# Copy the Restler binaries from builder stage
+COPY --from=builder /restler_bin /restler_bin
+
+# The rest remains unchanged...
 WORKDIR /workspace
-
-# Create FuzzLean directory in workspace
 RUN mkdir -p /workspace/FuzzLean
-
-# Copy Restler configuration files and entrypoint script
 COPY ./services/restler/config /service/config
-
-# Ensure the entrypoint script is executable and fix line endings
 RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
-
-# Set the entrypoint
 ENTRYPOINT ["/service/config/entrypoint.sh"]
