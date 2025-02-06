@@ -17,14 +17,14 @@ services:
 
   restler:
     build:
-      context: .
+      context: ../..
       dockerfile: services/restler/Dockerfile.restler
     depends_on:
       vampi:
         condition: service_healthy
     volumes:
-      - ./services/vampi/openapi_specs:/specs
-      - ./services/restler/output:/workspace/fuzzing_results
+      - ../../services/vampi/openapi_specs:/specs
+      - ./output:/workspace/fuzzing_results
     networks:
       - restler-net
     environment:
