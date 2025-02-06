@@ -2,9 +2,11 @@ version: '3.8'
 
 services:
   vampi:
-    image: vampiserver:latest
+    image: erev0s/vampi:latest
     ports:
       - "5000:5000"
+    environment:
+      - vulnerable=1
     networks:
       - restler-net
     healthcheck:
@@ -22,7 +24,7 @@ services:
         condition: service_healthy
     volumes:
       - ./services/vampi/openapi_specs:/specs
-      - ./fuzzing_results:/workspace/fuzzing_results
+      - ./services/restler/output:/workspace/fuzzing_results
     networks:
       - restler-net
     environment:
