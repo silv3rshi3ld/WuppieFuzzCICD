@@ -8,11 +8,21 @@ services:
     networks:
       - restler-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/createdb || exit 1"]
       start_period: 40s
       interval: 10s
       timeout: 5s
       retries: 3
+
+  init-vampi:
+    image: curlimages/curl:latest
+    depends_on:
+      vampi:
+        condition: service_started
+    networks:
+      - restler-net
+    command: ["sh", "-c", "sleep 10 && curl -s http://vampi:5000/createdb"]
+
   restler:
     build:
       context: ../..
@@ -20,6 +30,8 @@ services:
     depends_on:
       vampi:
         condition: service_healthy
+      init-vampi:
+        condition: service_completed_successfully
     volumes:
       - ../../services/vampi/openapi_specs:/specs
       - ./output:/workspace/fuzzing_results
