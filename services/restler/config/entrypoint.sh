@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Convert OpenAPI spec to Restler format
 echo "Converting OpenAPI spec to RESTler format..."
@@ -7,7 +7,8 @@ cd /restler/restler/
 python ./restler.py compile \
   --api_spec "$OPENAPI_SPEC" \
   --set_version 1.0 \
-  --settings /workspace/settings.json
+  --settings /workspace/settings.json \
+  --host "$TARGET_URL"
 
 # Move compiled files to workspace
 mkdir -p /workspace/Compile
