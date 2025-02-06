@@ -1,56 +1,93 @@
 #!/bin/bash
-set -euo pipefail
+set -e
 
-# Convert OpenAPI spec to Restler format
+# Wait for VAmPI to be ready first
+echo "Waiting for VAmPI to become available..."
+until curl -s -f "$TARGET_URL"/ >/dev/null; do
+  echo "VAmPI is not ready yet... retrying in 5s"
+  sleep 5
+done
+echo "VAmPI is ready!"
+
+# Convert OpenAPI spec to RESTler format (Compile Mode)
 echo "Converting OpenAPI spec to RESTler format..."
 cd /restler/restler/
-python ./restler.py compile \
-  --api_spec "$OPENAPI_SPEC" \
-  --set_version 1.0 \
-  --settings /workspace/settings.json \
-  --host "$TARGET_URL"
+python restler.py compile --api_spec "$OPENAPI_SPEC"
 
 # Move compiled files to workspace
-mkdir -p /workspace/Compile
 cp -r Compile/* /workspace/
 cd /workspace
 
-# Define common RESTler parameters
-RESTLER_ARGS="--grammar_file ./grammar.py \
-  --settings ./settings.json \
-  --target_url $TARGET_URL \
-  --time_budget 1 \
-  --no_ssl \
-  --no_tokens_in_logs"
-
-run_restler() {
-  local mode=$1
-  echo "Running $mode mode..."
-  dotnet /restler/restler/engine/Restler.dll $mode $RESTLER_ARGS \
-    --results_dir "/workspace/fuzzing_results/${mode,,}"
-}
-
 # Mode-based execution
-case $MODE in
+case "$MODE" in
   "test")
-    run_restler "test"
+    echo "Running TEST mode (smoketest)"
+    dotnet /restler/restler/engine/Restler.dll test \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/test
     ;;
+  
   "fuzz-lean")
-    run_restler "fuzz-lean"
+    echo "Running FUZZ-LEAN mode"
+    dotnet /restler/restler/engine/Restler.dll fuzz-lean \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/fuzz-lean
     ;;
+    
   "fuzz")
-    run_restler "fuzz"
+    echo "Running FULL FUZZ mode"
+    dotnet /restler/restler/engine/Restler.dll fuzz \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/fuzz
     ;;
+    
   "all")
-    echo "Running COMPLETE MODE SEQUENCE"
-    run_restler "test"
-    run_restler "fuzz-lean"
-    run_restler "fuzz"
+    echo "Running ALL modes: test, fuzz-lean, and full fuzz sequentially"
+    dotnet /restler/restler/engine/Restler.dll test \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/test
+
+    dotnet /restler/restler/engine/Restler.dll fuzz-lean \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/fuzz-lean
+
+    dotnet /restler/restler/engine/Restler.dll fuzz \
+      --grammar_file ./grammar.py \
+      --settings ./settings.json \
+      --target_url "$TARGET_URL" \
+      --time_budget 1 \
+      --no_ssl \
+      --no_tokens_in_logs \
+      --results_dir /workspace/fuzzing_results/fuzz
     ;;
+    
   *)
-    echo "Error: Invalid MODE specified. Valid values are: test, fuzz-lean, fuzz, all"
+    echo "Unknown mode: $MODE"
     exit 1
     ;;
 esac
-
-echo "RESTler execution completed successfully!"
