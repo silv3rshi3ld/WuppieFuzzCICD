@@ -27,7 +27,9 @@ head -n 10 /workspace/openapi3.yml || true
 # Compile API specification
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/workspace/openapi3.yml"
+    --api_spec "/workspace/openapi3.yml" \
+    --target_ip "${TARGET_IP}" \
+    --target_port "${TARGET_PORT}"
 
 # Verify compilation results
 echo "Checking compilation results..."
