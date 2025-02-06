@@ -8,7 +8,7 @@ on:
 
 jobs:
   evomaster:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
           path: generated_tests
 
   wuppiefuzz:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
           path: WuppieFuzz/reports/
 
   restler:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     env:
       RUN_FUZZ_LEAN: "true"   # Set to "true" if you want to run fuzz-lean testing
       RUN_FUZZ: "true"        # Set to "true" if you want to run full fuzzing
