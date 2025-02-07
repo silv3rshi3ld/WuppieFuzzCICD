@@ -1,93 +1,25 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
-# Wait for VAmPI to be ready first
-echo "Waiting for VAmPI to become available..."
-until curl -s -f "$TARGET_URL"/ >/dev/null; do
-  echo "VAmPI is not ready yet... retrying in 5s"
-  sleep 5
-done
-echo "VAmPI is ready!"
-
-# Convert OpenAPI spec to RESTler format (Compile Mode)
-echo "Converting OpenAPI spec to RESTler format..."
-cd /restler/restler/
-python restler.py compile --api_spec "$OPENAPI_SPEC"
-
-# Move compiled files to workspace
-cp -r Compile/* /workspace/
-cd /workspace
-
-# Mode-based execution
-case "$MODE" in
-  "test")
-    echo "Running TEST mode (smoketest)"
-    dotnet /restler/restler/engine/Restler.dll test \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/test
-    ;;
-  
-  "fuzz-lean")
-    echo "Running FUZZ-LEAN mode"
-    dotnet /restler/restler/engine/Restler.dll fuzz-lean \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/fuzz-lean
-    ;;
-    
-  "fuzz")
-    echo "Running FULL FUZZ mode"
-    dotnet /restler/restler/engine/Restler.dll fuzz \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/fuzz
-    ;;
-    
-  "all")
-    echo "Running ALL modes: test, fuzz-lean, and full fuzz sequentially"
-    dotnet /restler/restler/engine/Restler.dll test \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/test
-
-    dotnet /restler/restler/engine/Restler.dll fuzz-lean \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/fuzz-lean
-
-    dotnet /restler/restler/engine/Restler.dll fuzz \
-      --grammar_file ./grammar.py \
-      --settings ./settings.json \
-      --target_url "$TARGET_URL" \
-      --time_budget 1 \
-      --no_ssl \
-      --no_tokens_in_logs \
-      --results_dir /workspace/fuzzing_results/fuzz
-    ;;
-    
-  *)
-    echo "Unknown mode: $MODE"
-    exit 1
-    ;;
-esac
+# If no arguments are provided, run the full workflow (compile -> test -> fuzz-lean -> fuzz)
+if [ "$#" -eq 0 ]; then
+  echo "No mode specified. Running full RESTler workflow..."
+  # Clean up previous compile results (if any)
+  rm -rf Compile
+  # Mode: Compile – generate grammar and dictionary from your OpenAPI spec.
+  echo "Compiling grammar..."
+  /RESTler/restler/Restler compile compile-config.json
+  # Mode: Test – perform a quick smoke-test using the generated grammar.
+  echo "Running test mode..."
+  /RESTler/restler/Restler test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  # Mode: Fuzz-lean – perform a short fuzzing run.
+  echo "Running fuzz-lean mode..."
+  /RESTler/restler/Restler fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  # Mode: Fuzz – perform a longer fuzzing run (here with a 1-hour time budget).
+  echo "Running fuzz mode..."
+  /RESTler/restler/Restler fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget 1
+else
+  # If arguments are provided, forward them to the RESTler binary.
+  echo "Running RESTler with arguments: $@"
+  exec /RESTler/restler/Restler "$@"
+fi

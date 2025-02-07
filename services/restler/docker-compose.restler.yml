@@ -8,7 +8,7 @@ services:
       - vulnerable=1
     networks:
       - restler-net
-    command: ["app.py"]  # Use CMD array format to work with ENTRYPOINT
+    command: ["app.py"]
 
   init-vampi:
     image: curlimages/curl:latest
@@ -25,14 +25,13 @@ services:
     depends_on:
       - init-vampi
     volumes:
-      - ../../services/vampi/openapi_specs:/specs
-      - ./output:/workspace/fuzzing_results
+      - ../../services/vampi/openapi_specs:/RESTler/openapi-specs:ro
+      - ./output:/RESTler/results
     networks:
       - restler-net
     environment:
-      - OPENAPI_SPEC=/specs/openapi3.yml
       - TARGET_URL=http://vampi:5000
-      - MODE=all
+    # No MODE environment variable needed as the entrypoint now handles the workflow
 
 networks:
   restler-net:
