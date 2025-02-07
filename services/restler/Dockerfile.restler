@@ -19,21 +19,18 @@ FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine
 # Install Python in the runtime image (if needed by RESTler)
 RUN apk add --no-cache python3
 
-# Copy the built RESTler binary and required directories from the builder stage.
-COPY --from=builder /restler_bin /RESTler/restler
-COPY --from=builder /restler-fuzzer/compiler /RESTler/compiler
-COPY --from=builder /restler-fuzzer/engine /RESTler/engine
-COPY --from=builder /restler-fuzzer/resultsAnalyzer /RESTler/resultsAnalyzer
+# Copy the built RESTler binary from the builder stage
+COPY --from=builder /restler_bin /RESTler
 
-# Precompile python modules in the engine directory (optional but recommended)
+# Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
 
-# Copy the entrypoint script into the image.
+# Copy the entrypoint script into the image
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Set the working directory.
+# Set the working directory
 WORKDIR /RESTler
 
-# Set the default entrypoint to our script.
+# Set the default entrypoint to our script
 ENTRYPOINT ["/entrypoint.sh"]
