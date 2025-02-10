@@ -59,8 +59,8 @@ RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
 # Copy the built RESTler files from builder
 COPY --from=builder /restler_bin /RESTler
 
-# Copy the Python engine files
-COPY --from=builder /restler-fuzzer/engine /RESTler/engine
+# Copy the Python engine files from the correct path
+COPY --from=builder /restler-fuzzer/restler/engine /RESTler/engine
 
 # Set execute permissions and verify installation
 RUN chmod -R 755 /RESTler && \
