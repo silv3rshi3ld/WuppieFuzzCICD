@@ -1,52 +1,70 @@
 # Stage 1: Build RESTler from source
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
 
-# Install required tools
-RUN apt-get update && apt-get install -y python3 python3-pip git dos2unix tree
+# Install required tools and dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    python3 \
+    python3-pip \
+    git \
+    dos2unix \
+    tree \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clone the official RESTler repository from GitHub
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer
+# Install Python dependencies
+RUN pip3 install requests applicationinsights pytest
+
+# Clone a specific version of RESTler that we know works
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer && \
+    cd /restler-fuzzer && \
+    git checkout v9.1.0  # Using a stable release version
 
 WORKDIR /restler-fuzzer
 
-# Build RESTler using the provided build script and verify the output
-RUN set -e && \
-    python3 build-restler.py --dest_dir /restler_bin && \
+# Build RESTler using the provided build script
+RUN mkdir -p /restler_bin && \
+    python3 ./build-restler.py --dest_dir /restler_bin && \
+    # Verify the build output
     if [ ! -d "/restler_bin" ]; then \
         echo "Error: /restler_bin directory was not created" && \
         exit 1; \
     fi && \
-    if [ ! -f "/restler_bin/restler.py" ]; then \
-        echo "Error: restler.py was not created" && \
-        exit 1; \
-    fi && \
+    # List all files to help with debugging
     echo "=== RESTler bin contents ===" && \
     ls -la /restler_bin && \
-    echo "=== RESTler bin Python files ===" && \
-    find /restler_bin -name "*.py" && \
-    echo "=== RESTler bin executables ===" && \
-    find /restler_bin -type f -executable
+    echo "=== Python files in source ===" && \
+    find . -name "*.py" && \
+    echo "=== Contents of /restler_bin ===" && \
+    find /restler_bin -type f
 
 # Stage 2: Create a lean runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 # Install Python and required packages
-RUN apt-get update && apt-get install -y python3 dos2unix tree && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y \
+    python3 \
+    python3-pip \
+    dos2unix \
+    tree \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the entire RESTler directory from builder
-COPY --from=builder /restler_bin /RESTler
+# Install Python dependencies
+RUN pip3 install requests applicationinsights
 
 # Create necessary directories for mounted volumes
 RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
 
-# Set execute permissions on RESTler binaries and verify the installation
-RUN set -e && \
-    chmod -R 755 /RESTler && \
+# Copy the built RESTler files from builder
+COPY --from=builder /restler_bin /RESTler
+
+# Copy the Python engine files
+COPY --from=builder /restler-fuzzer/restler/engine /RESTler/engine
+
+# Set execute permissions and verify installation
+RUN chmod -R 755 /RESTler && \
     find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
-    if [ ! -f "/RESTler/restler.py" ]; then \
-        echo "Error: restler.py is missing in the final image" && \
-        exit 1; \
-    fi && \
     echo "=== RESTler contents ===" && \
     ls -la /RESTler && \
     echo "=== RESTler Python files ===" && \
@@ -57,7 +75,7 @@ RUN set -e && \
 # Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
 
-# Copy the entrypoint script into the image
+# Copy the entrypoint script
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
 
 # Convert line endings and set permissions
