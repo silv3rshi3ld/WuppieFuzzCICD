@@ -13,9 +13,9 @@ WORKDIR /restler-fuzzer
 # This produces the RESTler binaries in /restler_bin.
 RUN python3 build-restler.py --dest_dir /restler_bin && \
     echo "=== RESTler bin contents ===" && \
-    ls -R /restler_bin && \
+    ls -la /restler_bin && \
     echo "=== RESTler bin Python files ===" && \
-    find /restler_bin -type f -name "*.py" && \
+    find /restler_bin -name "*.py" && \
     echo "=== RESTler bin executables ===" && \
     find /restler_bin -type f -executable
 
@@ -32,9 +32,9 @@ COPY --from=builder /restler_bin /RESTler
 RUN chmod -R 755 /RESTler && \
     find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
     echo "=== RESTler contents ===" && \
-    ls -R /RESTler && \
+    ls -la /RESTler && \
     echo "=== RESTler Python files ===" && \
-    find /RESTler -type f -name "*.py" && \
+    find /RESTler -name "*.py" && \
     echo "=== RESTler executables ===" && \
     find /RESTler -type f -executable
 
