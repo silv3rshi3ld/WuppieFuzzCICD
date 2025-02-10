@@ -8,7 +8,7 @@ if [ "$#" -eq 0 ]; then
   rm -rf Compile
   # Mode: Compile – generate grammar and dictionary from your OpenAPI spec.
   echo "Compiling grammar..."
-  /RESTler/restler compile compile-config.json
+  /RESTler/restler compile --api_spec /RESTler/openapi-specs/openapi3.yml --dest_dir Compile
   # Mode: Test – perform a quick smoke-test using the generated grammar.
   echo "Running test mode..."
   /RESTler/restler test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
