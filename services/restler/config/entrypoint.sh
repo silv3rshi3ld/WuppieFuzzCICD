@@ -76,7 +76,13 @@ if [ "$#" -eq 0 ]; then
         --fuzzing_mode bfs \
         --time_budget 1.0
 else
-    # If arguments are provided, forward them to the RESTler binary.
-    echo "Running RESTler with arguments: $@"
-    exec python3 "$RESTLER_PATH" "$@"
+    # If arguments are provided, check if it's a compile command
+    if [[ "$1" == "--api_spec_file" ]]; then
+        echo "Running RESTler compile with arguments..."
+        exec python3 "$RESTLER_PATH" compile "$@"
+    else
+        # For other commands, pass arguments directly
+        echo "Running RESTler with arguments: $@"
+        exec python3 "$RESTLER_PATH" "$@"
+    fi
 fi
