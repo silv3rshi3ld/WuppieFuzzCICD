@@ -8,16 +8,16 @@ if [ "$#" -eq 0 ]; then
   rm -rf Compile
   # Mode: Compile – generate grammar and dictionary from your OpenAPI spec.
   echo "Compiling grammar..."
-  python3 /RESTler/engine/restler.py compile --api_spec /RESTler/openapi-specs/openapi3.yml --dest_dir Compile
+  python3 /RESTler/engine/restler.py --restler_grammar /RESTler/openapi-specs/openapi3.yml --target_port 5000 --target_ip 172.18.0.2
   # Mode: Test – perform a quick smoke-test using the generated grammar.
   echo "Running test mode..."
-  python3 /RESTler/engine/restler.py test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  python3 /RESTler/engine/restler.py --fuzzing_mode test --target_port 5000 --target_ip 172.18.0.2
   # Mode: Fuzz-lean – perform a short fuzzing run.
   echo "Running fuzz-lean mode..."
-  python3 /RESTler/engine/restler.py fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  python3 /RESTler/engine/restler.py --fuzzing_mode fuzzing --target_port 5000 --target_ip 172.18.0.2
   # Mode: Fuzz – perform a longer fuzzing run (here with a 1-hour time budget).
   echo "Running fuzz mode..."
-  python3 /RESTler/engine/restler.py fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget 1
+  python3 /RESTler/engine/restler.py --fuzzing_mode fuzzing --target_port 5000 --target_ip 172.18.0.2 --time_budget 1
 else
   # If arguments are provided, forward them to the RESTler binary.
   echo "Running RESTler with arguments: $@"
