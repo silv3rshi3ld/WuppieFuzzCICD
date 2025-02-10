@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
 
 # Install required tools
-RUN apt-get update && apt-get install -y python3 python3-pip git
+RUN apt-get update && apt-get install -y python3 python3-pip git dos2unix tree
 
 # Clone the official RESTler repository from GitHub
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer
@@ -11,26 +11,42 @@ WORKDIR /restler-fuzzer
 
 # Build RESTler using the provided build script.
 # This produces the RESTler binaries in /restler_bin.
-RUN python3 build-restler.py --dest_dir /restler_bin
+RUN python3 build-restler.py --dest_dir /restler_bin && \
+    echo "=== RESTler bin contents ===" && \
+    ls -R /restler_bin && \
+    echo "=== RESTler bin Python files ===" && \
+    find /restler_bin -type f -name "*.py" && \
+    echo "=== RESTler bin executables ===" && \
+    find /restler_bin -type f -executable
 
 # Stage 2: Create a lean runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
-# Install Python in the runtime image (if needed by RESTler)
-RUN apk add --no-cache python3
+# Install Python and required packages
+RUN apt-get update && apt-get install -y python3 dos2unix tree && rm -rf /var/lib/apt/lists/*
 
 # Copy the built RESTler binary from the builder stage
 COPY --from=builder /restler_bin /RESTler
 
 # Set execute permissions on RESTler binaries
-RUN chmod -R +x /RESTler
+RUN chmod -R 755 /RESTler && \
+    find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
+    echo "=== RESTler contents ===" && \
+    ls -R /RESTler && \
+    echo "=== RESTler Python files ===" && \
+    find /RESTler -type f -name "*.py" && \
+    echo "=== RESTler executables ===" && \
+    find /RESTler -type f -executable
 
 # Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
 
 # Copy the entrypoint script into the image
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+# Convert line endings and set permissions
+RUN dos2unix /entrypoint.sh && \
+    chmod 755 /entrypoint.sh
 
 # Set the working directory
 WORKDIR /RESTler

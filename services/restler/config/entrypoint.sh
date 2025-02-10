@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # If no arguments are provided, run the full workflow (compile -> test -> fuzz-lean -> fuzz)
@@ -8,18 +8,18 @@ if [ "$#" -eq 0 ]; then
   rm -rf Compile
   # Mode: Compile – generate grammar and dictionary from your OpenAPI spec.
   echo "Compiling grammar..."
-  /RESTler/restler compile --api_spec /RESTler/openapi-specs/openapi3.yml --dest_dir Compile
+  python3 /RESTler/restler.py compile --api_spec /RESTler/openapi-specs/openapi3.yml --dest_dir Compile
   # Mode: Test – perform a quick smoke-test using the generated grammar.
   echo "Running test mode..."
-  /RESTler/restler test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  python3 /RESTler/restler.py test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
   # Mode: Fuzz-lean – perform a short fuzzing run.
   echo "Running fuzz-lean mode..."
-  /RESTler/restler fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+  python3 /RESTler/restler.py fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
   # Mode: Fuzz – perform a longer fuzzing run (here with a 1-hour time budget).
   echo "Running fuzz mode..."
-  /RESTler/restler fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget 1
+  python3 /RESTler/restler.py fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget 1
 else
   # If arguments are provided, forward them to the RESTler binary.
   echo "Running RESTler with arguments: $@"
-  exec /RESTler/restler "$@"
+  exec python3 /RESTler/restler.py "$@"
 fi
