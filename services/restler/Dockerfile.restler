@@ -24,6 +24,7 @@ COPY --from=builder /restler_bin /RESTler
 
 # Set execute permissions on RESTler binaries
 RUN chmod +x /RESTler/restler
+RUN chmod +x /RESTler/engine/*
 
 # Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
