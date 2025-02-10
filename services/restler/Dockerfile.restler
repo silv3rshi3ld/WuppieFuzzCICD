@@ -23,8 +23,7 @@ RUN apk add --no-cache python3
 COPY --from=builder /restler_bin /RESTler
 
 # Set execute permissions on RESTler binaries
-RUN chmod +x /RESTler/restler
-RUN chmod +x /RESTler/engine/*
+RUN chmod -R +x /RESTler
 
 # Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
