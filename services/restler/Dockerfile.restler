@@ -9,9 +9,17 @@ RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer
 
 WORKDIR /restler-fuzzer
 
-# Build RESTler using the provided build script.
-# This produces the RESTler binaries in /restler_bin.
-RUN python3 build-restler.py --dest_dir /restler_bin && \
+# Build RESTler using the provided build script and verify the output
+RUN set -e && \
+    python3 build-restler.py --dest_dir /restler_bin && \
+    if [ ! -d "/restler_bin" ]; then \
+        echo "Error: /restler_bin directory was not created" && \
+        exit 1; \
+    fi && \
+    if [ ! -f "/restler_bin/restler.py" ]; then \
+        echo "Error: restler.py was not created" && \
+        exit 1; \
+    fi && \
     echo "=== RESTler bin contents ===" && \
     ls -la /restler_bin && \
     echo "=== RESTler bin Python files ===" && \
@@ -25,15 +33,20 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 # Install Python and required packages
 RUN apt-get update && apt-get install -y python3 dos2unix tree && rm -rf /var/lib/apt/lists/*
 
-# Copy the built RESTler binary from the builder stage
+# Copy the entire RESTler directory from builder
 COPY --from=builder /restler_bin /RESTler
 
-# Copy the restler.py file to the correct location
-COPY --from=builder /restler_bin/restler.py /RESTler/restler.py
+# Create necessary directories for mounted volumes
+RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
 
-# Set execute permissions on RESTler binaries
-RUN chmod -R 755 /RESTler && \
+# Set execute permissions on RESTler binaries and verify the installation
+RUN set -e && \
+    chmod -R 755 /RESTler && \
     find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
+    if [ ! -f "/RESTler/restler.py" ]; then \
+        echo "Error: restler.py is missing in the final image" && \
+        exit 1; \
+    fi && \
     echo "=== RESTler contents ===" && \
     ls -la /RESTler && \
     echo "=== RESTler Python files ===" && \
