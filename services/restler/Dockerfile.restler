@@ -28,6 +28,9 @@ RUN apt-get update && apt-get install -y python3 dos2unix tree && rm -rf /var/li
 # Copy the built RESTler binary from the builder stage
 COPY --from=builder /restler_bin /RESTler
 
+# Copy the restler.py file to the correct location
+COPY --from=builder /restler_bin/restler.py /RESTler/restler.py
+
 # Set execute permissions on RESTler binaries
 RUN chmod -R 755 /RESTler && \
     find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
