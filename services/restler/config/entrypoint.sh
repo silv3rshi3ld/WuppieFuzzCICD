@@ -48,15 +48,33 @@ if [ "$#" -eq 0 ]; then
     
     # Mode: Test – perform a quick smoke-test using the generated grammar.
     echo "Running test mode..."
-    python3 "$RESTLER_PATH" test --grammar_file /RESTler/Compile/grammar.py --dictionary_file /RESTler/Compile/dict.json --target_ip vampi --target_port 5000
-    
+    python3 "$RESTLER_PATH" \
+        --restler_grammar /RESTler/Compile/grammar.py \
+        --target_ip vampi \
+        --target_port 5000 \
+        --settings /RESTler/config/test-config.json \
+        --fuzzing_mode directed-smoke-test \
+        --time_budget 0.1
+
     # Mode: Fuzz-lean – perform a short fuzzing run.
     echo "Running fuzz-lean mode..."
-    python3 "$RESTLER_PATH" fuzz-lean --grammar_file /RESTler/Compile/grammar.py --dictionary_file /RESTler/Compile/dict.json --target_ip vampi --target_port 5000
-    
-    # Mode: Fuzz – perform a longer fuzzing run (here with a 1-hour time budget).
+    python3 "$RESTLER_PATH" \
+        --restler_grammar /RESTler/Compile/grammar.py \
+        --target_ip vampi \
+        --target_port 5000 \
+        --settings /RESTler/config/fuzz-lean-config.json \
+        --fuzzing_mode bfs-cheap \
+        --time_budget 0.5
+
+    # Mode: Fuzz – perform a longer fuzzing run (1-hour time budget).
     echo "Running fuzz mode..."
-    python3 "$RESTLER_PATH" fuzz --grammar_file /RESTler/Compile/grammar.py --dictionary_file /RESTler/Compile/dict.json --target_ip vampi --target_port 5000 --time_budget 1
+    python3 "$RESTLER_PATH" \
+        --restler_grammar /RESTler/Compile/grammar.py \
+        --target_ip vampi \
+        --target_port 5000 \
+        --settings /RESTler/config/fuzz-config.json \
+        --fuzzing_mode bfs \
+        --time_budget 1.0
 else
     # If arguments are provided, forward them to the RESTler binary.
     echo "Running RESTler with arguments: $@"
