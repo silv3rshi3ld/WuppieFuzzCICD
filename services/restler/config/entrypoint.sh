@@ -1,88 +1,80 @@
 #!/bin/bash
 set -e
 
-# Function to find restler.py
-find_restler() {
-    # First check in root directory
-    if [ -f "/RESTler/restler.py" ]; then
-        echo "/RESTler/restler.py"
-        return 0
-    fi
-    
-    # Then check in engine directory
-    if [ -f "/RESTler/engine/restler.py" ]; then
-        echo "/RESTler/engine/restler.py"
-        return 0
-    fi
-    
-    echo "Error: Could not find restler.py"
-    return 1
-}
+echo "Starting RESTler Fuzzer..."
 
-# Find restler.py
-RESTLER_PATH=$(find_restler)
-if [ $? -ne 0 ]; then
-    echo "Directory contents of /RESTler:"
-    ls -R /RESTler
+# Create necessary directories with appropriate permissions
+mkdir -p /RESTler/results
+chmod 755 /RESTler/results
+
+# Debug: Check if OpenAPI file exists
+echo "Checking OpenAPI file..."
+if [ ! -f "/RESTler/openapi-specs/openapi3.yml" ]; then
+    echo "Error: OpenAPI file not found at /RESTler/openapi-specs/openapi3.yml"
+    ls -la /RESTler/openapi-specs/
     exit 1
 fi
 
-echo "Using RESTler at: $RESTLER_PATH"
+# Compile API specification
+echo "Compiling API specification..."
+dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" compile \
+    --api_spec "/RESTler/openapi-specs/openapi3.yml"
 
-# If no arguments are provided, run the full workflow (compile -> test -> fuzz-lean -> fuzz)
-if [ "$#" -eq 0 ]; then
-    echo "No mode specified. Running full RESTler workflow..."
-    
-    # Clean up previous compile results (if any)
-    rm -rf Compile
-    
-    echo "Directory structure before compilation:"
-    ls -R /RESTler
-    
-    # Mode: Compile – generate grammar and dictionary from your OpenAPI spec.
-    echo "Compiling grammar..."
-    python3 "$RESTLER_PATH" compile --api_spec_file /RESTler/openapi-specs/openapi3.yml --settings /RESTler/config/compile-config.json
-    
-    echo "Compilation complete. Directory structure:"
-    ls -R /RESTler
-    
-    # Mode: Test – perform a quick smoke-test using the generated grammar.
-    echo "Running test mode..."
-    python3 "$RESTLER_PATH" \
-        --restler_grammar /RESTler/Compile/grammar.py \
-        --target_ip vampi \
-        --target_port 5000 \
-        --settings /RESTler/config/test-config.json \
-        --fuzzing_mode directed-smoke-test \
-        --time_budget 0.1
-
-    # Mode: Fuzz-lean – perform a short fuzzing run.
-    echo "Running fuzz-lean mode..."
-    python3 "$RESTLER_PATH" \
-        --restler_grammar /RESTler/Compile/grammar.py \
-        --target_ip vampi \
-        --target_port 5000 \
-        --settings /RESTler/config/fuzz-lean-config.json \
-        --fuzzing_mode bfs-cheap \
-        --time_budget 0.5
-
-    # Mode: Fuzz – perform a longer fuzzing run (1-hour time budget).
-    echo "Running fuzz mode..."
-    python3 "$RESTLER_PATH" \
-        --restler_grammar /RESTler/Compile/grammar.py \
-        --target_ip vampi \
-        --target_port 5000 \
-        --settings /RESTler/config/fuzz-config.json \
-        --fuzzing_mode bfs \
-        --time_budget 1.0
-else
-    # If arguments are provided, check if it's a compile command
-    if [[ "$1" == "--api_spec_file" ]]; then
-        echo "Running RESTler compile with arguments..."
-        exec python3 "$RESTLER_PATH" compile "$@"
-    else
-        # For other commands, pass arguments directly
-        echo "Running RESTler with arguments: $@"
-        exec python3 "$RESTLER_PATH" "$@"
-    fi
+# Verify grammar file exists in Compile directory
+if [ ! -f "/RESTler/Compile/grammar.py" ]; then
+    echo "Error: Grammar file was not generated!"
+    echo "Checking Compile directory contents:"
+    ls -la /RESTler/Compile
+    exit 1
 fi
+
+# Display compilation logs
+echo "Compilation logs:"
+cat /RESTler/Compile/RestlerCompile.log || echo "No compile log found."
+
+# Test step
+echo "Running test phase..."
+dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" test \
+    --grammar_file "/RESTler/Compile/grammar.py" \
+    --dictionary_file "/RESTler/Compile/dict.json" \
+    --settings "/RESTler/config/test-config.json" \
+    --target_ip "${TARGET_IP:-vampi}" \
+    --target_port "${TARGET_PORT:-5000}" \
+    --no_ssl
+
+# Run fuzz-lean if enabled
+if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
+    echo "Starting fuzz-lean testing..."
+    dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" fuzz-lean \
+        --grammar_file "/RESTler/Compile/grammar.py" \
+        --dictionary_file "/RESTler/Compile/dict.json" \
+        --settings "/RESTler/config/fuzz-lean-config.json" \
+        --time_budget "${FUZZ_LEAN_TIME_BUDGET:-0.05}" \
+        --target_ip "${TARGET_IP:-vampi}" \
+        --target_port "${TARGET_PORT:-5000}" \
+        --no_ssl
+fi
+
+# Run full fuzzing if enabled
+if [ "${RUN_FUZZ}" = "true" ]; then
+    echo "Starting full fuzzing..."
+    dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" fuzz \
+        --grammar_file "/RESTler/Compile/grammar.py" \
+        --dictionary_file "/RESTler/Compile/dict.json" \
+        --settings "/RESTler/config/fuzz-config.json" \
+        --time_budget "${FUZZ_TIME_BUDGET:-0.25}" \
+        --target_ip "${TARGET_IP:-vampi}" \
+        --target_port "${TARGET_PORT:-5000}" \
+        --no_ssl
+fi
+
+# Copy results to output directory
+echo "Copying results to output directory..."
+for dir in Test FuzzLean Fuzz; do
+    if [ -d "/RESTler/${dir}/RestlerResults" ]; then
+        mkdir -p "/RESTler/results/${dir}"
+        cp -r "/RESTler/${dir}/RestlerResults" "/RESTler/results/${dir}/"
+    fi
+done
+
+echo "RESTler execution completed!"
