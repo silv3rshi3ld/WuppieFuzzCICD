@@ -12,8 +12,8 @@ RUN apt-get update && \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies with --break-system-packages flag
-RUN pip3 install --break-system-packages requests applicationinsights pytest
+# Install Python dependencies
+RUN pip3 install requests applicationinsights pytest
 
 # Clone a specific version of RESTler that we know works
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer && \
@@ -50,8 +50,8 @@ RUN apt-get update && \
     tree \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies with --break-system-packages flag
-RUN pip3 install --break-system-packages requests applicationinsights
+# Install Python dependencies
+RUN pip3 install requests applicationinsights
 
 # Create necessary directories for mounted volumes
 RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
