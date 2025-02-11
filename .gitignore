@@ -42,3 +42,10 @@ yarn-error.log*
 # Operating System
 .DS_Store
 Thumbs.db
+dashboard/README.md
+dashboard-ui-enhancement-plan.md
+dashboard-styling-plan.md
+dashboard-portable-plan.md
+dashboard-plan.md
+dashboard-metrics-plan.md
+dashboard-conversion-plan.md

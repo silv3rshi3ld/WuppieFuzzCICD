@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuzzing Results Dashboard</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/modern-normalize@2.0.0/modern-normalize.min.css" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <style>
+        :root {
+            --color-primary: #3b82f6;
+            --color-success: #22c55e;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            --color-gray-50: #f9fafb;
+            --color-gray-100: #f3f4f6;
+            --color-gray-200: #e5e7eb;
+            --color-gray-700: #374151;
+            --color-gray-900: #111827;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
+
+        .card {
+            @apply bg-white rounded-lg shadow-sm border border-gray-200;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            @apply shadow-md;
+            transform: translateY(-1px);
+        }
+
+        .tree-item {
+            @apply rounded-md hover:bg-gray-100 transition-colors;
+        }
+
+        .btn {
+            @apply px-4 py-2 rounded-md transition-colors;
+            @apply hover:bg-opacity-90 active:transform active:scale-95;
+        }
+
+        .dashboard-grid {
+            @apply grid gap-6;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        /* Chart containers */
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+
+        /* Icons */
+        .icon-success {
+            color: var(--color-success);
+        }
+        .icon-error {
+            color: var(--color-error);
+        }
+        .icon-warning {
+            color: var(--color-warning);
+        }
+
+        /* Scrollbar styling */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: var(--color-gray-50);
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--color-gray-200);
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--color-gray-700);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div x-data="dashboard()">
+        <!-- Header -->
+        <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
+            <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
+                <h1 class="text-xl font-semibold">Endpoint Coverage Report</h1>
+                <div class="flex items-center gap-4">
+                    <template x-for="(enabled, type) in filters" :key="type">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                x-model="filters[type]"
+                                class="rounded border-gray-300 text-primary focus:ring-primary"
+                            >
+                            <span x-html="getStatusIcon(type)"></span>
+                            <span x-text="type.charAt(0).toUpperCase() + type.slice(1)"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex mt-16">
+            <!-- Left Sidebar: Endpoint Tree -->
+            <div class="w-72 border-r border-gray-200 overflow-y-auto h-[calc(100vh-4rem)] bg-gray-50 fixed custom-scrollbar">
+                <div class="p-4">
+                    <template x-for="(endpoint, idx) in endpoints" :key="idx">
+                        <div class="mb-6">
+                            <div class="text-sm font-mono font-medium text-gray-700 mb-2" x-text="endpoint.path"></div>
+                            <template x-for="(statuses, method) in endpoint.methods" :key="method">
+                                <div class="pl-4">
+                                    <div class="text-xs font-medium text-gray-500 mb-1" x-text="method"></div>
+                                    <div class="space-y-1">
+                                        <template x-for="(status, statusIdx) in statuses" :key="statusIdx">
+                                            <template x-if="filters[status.type === 'hit' ? 'hits' : status.type === 'miss' ? 'misses' : 'unspecified']">
+                                                <button
+                                                    @click="selectedEndpoint = status"
+                                                    class="w-full text-left p-2 text-xs flex items-center gap-2 hover:bg-gray-200 rounded transition-colors duration-150"
+                                                    :class="{'bg-gray-200': selectedEndpoint === status}"
+                                                >
+                                                    <span x-html="getStatusIcon(status.type, true)"></span>
+                                                    <span class="font-mono" x-text="status.status"></span>
+                                                </button>
+                                            </template>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="ml-72 p-6 flex-1 max-w-screen-2xl">
+                <!-- Request/Response Section -->
+                <template x-if="selectedEndpoint">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="card">
+                            <div class="p-4">
+                                <h3 class="font-medium mb-3">Request</h3>
+                                <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto custom-scrollbar" x-text="selectedEndpoint.request || 'No request data available'"></pre>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="p-4">
+                                <h3 class="font-medium mb-3">Response</h3>
+                                <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto custom-scrollbar" x-text="selectedEndpoint.response || 'No response data available'"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!selectedEndpoint">
+                    <div class="card mb-8">
+                        <div class="text-center py-12 text-gray-500">
+                            Select an endpoint to view details
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Graphs Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Coverage Distribution -->
+                    <div class="card">
+                        <div class="p-4">
+                            <h3 class="text-sm font-medium mb-4">Coverage Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="coverageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coverage by Method -->
+                    <div class="card">
+                        <div class="p-4">
+                            <h3 class="text-sm font-medium mb-4">Coverage by Method</h3>
+                            <div class="chart-container">
+                                <canvas id="methodChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Codes -->
+                    <div class="card">
+                        <div class="p-4">
+                            <h3 class="text-sm font-medium mb-4">Status Code Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Dependencies -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <!-- Sample Data -->
+    <script>
+        const fuzzerData = {
+            endpoints: [
+                {
+                    path: '/api/adminAuth',
+                    methods: {
+                        POST: [
+                            { status: '200', type: 'miss' },
+                            { status: '401', type: 'miss' },
+                            { 
+                                status: '500', 
+                                type: 'unspecified',
+                                request: 'echo eyJhZG1pbkNvZGUiOiLwn461IiwicGFzc3dvcmQiOiLvv7/vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv73vv7zIve+/vSJ9 | base64 --decode | curl http://localhost:3001/api/adminAuth? --request POST --header \'accept: application/json\' --header \'content-type: application/json\' --data @-',
+                                response: 'Server Error'
+                            }
+                        ]
+                    }
+                },
+                {
+                    path: '/api/categories/{id}',
+                    methods: {
+                        GET: [
+                            { status: '200', type: 'miss' },
+                            { 
+                                status: '404', 
+                                type: 'hit',
+                                request: 'curl http://localhost:3001/api/categories/Q%28T%2AU%2AU%2A? --request GET --header \'accept: application/json\'',
+                                response: '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/categories/Q%28T%2AU%2AU%2A</pre>\n</body>\n</html>'
+                            }
+                        ],
+                        DELETE: [
+                            { status: '204', type: 'miss' },
+                            { 
+                                status: '404', 
+                                type: 'hit',
+                                request: 'curl http://localhost:3001/api/categories/gsy%7C%3E_ow? --request DELETE --header \'accept: application/json\'',
+                                response: '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot DELETE /api/categories/gsy%7C%3E_ow</pre>\n</body>\n</html>'
+                            }
+                        ]
+                    }
+                }
+            ],
+            stats: {
+                statusDistribution: [
+                    { name: 'Hits', value: 3, color: '#22c55e' },
+                    { name: 'Misses', value: 35, color: '#ef4444' },
+                    { name: 'Unspecified', value: 4, color: '#f59e0b' }
+                ],
+                methodCoverage: [
+                    { method: 'POST', hits: 0, misses: 12, unspecified: 2 },
+                    { method: 'GET', hits: 2, misses: 8, unspecified: 1 },
+                    { method: 'PUT', hits: 0, misses: 8, unspecified: 1 },
+                    { method: 'DELETE', hits: 1, misses: 7, unspecified: 0 }
+                ],
+                statusCodes: [
+                    { status: '200', count: 12 },
+                    { status: '401', count: 8 },
+                    { status: '404', count: 6 },
+                    { status: '500', count: 4 },
+                    { status: '204', count: 3 }
+                ]
+            }
+        };
+    </script>
+
+    <!-- Application Logic -->
+    <script>
+        // Initialize Feather Icons
+        feather.replace();
+
+        // Wait for Alpine and DOM to be ready
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dashboard', () => ({
+                endpoints: fuzzerData.endpoints,
+                selectedEndpoint: null,
+                filters: {
+                    hits: true,
+                    misses: true,
+                    unspecified: true
+                },
+                charts: {},
+
+                init() {
+                    // Wait for next tick to ensure DOM elements are ready
+                    this.$nextTick(() => {
+                        this.initializeCharts();
+                        // Refresh Feather icons for dynamic content
+                        feather.replace();
+                    });
+                },
+
+                getStatusIcon(type, small = false) {
+                    const size = small ? 16 : 20;
+                    switch (type) {
+                        case 'hit':
+                            return `<i data-feather="check-circle" class="icon-success" width="${size}" height="${size}"></i>`;
+                        case 'miss':
+                            return `<i data-feather="x-circle" class="icon-error" width="${size}" height="${size}"></i>`;
+                        case 'unspecified':
+                            return `<i data-feather="alert-triangle" class="icon-warning" width="${size}" height="${size}"></i>`;
+                        default:
+                            return '';
+                    }
+                },
+
+                initializeCharts() {
+                    // Common chart options
+                    Chart.defaults.font.family = "'Inter', sans-serif";
+                    Chart.defaults.font.size = 12;
+                    Chart.defaults.plugins.legend.position = 'bottom';
+
+                    // Coverage Distribution Chart
+                    const coverageCtx = document.getElementById('coverageChart').getContext('2d');
+                    this.charts.coverage = new Chart(coverageCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: fuzzerData.stats.statusDistribution.map(d => d.name),
+                            datasets: [{
+                                data: fuzzerData.stats.statusDistribution.map(d => d.value),
+                                backgroundColor: fuzzerData.stats.statusDistribution.map(d => d.color)
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '60%',
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Method Coverage Chart
+                    const methodCtx = document.getElementById('methodChart').getContext('2d');
+                    this.charts.method = new Chart(methodCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: fuzzerData.stats.methodCoverage.map(d => d.method),
+                            datasets: [
+                                {
+                                    label: 'Hits',
+                                    data: fuzzerData.stats.methodCoverage.map(d => d.hits),
+                                    backgroundColor: '#22c55e'
+                                },
+                                {
+                                    label: 'Misses',
+                                    data: fuzzerData.stats.methodCoverage.map(d => d.misses),
+                                    backgroundColor: '#ef4444'
+                                },
+                                {
+                                    label: 'Unspecified',
+                                    data: fuzzerData.stats.methodCoverage.map(d => d.unspecified),
+                                    backgroundColor: '#f59e0b'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: { 
+                                    stacked: true,
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: { 
+                                    stacked: true,
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Status Codes Chart
+                    const statusCtx = document.getElementById('statusChart').getContext('2d');
+                    this.charts.status = new Chart(statusCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: fuzzerData.stats.statusCodes.map(d => d.status),
+                            datasets: [{
+                                label: 'Count',
+                                data: fuzzerData.stats.statusCodes.map(d => d.count),
+                                backgroundColor: '#3b82f6'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }));
+        });
+    </script>
+</body>
+</html>
