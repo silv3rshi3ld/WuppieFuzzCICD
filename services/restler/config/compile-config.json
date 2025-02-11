@@ -1,5 +1,5 @@
 {
-    "SwaggerSpecFilePath": "/RESTler/openapi-specs/openapi3.yml",
+    "SwaggerSpecFilePath": "/RESTler/results/openapi3.json",
     "GrammarOutputDirectoryPath": "/RESTler/Compile",
     "CustomDictionaryFilePath": null,
     "IncludeOptionalParameters": true,
