@@ -15,7 +15,7 @@ if [ ! -f "/RESTler/openapi-specs/openapi3.yml" ]; then
     exit 1
 fi
 
-# Convert YAML to JSON
+# Convert YAML to JSON in the writable results directory
 echo "Converting YAML to JSON..."
 python3 -c '
 import yaml
@@ -25,7 +25,7 @@ import sys
 try:
     with open("/RESTler/openapi-specs/openapi3.yml", "r") as yaml_file:
         yaml_content = yaml.safe_load(yaml_file)
-    with open("/RESTler/openapi-specs/openapi3.json", "w") as json_file:
+    with open("/RESTler/results/openapi3.json", "w") as json_file:
         json.dump(yaml_content, json_file, indent=2)
     print("Successfully converted YAML to JSON")
 except Exception as e:
@@ -33,10 +33,10 @@ except Exception as e:
     sys.exit(1)
 '
 
-# Compile API specification using the JSON file
+# Compile API specification using the JSON file from the results directory
 echo "Compiling API specification..."
 dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" compile \
-    --api_spec "/RESTler/openapi-specs/openapi3.json"
+    --api_spec "/RESTler/results/openapi3.json"
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/RESTler/Compile/grammar.py" ]; then
