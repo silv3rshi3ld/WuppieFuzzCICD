@@ -35,8 +35,7 @@ except Exception as e:
 
 # Compile API specification using the JSON file from the results directory
 echo "Compiling API specification..."
-dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" compile \
-    --settings "/RESTler/config/compile-config.json"
+dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" compile "/RESTler/config/compile-config.json"
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/RESTler/Compile/grammar.py" ]; then
