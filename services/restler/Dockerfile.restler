@@ -30,8 +30,8 @@ WORKDIR /workspace
 # Create a FuzzLean directory if needed by your workflow
 RUN mkdir -p /workspace/FuzzLean
 
-# Copy RESTler configuration files and entrypoint (assumes you have a local ./config folder)
-COPY ./config /service/config
+# Copy RESTler configuration files and entrypoint
+COPY config /service/config
 
 # Ensure the entrypoint script is executable and convert Windows line endings to Unix
 RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
