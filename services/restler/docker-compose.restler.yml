@@ -26,7 +26,6 @@ services:
       - init-vampi
     volumes:
       - ../../services/vampi/openapi_specs:/RESTler/openapi-specs:ro
-      - ./config:/RESTler/config:ro
       - ./output:/RESTler/results
     networks:
       - restler-net
