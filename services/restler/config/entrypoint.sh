@@ -4,21 +4,24 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/results
-chmod 755 /workspace/results
+mkdir -p /workspace/output
+chmod 755 /workspace/output
+
+# Change to the workspace directory
+cd /workspace
 
 # Debug: Check if OpenAPI file exists
 echo "Checking OpenAPI file..."
-if [ ! -f "/RESTler/openapi-specs/openapi3.yml" ]; then
-    echo "Error: OpenAPI file not found at /RESTler/openapi-specs/openapi3.yml"
-    ls -la /RESTler/openapi-specs/
+if [ ! -f "/workspace/openapi3.yml" ]; then
+    echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
+    ls -la /workspace/
     exit 1
 fi
 
-# Compile API specification using the YAML file directly
+# Compile API specification
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/RESTler/openapi-specs/openapi3.yml"
+    --api_spec "/workspace/openapi3.yml"
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
@@ -37,9 +40,9 @@ echo "Running test phase..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
-    --settings "/RESTler/config/test-config.json" \
-    --target_ip "${TARGET_IP:-vampi}" \
-    --target_port "${TARGET_PORT:-5000}" \
+    --settings "/workspace/Compile/engine_settings.json" \
+    --target_ip "${TARGET_IP}" \
+    --target_port "${TARGET_PORT}" \
     --no_ssl
 
 # Run fuzz-lean if enabled
@@ -48,10 +51,10 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/RESTler/config/fuzz-lean-config.json" \
-        --time_budget "${FUZZ_LEAN_TIME_BUDGET:-0.05}" \
-        --target_ip "${TARGET_IP:-vampi}" \
-        --target_port "${TARGET_PORT:-5000}" \
+        --settings "/workspace/Compile/engine_settings.json" \
+        --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
         --no_ssl
 fi
 
@@ -61,10 +64,10 @@ if [ "${RUN_FUZZ}" = "true" ]; then
     dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
-        --settings "/RESTler/config/fuzz-config.json" \
-        --time_budget "${FUZZ_TIME_BUDGET:-0.25}" \
-        --target_ip "${TARGET_IP:-vampi}" \
-        --target_port "${TARGET_PORT:-5000}" \
+        --settings "/workspace/Compile/engine_settings.json" \
+        --time_budget "${FUZZ_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
         --no_ssl
 fi
 
@@ -72,8 +75,8 @@ fi
 echo "Copying results to output directory..."
 for dir in Test FuzzLean Fuzz; do
     if [ -d "/workspace/${dir}/RestlerResults" ]; then
-        mkdir -p "/workspace/results/${dir}"
-        cp -r "/workspace/${dir}/RestlerResults" "/workspace/results/${dir}/"
+        mkdir -p "/workspace/output/${dir}"
+        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
     fi
 done
 

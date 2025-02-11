@@ -24,13 +24,9 @@ RUN python ./build-restler.py --dest_dir /restler_bin --compile_type engine --py
 # Install additional RESTler-related Python dependencies
 RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights pyyaml
 
-# Set up workspace directory structure
+# Set up workspace directory
 WORKDIR /workspace
-RUN mkdir -p /workspace/Compile \
-    /workspace/Test \
-    /workspace/FuzzLean \
-    /workspace/Fuzz \
-    /workspace/results
+RUN mkdir -p /workspace/output
 
 # Copy RESTler configuration files and entrypoint
 COPY services/restler/config /RESTler/config

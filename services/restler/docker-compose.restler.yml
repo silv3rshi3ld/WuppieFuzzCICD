@@ -25,12 +25,15 @@ services:
     depends_on:
       - init-vampi
     volumes:
-      - ../../services/vampi/openapi_specs:/RESTler/openapi-specs:ro
-      - ./output:/RESTler/results
+      - ../../services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      - ./output:/workspace/output
     networks:
       - restler-net
     environment:
-      - TARGET_URL=http://vampi:5000
+      - TARGET_IP=vampi
+      - TARGET_PORT=5000
+      - RUN_FUZZ_LEAN=true
+      - FUZZ_LEAN_TIME_BUDGET=0.05
     entrypoint: ["/RESTler/config/entrypoint.sh"]
 
 networks:
