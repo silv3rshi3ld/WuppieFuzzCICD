@@ -2,8 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS builder
 
 # Install required tools and dependencies
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     git \
@@ -13,7 +12,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-RUN pip3 install requests applicationinsights pytest
+RUN pip3 install requests applicationinsights pytest pyyaml
 
 # Clone a specific version of RESTler that we know works
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer && \
@@ -22,28 +21,21 @@ RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer &&
 
 WORKDIR /restler-fuzzer
 
-# Build RESTler using the provided build script
+# Build RESTler using the provided build script with auto-generation
 RUN mkdir -p /restler_bin && \
-    python3 ./build-restler.py --dest_dir /restler_bin && \
-    # Verify the build output
+    python3 ./build-restler.py --dest_dir /restler_bin --compile_type engine --python_path /usr/bin/python3 && \
     if [ ! -d "/restler_bin" ]; then \
-        echo "Error: /restler_bin directory was not created" && \
-        exit 1; \
+        echo "Error: /restler_bin directory was not created" && exit 1; \
     fi && \
-    # List all files to help with debugging
-    echo "=== RESTler bin contents ===" && \
-    ls -la /restler_bin && \
-    echo "=== Python files in source ===" && \
-    find . -name "*.py" && \
-    echo "=== Contents of /restler_bin ===" && \
-    find /restler_bin -type f
+    echo "=== RESTler bin contents ===" && ls -la /restler_bin && \
+    echo "=== Python files in source ===" && find . -name "*.py" && \
+    echo "=== Contents of /restler_bin ===" && find /restler_bin -type f
 
 # Stage 2: Create a lean runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:6.0
 
 # Install Python and required packages
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     dos2unix \
@@ -59,19 +51,18 @@ RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
 # Copy ALL the built RESTler files from builder, including Restler.dll
 COPY --from=builder /restler_bin/* /RESTler/
 
-# Copy the Python engine and compiler files from the correct path
+# Copy the Python engine files from the source tree (if required)
 COPY --from=builder /restler-fuzzer/restler/engine /RESTler/engine
-COPY --from=builder /restler-fuzzer/restler/compiler /RESTler/compiler
+# The "compiler" directory is no longer present in this version;
+# so we remove or comment out the following line:
+# COPY --from=builder /restler-fuzzer/restler/compiler /RESTler/compiler
 
 # Set execute permissions and verify installation
 RUN chmod -R 755 /RESTler && \
     find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
-    echo "=== RESTler contents ===" && \
-    ls -la /RESTler && \
-    echo "=== RESTler Python files ===" && \
-    find /RESTler -name "*.py" && \
-    echo "=== RESTler executables ===" && \
-    find /RESTler -type f -executable
+    echo "=== RESTler contents ===" && ls -la /RESTler && \
+    echo "=== RESTler Python files ===" && find /RESTler -name "*.py" && \
+    echo "=== RESTler executables ===" && find /RESTler -type f -executable
 
 # Precompile python modules in the engine directory
 RUN python3 -m compileall -b /RESTler/engine
@@ -80,8 +71,7 @@ RUN python3 -m compileall -b /RESTler/engine
 COPY services/restler/config/entrypoint.sh /entrypoint.sh
 
 # Convert line endings and set permissions
-RUN dos2unix /entrypoint.sh && \
-    chmod 755 /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod 755 /entrypoint.sh
 
 # Set the working directory
 WORKDIR /RESTler
