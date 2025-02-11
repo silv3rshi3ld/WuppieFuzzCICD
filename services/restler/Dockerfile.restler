@@ -31,7 +31,7 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint into /RESTler/config
-COPY config /RESTler/config
+COPY services/restler/config /RESTler/config
 
 # Ensure the entrypoint script is executable and convert Windows line endings to Unix
 RUN chmod +x /RESTler/config/entrypoint.sh && sed -i 's/\r$//g' /RESTler/config/entrypoint.sh
