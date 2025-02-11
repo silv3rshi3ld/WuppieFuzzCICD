@@ -1,5 +1,5 @@
 # Stage 1: Build RESTler from source
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS builder
 
 # Install required tools and dependencies
 RUN apt-get update && \
@@ -39,7 +39,7 @@ RUN mkdir -p /restler_bin && \
     find /restler_bin -type f
 
 # Stage 2: Create a lean runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
 
 # Install Python and required packages
 RUN apt-get update && \
