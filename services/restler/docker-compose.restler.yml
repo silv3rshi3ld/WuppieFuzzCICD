@@ -32,7 +32,7 @@ services:
       - restler-net
     environment:
       - TARGET_URL=http://vampi:5000
-    entrypoint: ["/entrypoint.sh"]
+    entrypoint: ["/RESTler/config/entrypoint.sh"]
 
 networks:
   restler-net:
