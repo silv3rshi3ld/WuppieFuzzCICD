@@ -31,13 +31,13 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint
+# Ensure that the "config" folder exists in your build context.
 COPY config /service/config
 
 # Ensure the entrypoint script is executable and convert Windows line endings to Unix
 RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
 
 # Copy built RESTler files from the build output into a location expected by the entrypoint.
-# In this example, we copy all files from /restler_bin into /RESTler.
 RUN mkdir -p /RESTler && cp -r /restler_bin/* /RESTler/
 
 # Set the entrypoint for the container
