@@ -1,80 +1,44 @@
-# Stage 1: Build RESTler from source
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS builder
+FROM python:3.8-slim
 
-# Install required tools and dependencies
+# Install system dependencies and the .NET SDK
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
+    wget \
+    apt-transport-https \
     git \
-    dos2unix \
-    tree \
+    curl \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    libssl-dev \
+ && wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+ && dpkg -i packages-microsoft-prod.deb \
+ && apt-get update \
+ && apt-get install -y dotnet-sdk-6.0 \
+ && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip3 install requests applicationinsights pytest pyyaml
+# Clone the official RESTler repository
+RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 
-# Clone a specific version of RESTler that we know works
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler-fuzzer && \
-    cd /restler-fuzzer && \
-    git checkout v9.1.0  # Using a stable release version
+# Build RESTler using the provided Python script with engine compilation
+WORKDIR /restler
+RUN python ./build-restler.py --dest_dir /restler_bin --compile_type engine --python_path /usr/bin/python3
 
-WORKDIR /restler-fuzzer
+# Install additional RESTler-related Python dependencies
+RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights pyyaml
 
-# Build RESTler using the provided build script with auto-generation
-RUN mkdir -p /restler_bin && \
-    python3 ./build-restler.py --dest_dir /restler_bin --compile_type engine --python_path /usr/bin/python3 && \
-    if [ ! -d "/restler_bin" ]; then \
-        echo "Error: /restler_bin directory was not created" && exit 1; \
-    fi && \
-    echo "=== RESTler bin contents ===" && ls -la /restler_bin && \
-    echo "=== Python files in source ===" && find . -name "*.py" && \
-    echo "=== Contents of /restler_bin ===" && find /restler_bin -type f
+# Set the working directory for running RESTler or further configuration
+WORKDIR /workspace
 
-# Stage 2: Create a lean runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:6.0
+# Create a FuzzLean directory if needed by your workflow
+RUN mkdir -p /workspace/FuzzLean
 
-# Install Python and required packages
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    dos2unix \
-    tree \
-    && rm -rf /var/lib/apt/lists/*
+# Copy RESTler configuration files and entrypoint (assumes you have a local ./config folder)
+COPY ./config /service/config
 
-# Install Python dependencies including PyYAML for YAML processing
-RUN pip3 install requests applicationinsights pyyaml
+# Ensure the entrypoint script is executable and convert Windows line endings to Unix
+RUN chmod +x /service/config/entrypoint.sh && sed -i 's/\r$//g' /service/config/entrypoint.sh
 
-# Create necessary directories for mounted volumes
-RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
+# Copy built RESTler files from the build output into a location expected by the entrypoint.
+# In this example, we copy all files from /restler_bin into /RESTler.
+RUN mkdir -p /RESTler && cp -r /restler_bin/* /RESTler/
 
-# Copy ALL the built RESTler files from builder, including Restler.dll
-COPY --from=builder /restler_bin/* /RESTler/
-
-# Copy the Python engine files from the source tree (if required)
-COPY --from=builder /restler-fuzzer/restler/engine /RESTler/engine
-# The "compiler" directory is no longer present in this version;
-# so we remove or comment out the following line:
-# COPY --from=builder /restler-fuzzer/restler/compiler /RESTler/compiler
-
-# Set execute permissions and verify installation
-RUN chmod -R 755 /RESTler && \
-    find /RESTler -type f -name "*.py" -exec chmod 755 {} \; && \
-    echo "=== RESTler contents ===" && ls -la /RESTler && \
-    echo "=== RESTler Python files ===" && find /RESTler -name "*.py" && \
-    echo "=== RESTler executables ===" && find /RESTler -type f -executable
-
-# Precompile python modules in the engine directory
-RUN python3 -m compileall -b /RESTler/engine
-
-# Copy the entrypoint script
-COPY services/restler/config/entrypoint.sh /entrypoint.sh
-
-# Convert line endings and set permissions
-RUN dos2unix /entrypoint.sh && chmod 755 /entrypoint.sh
-
-# Set the working directory
-WORKDIR /RESTler
-
-# Set the default entrypoint to our script
-ENTRYPOINT ["/entrypoint.sh"]
+# Set the entrypoint for the container
+ENTRYPOINT ["/service/config/entrypoint.sh"]
