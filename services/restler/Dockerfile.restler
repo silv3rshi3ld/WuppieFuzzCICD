@@ -50,8 +50,8 @@ RUN apt-get update && \
     tree \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip3 install requests applicationinsights
+# Install Python dependencies including PyYAML for YAML processing
+RUN pip3 install requests applicationinsights pyyaml
 
 # Create necessary directories for mounted volumes
 RUN mkdir -p /RESTler/openapi-specs /RESTler/config /RESTler/results
