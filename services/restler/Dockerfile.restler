@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 # Clone the official RESTler repository
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 
-# Build RESTler using the provided Python script (use the simple build command that worked)
+# Build RESTler using the provided Python script
 WORKDIR /restler
 RUN python ./build-restler.py --dest_dir /restler_bin
 
@@ -29,12 +29,8 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/output /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint
-# (Assume your working configuration files are in a local folder named "config")
-COPY services/restler/config /service/config
+# Since the build context is "services/restler", the "config" folder is in the current directory.
+COPY config /service/config
 
-
-# Ensure all config files are executable and that Windows CRLF are converted to Unix LF
-RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
-
-# Set the entrypoint for the container
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+# Ensure config files have Unix line endings and are executable
+RUN chmod -R +x /service/config/ && find /

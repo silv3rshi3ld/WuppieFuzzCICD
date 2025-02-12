@@ -21,12 +21,15 @@ services:
 
   restler:
     build:
-      context: ../..
-      dockerfile: services/restler/Dockerfile.restler
+      context: .
+      dockerfile: Dockerfile.restler
     depends_on:
       - init-vampi
     volumes:
-      - ../../services/vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      # The OpenAPI spec is located in the vampi service folder relative to the repository root.
+      # From services/restler, its relative path is "../vampi/openapi_specs/openapi3.yml"
+      - ../vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
+      # Mount an output folder from services/restler (it will be created if not present)
       - ./output:/workspace/output
     networks:
       - restler-net
