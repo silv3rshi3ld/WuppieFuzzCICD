@@ -35,7 +35,7 @@ except Exception as e:
 
 # Compile API specification using the JSON file from the results directory
 echo "Compiling API specification..."
-dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" compile --api_spec "/RESTler/results/openapi3.json"
+dotnet /RESTler/restler/Restler.dll --workingDirPath "/RESTler" compile --api_spec "/RESTler/results/openapi3.json"
 
 # Verify grammar file exists in Compile directory
 if [ ! -f "/RESTler/Compile/grammar.py" ]; then
@@ -51,7 +51,7 @@ cat /RESTler/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Test step
 echo "Running test phase..."
-dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" test \
+dotnet /RESTler/restler/Restler.dll --workingDirPath "/RESTler" test \
     --grammar_file "/RESTler/Compile/grammar.py" \
     --dictionary_file "/RESTler/Compile/dict.json" \
     --settings "/RESTler/config/test-config.json" \
@@ -62,7 +62,7 @@ dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" test \
 # Run fuzz-lean if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
-    dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" fuzz-lean \
+    dotnet /RESTler/restler/Restler.dll --workingDirPath "/RESTler" fuzz-lean \
         --grammar_file "/RESTler/Compile/grammar.py" \
         --dictionary_file "/RESTler/Compile/dict.json" \
         --settings "/RESTler/config/fuzz-lean-config.json" \
@@ -75,7 +75,7 @@ fi
 # Run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
-    dotnet /RESTler/Restler.dll --workingDirPath "/RESTler" fuzz \
+    dotnet /RESTler/restler/Restler.dll --workingDirPath "/RESTler" fuzz \
         --grammar_file "/RESTler/Compile/grammar.py" \
         --dictionary_file "/RESTler/Compile/dict.json" \
         --settings "/RESTler/config/fuzz-config.json" \
