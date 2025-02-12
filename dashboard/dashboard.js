@@ -1,194 +1,202 @@
-// Enhanced chart initialization with null checks and better status code visualization
+// Global chart instances
+let chartInstances = {};
+
+// Enhanced chart initialization with better error handling
 function initializeCharts(charts) {
+    // Clean up existing charts
+    Object.entries(chartInstances).forEach(([key, chart]) => {
+        if (chart && typeof chart.destroy === 'function') {
+            chart.destroy();
+            chartInstances[key] = null;
+        }
+    });
+
+    // Set chart defaults
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.font.size = 12;
     Chart.defaults.plugins.legend.position = 'bottom';
 
-    // Coverage Distribution Chart
-    const coverageCtx = document.getElementById('coverageChart')?.getContext('2d');
-    if (coverageCtx) {
-        charts.coverage = new Chart(coverageCtx, {
-            type: 'doughnut',
-            data: {
-                labels: window.fuzzerData.stats.statusDistribution.map(d => d.name),
-                datasets: [{
-                    data: window.fuzzerData.stats.statusDistribution.map(d => d.value),
-                    backgroundColor: window.fuzzerData.stats.statusDistribution.map(d => d.color)
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '60%',
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            font: {
-                                size: 13
-                            }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value = context.raw;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = Math.round((value / total) * 100);
-                                return `${context.label}: ${value} (${percentage}%)`;
-                            }
+    try {
+        // Initialize each chart
+        chartInstances.coverage = createCoverageChart();
+        chartInstances.method = createMethodChart();
+        chartInstances.status = createStatusChart();
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+    }
+}
+
+function createCoverageChart() {
+    const canvas = document.getElementById('coverageChart');
+    if (!canvas) return null;
+
+    return new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: window.fuzzerData.stats.statusDistribution.map(d => d.name),
+            datasets: [{
+                data: window.fuzzerData.stats.statusDistribution.map(d => d.value),
+                backgroundColor: window.fuzzerData.stats.statusDistribution.map(d => d.color)
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        font: { size: 13 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.raw;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${context.label}: ${value} (${percentage}%)`;
                         }
                     }
                 }
             }
-        });
-    }
+        }
+    });
+}
 
-    // Method Coverage Chart
-    const methodCtx = document.getElementById('methodChart')?.getContext('2d');
-    if (methodCtx) {
-        charts.method = new Chart(methodCtx, {
-            type: 'bar',
-            data: {
-                labels: window.fuzzerData.stats.methodCoverage.map(d => d.method),
-                datasets: [
-                    {
-                        label: 'Hits',
-                        data: window.fuzzerData.stats.methodCoverage.map(d => d.hits),
-                        backgroundColor: '#22c55e'
-                    },
-                    {
-                        label: 'Misses',
-                        data: window.fuzzerData.stats.methodCoverage.map(d => d.misses),
-                        backgroundColor: '#ef4444'
-                    },
-                    {
-                        label: 'Unspecified',
-                        data: window.fuzzerData.stats.methodCoverage.map(d => d.unspecified),
-                        backgroundColor: '#f59e0b'
-                    }
-                ]
+function createMethodChart() {
+    const canvas = document.getElementById('methodChart');
+    if (!canvas) return null;
+
+    return new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: window.fuzzerData.stats.methodCoverage.map(d => d.method),
+            datasets: [
+                {
+                    label: 'Hits',
+                    data: window.fuzzerData.stats.methodCoverage.map(d => d.hits),
+                    backgroundColor: '#22c55e'
+                },
+                {
+                    label: 'Misses',
+                    data: window.fuzzerData.stats.methodCoverage.map(d => d.misses),
+                    backgroundColor: '#ef4444'
+                },
+                {
+                    label: 'Unspecified',
+                    data: window.fuzzerData.stats.methodCoverage.map(d => d.unspecified),
+                    backgroundColor: '#f59e0b'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    stacked: true,
+                    grid: { display: false }
+                },
+                y: { 
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: { color: '#f3f4f6' }
+                }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { 
-                        stacked: true,
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: { 
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: {
-                            color: '#f3f4f6'
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 20,
+                        font: { size: 13 }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createStatusChart() {
+    const canvas = document.getElementById('statusChart');
+    if (!canvas) return null;
+
+    const statusData = window.fuzzerData.stats.statusCodes.map(d => ({
+        ...d,
+        color: parseInt(d.status) >= 500 ? '#dc2626' :
+               parseInt(d.status) >= 400 ? '#f59e0b' :
+               parseInt(d.status) >= 200 && parseInt(d.status) < 300 ? '#22c55e' :
+               '#6b7280'
+    }));
+
+    return new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: statusData.map(d => d.status),
+            datasets: [{
+                label: 'Count',
+                data: statusData.map(d => d.count),
+                backgroundColor: statusData.map(d => d.color),
+                borderWidth: statusData.map(d => parseInt(d.status) >= 500 ? 3 : 1),
+                borderColor: statusData.map(d => parseInt(d.status) >= 500 ? '#991b1b' : 'transparent'),
+                barThickness: 40
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        font: {
+                            size: 13,
+                            weight: (ctx) => parseInt(ctx.tick.label) >= 500 ? 'bold' : 'normal'
                         }
                     }
                 },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            font: {
-                                size: 13
-                            }
-                        }
-                    }
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f3f4f6' }
                 }
-            }
-        });
-    }
-
-    // Status Codes Chart with enhanced 500+ error visibility
-    const statusCtx = document.getElementById('statusChart')?.getContext('2d');
-    if (statusCtx) {
-        const statusData = window.fuzzerData.stats.statusCodes.map(d => ({
-            ...d,
-            color: parseInt(d.status) >= 500 ? '#dc2626' :
-                   parseInt(d.status) >= 400 ? '#f59e0b' :
-                   parseInt(d.status) >= 200 && parseInt(d.status) < 300 ? '#22c55e' :
-                   '#6b7280'
-        }));
-
-        charts.status = new Chart(statusCtx, {
-            type: 'bar',
-            data: {
-                labels: statusData.map(d => d.status),
-                datasets: [{
-                    label: 'Count',
-                    data: statusData.map(d => d.count),
-                    backgroundColor: statusData.map(d => d.color),
-                    borderWidth: statusData.map(d => parseInt(d.status) >= 500 ? 3 : 1),
-                    borderColor: statusData.map(d => parseInt(d.status) >= 500 ? '#991b1b' : 'transparent'),
-                    barThickness: 40
-                }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            font: {
-                                size: 13,
-                                weight: (ctx) => parseInt(ctx.tick.label) >= 500 ? 'bold' : 'normal'
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const status = context.label;
+                            const count = context.raw;
+                            let description = '';
+                            
+                            if (parseInt(status) >= 500) {
+                                description = '⚠️ CRITICAL: Server Error!\nRequires immediate investigation';
+                            } else if (parseInt(status) >= 400) {
+                                description = 'Client Error - Check Request Parameters';
+                            } else if (parseInt(status) >= 200 && parseInt(status) < 300) {
+                                description = 'Success - Expected Response';
+                            } else if (parseInt(status) >= 300 && parseInt(status) < 400) {
+                                description = 'Redirection - Check Location Header';
                             }
+                            
+                            return [
+                                `Count: ${count}`,
+                                description
+                            ];
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: '#f3f4f6'
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
+                    titleFont: {
+                        size: 14,
+                        weight: (ctx) => parseInt(ctx.label) >= 500 ? 'bold' : 'normal'
                     },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const status = context.label;
-                                const count = context.raw;
-                                let description = '';
-                                
-                                if (parseInt(status) >= 500) {
-                                    description = '⚠️ CRITICAL: Server Error!\nRequires immediate investigation';
-                                } else if (parseInt(status) >= 400) {
-                                    description = 'Client Error - Check Request Parameters';
-                                } else if (parseInt(status) >= 200 && parseInt(status) < 300) {
-                                    description = 'Success - Expected Response';
-                                } else if (parseInt(status) >= 300 && parseInt(status) < 400) {
-                                    description = 'Redirection - Check Location Header';
-                                }
-                                
-                                return [
-                                    `Count: ${count}`,
-                                    description
-                                ];
-                            }
-                        },
-                        titleFont: {
-                            size: 14,
-                            weight: (ctx) => parseInt(ctx.label) >= 500 ? 'bold' : 'normal'
-                        },
-                        bodyFont: {
-                            size: 13
-                        },
-                        padding: 12
-                    }
+                    bodyFont: { size: 13 },
+                    padding: 12
                 }
             }
-        });
-    }
+        }
+    });
 }
 
 // Enhanced status handling
@@ -222,4 +230,11 @@ function filterBugs(bugs, query) {
         bug.status.toLowerCase().includes(query) ||
         (bug.request && bug.request.toLowerCase().includes(query))
     );
+}
+
+// Initialize Feather icons
+function initializeIcons() {
+    if (typeof feather !== 'undefined') {
+        feather.replace();
+    }
 }

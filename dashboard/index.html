@@ -106,9 +106,25 @@
                 charts: {},
 
                 init() {
+                    // Initialize icons first
+                    initializeIcons();
+
+                    // Initialize charts after a small delay to ensure DOM is ready
                     this.$nextTick(() => {
-                        initializeCharts(this.charts);
-                        feather.replace();
+                        setTimeout(() => {
+                            const coverageChart = document.getElementById('coverageChart');
+                            const methodChart = document.getElementById('methodChart');
+                            const statusChart = document.getElementById('statusChart');
+
+                            if (coverageChart && methodChart && statusChart) {
+                                initializeCharts(this.charts);
+                            }
+                        }, 100);
+                    });
+
+                    // Watch for changes that require icon updates
+                    this.$watch('filteredBugs', () => {
+                        setTimeout(initializeIcons, 50);
                     });
                 },
 
@@ -159,8 +175,8 @@
     <!-- Load Alpine.js last -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
-<body class="bg-gray-50">
-    <div x-data="dashboard()">
+<body class="bg-gray-50" x-data="dashboard()" x-init="init">
+    <div>
         <!-- Header -->
         <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
             <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
@@ -220,7 +236,10 @@
                 <!-- Overall Statistics Section -->
                 <div class="mb-8">
                     <div class="section-header">
-                        <h2 class="section-title">Overall Statistics</h2>
+                        <h2 class="section-title">
+                            <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                            Overall Statistics
+                        </h2>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                         <div class="stats-card">
@@ -247,12 +266,18 @@
                 <!-- Charts Section -->
                 <div class="mb-8">
                     <div class="section-header">
-                        <h2 class="section-title">Response Analysis</h2>
+                        <h2 class="section-title">
+                            <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                            Response Analysis
+                        </h2>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <!-- Coverage Distribution -->
                         <div class="chart-card">
-                            <h3 class="chart-title">Coverage Distribution</h3>
+                            <h3 class="chart-title">
+                                <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                                Coverage Distribution
+                            </h3>
                             <div class="chart-container">
                                 <canvas id="coverageChart"></canvas>
                             </div>
@@ -260,7 +285,10 @@
 
                         <!-- Coverage by Method -->
                         <div class="chart-card">
-                            <h3 class="chart-title">Coverage by Method</h3>
+                            <h3 class="chart-title">
+                                <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                                Coverage by Method
+                            </h3>
                             <div class="chart-container">
                                 <canvas id="methodChart"></canvas>
                             </div>
@@ -268,7 +296,10 @@
 
                         <!-- Status Codes -->
                         <div class="chart-card">
-                            <h3 class="chart-title">Status Code Distribution</h3>
+                            <h3 class="chart-title">
+                                <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                                Status Code Distribution
+                            </h3>
                             <div class="chart-container">
                                 <canvas id="statusChart"></canvas>
                             </div>
@@ -280,7 +311,10 @@
                 <div class="mb-8">
                     <div class="section-header">
                         <div class="flex-1">
-                            <h2 class="section-title">All Issues</h2>
+                            <h2 class="section-title">
+                                <i data-feather="alert-circle" class="h-6 w-6 text-gray-400"></i>
+                                All Issues
+                            </h2>
                             <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredBugs.length + ' total)'"></p>
                         </div>
                         <input 
@@ -333,12 +367,18 @@
                 <template x-if="selectedEndpoint">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="chart-card">
-                            <h3 class="chart-title">Request</h3>
+                            <h3 class="chart-title">
+                                <i data-feather="arrow-right" class="h-5 w-5 text-gray-400"></i>
+                                Request
+                            </h3>
                             <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.request || 'No request data available'"></pre>
                         </div>
                         
                         <div class="chart-card">
-                            <h3 class="chart-title">Response</h3>
+                            <h3 class="chart-title">
+                                <i data-feather="arrow-left" class="h-5 w-5 text-gray-400"></i>
+                                Response
+                            </h3>
                             <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.response || 'No response data available'"></pre>
                         </div>
                     </div>
@@ -346,6 +386,7 @@
                 <template x-if="!selectedEndpoint">
                     <div class="chart-card">
                         <div class="text-center py-12 text-gray-500">
+                            <i data-feather="info" class="h-6 w-6 mx-auto mb-2"></i>
                             Select an endpoint to view details
                         </div>
                     </div>
