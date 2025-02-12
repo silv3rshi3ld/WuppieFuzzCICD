@@ -30,7 +30,8 @@ RUN mkdir -p /workspace/output /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint
 # (Assume your working configuration files are in a local folder named "config")
-COPY ./config /service/config
+COPY services/restler/config /service/config
+
 
 # Ensure all config files are executable and that Windows CRLF are converted to Unix LF
 RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
