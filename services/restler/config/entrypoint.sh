@@ -76,6 +76,26 @@ for dir in Test FuzzLean Fuzz; do
     fi
 done
 
+# --- NEW WAIT STEP ---
+# Add a check to wait until the output folder has content
+echo "Waiting for output files to be created..."
+max_wait=60  # maximum seconds to wait
+elapsed=0
+while [ $elapsed -lt $max_wait ]; do
+    if [ -d "/workspace/output" ] && [ "$(ls -A /workspace/output)" ]; then
+        echo "Output detected."
+        break
+    else
+        echo "Output not found yet, sleeping 5 seconds..."
+        sleep 5
+        elapsed=$((elapsed+5))
+    fi
+done
+if [ $elapsed -ge $max_wait ]; then
+    echo "Warning: Timeout reached without detecting output."
+fi
+# --- END WAIT STEP ---
+
 # DEBUG: List directories after execution
 echo "----- LS of /workspace AFTER execution -----"
 ls -la /workspace
