@@ -1,6 +1,6 @@
 FROM python:3.8-slim-bullseye
 
-# Install system dependencies and the .NET SDK 8.0
+# Install system dependencies and the .NET SDK 8.0.
 RUN apt-get update && apt-get install -y \
     wget \
     apt-transport-https \
@@ -12,28 +12,28 @@ RUN apt-get update && apt-get install -y \
     dpkg -i packages-microsoft-prod.deb && \
     apt-get update && \
     apt-get install -y dotnet-sdk-8.0 && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* packages-microsoft-prod.deb
 
-# Clone the official RESTler repository
+# Clone the official RESTler repository.
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 
-# Build RESTler using the provided Python script
+# Build RESTler using the provided Python script.
 WORKDIR /restler
 RUN python ./build-restler.py --dest_dir /restler_bin
 
-# Install RESTler-related Python dependencies
+# Install RESTler-related Python dependencies.
 RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Set up workspace directory (create both output and FuzzLean directories)
+# Set up workspace directory (create output, FuzzLean, Test and Fuzz directories).
 WORKDIR /workspace
-RUN mkdir -p /workspace/output /workspace/FuzzLean
+RUN mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz
 
-# Copy RESTler configuration files and entrypoint
-# With build context set to services/restler, the config folder is in the current directory.
+# Copy RESTler configuration files and entrypoint.
+# (Assuming your config folder is located in services/restler/config.)
 COPY config /service/config
 
-# Ensure config files have Unix line endings and are executable
+# Ensure config files have Unix line endings and are executable.
 RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
 
-# Set the entrypoint for the container
+# Set the entrypoint for the container.
 ENTRYPOINT ["/service/config/entrypoint.sh"]

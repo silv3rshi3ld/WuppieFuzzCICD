@@ -10,7 +10,7 @@ services:
       - tokentimetolive=300
     networks:
       - restler-net
-    command: ["app.py"]
+    command: ["python3", "app.py"]
 
   init-vampi:
     image: curlimages/curl:latest
@@ -27,9 +27,9 @@ services:
     depends_on:
       - init-vampi
     volumes:
-      # Assuming the OpenAPI spec is in the vampi folder at ../vampi/openapi_specs/openapi3.yml
+      # Adjust the path to your OpenAPI spec as needed.
       - ../vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      # Mount an output folder from services/restler (it will be created if not present)
+      # Mount the output folder.
       - ./output:/workspace/output
     networks:
       - restler-net
