@@ -4,14 +4,14 @@ set -e
 echo "Starting RESTler Fuzzer..."
 
 # Create necessary directories with appropriate permissions
-mkdir -p /workspace/output
-chmod 755 /workspace/output
+mkdir -p /workspace/output /workspace/FuzzLean
+chmod 755 /workspace/output /workspace/FuzzLean
 
 # Change to the workspace directory
 cd /workspace
 
-# Debug: Check if OpenAPI file exists
-echo "Checking OpenAPI file..."
+# Debug: Check if the OpenAPI file exists
+echo "Checking for OpenAPI file..."
 if [ ! -f "/workspace/openapi3.yml" ]; then
     echo "Error: OpenAPI file not found at /workspace/openapi3.yml"
     ls -la /workspace/
@@ -20,22 +20,21 @@ fi
 
 # Compile API specification
 echo "Compiling API specification..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile \
-    --api_spec "/workspace/openapi3.yml"
+dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile --api_spec "/workspace/openapi3.yml"
 
-# Verify grammar file exists in Compile directory
+# Verify grammar file exists in the Compile directory
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
     echo "Error: Grammar file was not generated!"
-    echo "Checking Compile directory contents:"
+    echo "Contents of /workspace/Compile:"
     ls -la /workspace/Compile
     exit 1
 fi
 
-# Display compilation logs
+# Display compilation logs (if available)
 echo "Compilation logs:"
 cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
-# Test step
+# Run test phase
 echo "Running test phase..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --grammar_file "/workspace/Compile/grammar.py" \
@@ -45,7 +44,7 @@ dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --target_port "${TARGET_PORT}" \
     --no_ssl
 
-# Run fuzz-lean if enabled
+# Optionally run fuzz-lean testing if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
     dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
@@ -58,7 +57,7 @@ if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
         --no_ssl
 fi
 
-# Run full fuzzing if enabled
+# Optionally run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
     dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \

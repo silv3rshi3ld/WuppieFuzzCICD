@@ -7,32 +7,33 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     build-essential \
-    libssl-dev \
- && wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
- && dpkg -i packages-microsoft-prod.deb \
- && apt-get update \
- && apt-get install -y dotnet-sdk-6.0 \
- && rm -rf /var/lib/apt/lists/*
+    libssl-dev && \
+    wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-6.0 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Clone the official RESTler repository
 RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
 
-# Build RESTler using the provided Python script with engine compilation
+# Build RESTler using the provided Python script (use the simple build command that worked)
 WORKDIR /restler
-RUN python ./build-restler.py --dest_dir /restler_bin --compile_type engine --python_path /usr/local/bin/python3
+RUN python ./build-restler.py --dest_dir /restler_bin
 
-# Install additional RESTler-related Python dependencies
-RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights pyyaml
+# Install RESTler-related Python dependencies
+RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Set up workspace directory
+# Set up workspace directory (create both output and FuzzLean directories)
 WORKDIR /workspace
-RUN mkdir -p /workspace/output
+RUN mkdir -p /workspace/output /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint
-COPY services/restler/config /RESTler/config
+# (Assume your working configuration files are in a local folder named "config")
+COPY ./config /service/config
 
-# Ensure all config files are executable and convert Windows line endings to Unix
-RUN chmod -R +x /RESTler/config/ && find /RESTler/config -type f -exec sed -i 's/\r$//g' {} \;
+# Ensure all config files are executable and that Windows CRLF are converted to Unix LF
+RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
 
 # Set the entrypoint for the container
-ENTRYPOINT ["/RESTler/config/entrypoint.sh"]
+ENTRYPOINT ["/service/config/entrypoint.sh"]
