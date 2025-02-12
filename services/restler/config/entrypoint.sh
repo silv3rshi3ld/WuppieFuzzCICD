@@ -3,8 +3,7 @@ set -e
 
 echo "Starting RESTler Fuzzer..."
 
-# Create necessary directories with appropriate permissions.
-# (Also create Test and Fuzz so that if RESTler writes there, they exist.)
+# Create necessary directories (we also create Test and Fuzz so they exist if RESTler writes there).
 mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz
 chmod 755 /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz
 
@@ -23,7 +22,7 @@ fi
 echo "Compiling API specification..."
 dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" compile --api_spec "/workspace/openapi3.yml"
 
-# Verify grammar file exists in the Compile directory.
+# Verify that the grammar file was generated.
 if [ ! -f "/workspace/Compile/grammar.py" ]; then
     echo "Error: Grammar file was not generated!"
     echo "Contents of /workspace/Compile:"
@@ -71,12 +70,13 @@ if [ "${RUN_FUZZ}" = "true" ]; then
         --no_ssl
 fi
 
-# Copy results from RESTler output folders into the output directory.
+# Copy results (from any of the RESTler output directories) into /workspace/output.
 echo "Copying results to output directory..."
 for dir in Compile Test FuzzLean Fuzz; do
     if [ -d "/workspace/${dir}" ]; then
         mkdir -p "/workspace/output/${dir}"
-        cp -r /workspace/${dir}/* "/workspace/output/${dir}/"
+        # Use "|| true" to avoid exit if nothing is present.
+        cp -r /workspace/${dir}/* "/workspace/output/${dir}/" || true
     fi
 done
 

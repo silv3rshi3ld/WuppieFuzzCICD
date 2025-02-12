@@ -10,7 +10,8 @@ services:
       - tokentimetolive=300
     networks:
       - restler-net
-    command: ["python3", "app.py"]
+    # Use the default command provided in the vampi image.
+    command: ["app.py"]
 
   init-vampi:
     image: curlimages/curl:latest
@@ -27,9 +28,9 @@ services:
     depends_on:
       - init-vampi
     volumes:
-      # Adjust the path to your OpenAPI spec as needed.
+      # Mount your OpenAPI spec (adjust the host path as needed)
       - ../vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      # Mount the output folder.
+      # Mount the output folder so the artifact uploader can collect the results.
       - ./output:/workspace/output
     networks:
       - restler-net
