@@ -44,4 +44,39 @@ dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
     --target_port "${TARGET_PORT}" \
     --no_ssl
 
-# Optionally run fuzz-le
+# Optionally run fuzz-lean testing if enabled
+if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
+    echo "Starting fuzz-lean testing..."
+    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
+        --grammar_file "/workspace/Compile/grammar.py" \
+        --dictionary_file "/workspace/Compile/dict.json" \
+        --settings "/workspace/Compile/engine_settings.json" \
+        --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
+        --no_ssl
+fi
+
+# Optionally run full fuzzing if enabled
+if [ "${RUN_FUZZ}" = "true" ]; then
+    echo "Starting full fuzzing..."
+    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \
+        --grammar_file "/workspace/Compile/grammar.py" \
+        --dictionary_file "/workspace/Compile/dict.json" \
+        --settings "/workspace/Compile/engine_settings.json" \
+        --time_budget "${FUZZ_TIME_BUDGET}" \
+        --target_ip "${TARGET_IP}" \
+        --target_port "${TARGET_PORT}" \
+        --no_ssl
+fi
+
+# Copy results to output directory
+echo "Copying results to output directory..."
+for dir in Test FuzzLean Fuzz; do
+    if [ -d "/workspace/${dir}/RestlerResults" ]; then
+        mkdir -p "/workspace/output/${dir}"
+        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
+    fi
+done
+
+echo "RESTler execution completed!"

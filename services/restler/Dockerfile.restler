@@ -29,8 +29,11 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/output /workspace/FuzzLean
 
 # Copy RESTler configuration files and entrypoint
-# Since the build context is "services/restler", the "config" folder is in the current directory.
+# With build context set to services/restler, the config folder is in the current directory.
 COPY config /service/config
 
 # Ensure config files have Unix line endings and are executable
-RUN chmod -R +x /service/config/ && find /
+RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
+
+# Set the entrypoint for the container
+ENTRYPOINT ["/service/config/entrypoint.sh"]
