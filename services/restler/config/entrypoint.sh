@@ -36,7 +36,7 @@ cat /workspace/Compile/RestlerCompile.log || echo "No compile log found."
 
 # Run test phase
 echo "Running test phase..."
-dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
+dotnet /Restler/restler/Restler.dll --workingDirPath "/workspace" test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
     --settings "/workspace/Compile/engine_settings.json" \
@@ -47,7 +47,7 @@ dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" test \
 # Optionally run fuzz-lean testing if enabled
 if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
     echo "Starting fuzz-lean testing..."
-    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
+    dotnet /Restler/restler/Restler.dll --workingDirPath "/workspace" fuzz-lean \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
@@ -60,7 +60,7 @@ fi
 # Optionally run full fuzzing if enabled
 if [ "${RUN_FUZZ}" = "true" ]; then
     echo "Starting full fuzzing..."
-    dotnet /restler_bin/restler/Restler.dll --workingDirPath "/workspace" fuzz \
+    dotnet /Restler/restler/restler/Restler.dll --workingDirPath "/workspace" fuzz \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
