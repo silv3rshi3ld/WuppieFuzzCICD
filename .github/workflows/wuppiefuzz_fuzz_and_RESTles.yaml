@@ -101,7 +101,7 @@ jobs:
     env:
       MODE: "all"  # Run all RESTler modes in sequence
       # Valid values: test, fuzz-lean, fuzz, all
-      BASE_DIR: /github/workspace
+      BASE_DIR: ${{ github.workspace }}
       NETWORK_SUFFIX: ${{ github.run_id }}
     steps:
       - name: Checkout Repository
@@ -109,19 +109,19 @@ jobs:
 
       - name: Prepare Environment
         run: |
-          mkdir -p /github/workspace/restler-output
-          chmod -R 777 /github/workspace/restler-output
+          mkdir -p restler-output
+          chmod -R 777 restler-output
           echo "=== Initial output directory structure ==="
-          ls -la /github/workspace/restler-output
+          ls -la restler-output
 
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
           echo "=== Listing output directory structure ==="
-          ls -R /github/workspace/restler-output || true
+          ls -R ../../restler-output || true
           echo "=== Detailed output directory listing ==="
-          find /github/workspace/restler-output -type f -exec ls -l {} \; || true
+          find ../../restler-output -type f -exec ls -l {} \; || true
 
       - name: Check Container Logs
         if: always()
@@ -134,4 +134,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: /github/workspace/restler-output
+          path: restler-output
