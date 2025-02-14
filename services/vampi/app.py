@@ -1,6 +1,4 @@
-from config import vuln_app, db
-from models.books_model import Book
-from models.user_model import User
+from config import vuln_app
 import os
 
 '''
@@ -13,10 +11,6 @@ vuln = int(os.getenv('vulnerable', 1))
 # token alive for how many seconds?
 alive = int(os.getenv('tokentimetolive', 60))
 
-
-# Create database tables before running the app
-with vuln_app.app.app_context():
-    db.create_all()
 
 # start the app with port 5000 and debug on!
 if __name__ == '__main__':

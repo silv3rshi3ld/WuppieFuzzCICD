@@ -28,7 +28,7 @@ services:
       - init-vampi
     volumes:
       - ../vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      - ${GITHUB_WORKSPACE}/services/restler/output:/workspace/output
+      - ${BASE_DIR}/restler-output:/workspace/output
     networks:
       - restler-net
     environment:
