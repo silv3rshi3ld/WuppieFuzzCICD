@@ -3,13 +3,22 @@ set -e
 
 echo "Starting RESTler Fuzzer..."
 
+# Set defaults for environment variables if they aren’t provided
+TARGET_IP="${TARGET_IP:-localhost}"
+TARGET_PORT="${TARGET_PORT:-80}"
+FUZZ_LEAN_TIME_BUDGET="${FUZZ_LEAN_TIME_BUDGET:-60}"
+FUZZ_TIME_BUDGET="${FUZZ_TIME_BUDGET:-300}"
+
+echo "Using TARGET_IP: $TARGET_IP, TARGET_PORT: $TARGET_PORT"
+echo "FUZZ_LEAN_TIME_BUDGET: $FUZZ_LEAN_TIME_BUDGET, FUZZ_TIME_BUDGET: $FUZZ_TIME_BUDGET"
+
 # Create required directories for output and intermediate results
 mkdir -p /workspace/output /workspace/Test /workspace/Fuzz /workspace/FuzzLean
 
 # Change to the workspace directory
 cd /workspace
 
-# DEBUG: List workspace contents before compile
+# DEBUG: List workspace contents before compilation
 echo "----- LS of /workspace BEFORE compilation -----"
 ls -la /workspace
 
@@ -35,33 +44,33 @@ dotnet /restler_bin/restler/Restler.dll test \
     --grammar_file "/workspace/Compile/grammar.py" \
     --dictionary_file "/workspace/Compile/dict.json" \
     --settings "/workspace/Compile/engine_settings.json" \
-    --target_ip "${TARGET_IP}" \
-    --target_port "${TARGET_PORT}" \
+    --target_ip "$TARGET_IP" \
+    --target_port "$TARGET_PORT" \
     --no_ssl
 
 # Optionally run fuzz-lean testing if enabled
-if [ "${RUN_FUZZ_LEAN}" = "true" ]; then
+if [ "$RUN_FUZZ_LEAN" = "true" ]; then
     echo "Starting fuzz-lean testing..."
     dotnet /restler_bin/restler/Restler.dll fuzz-lean \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
-        --time_budget "${FUZZ_LEAN_TIME_BUDGET}" \
-        --target_ip "${TARGET_IP}" \
-        --target_port "${TARGET_PORT}" \
+        --time_budget "$FUZZ_LEAN_TIME_BUDGET" \
+        --target_ip "$TARGET_IP" \
+        --target_port "$TARGET_PORT" \
         --no_ssl
 fi
 
 # Optionally run full fuzzing if enabled
-if [ "${RUN_FUZZ}" = "true" ]; then
+if [ "$RUN_FUZZ" = "true" ]; then
     echo "Starting full fuzzing..."
     dotnet /restler_bin/restler/Restler.dll fuzz \
         --grammar_file "/workspace/Compile/grammar.py" \
         --dictionary_file "/workspace/Compile/dict.json" \
         --settings "/workspace/Compile/engine_settings.json" \
-        --time_budget "${FUZZ_TIME_BUDGET}" \
-        --target_ip "${TARGET_IP}" \
-        --target_port "${TARGET_PORT}" \
+        --time_budget "$FUZZ_TIME_BUDGET" \
+        --target_ip "$TARGET_IP" \
+        --target_port "$TARGET_PORT" \
         --no_ssl
 fi
 
@@ -77,7 +86,7 @@ for dir in Test FuzzLean Fuzz; do
 done
 
 # --- NEW WAIT STEP ---
-# Add a check to wait until the output folder has content
+# Wait until output files are created (up to 60 seconds)
 echo "Waiting for output files to be created..."
 max_wait=60  # maximum seconds to wait
 elapsed=0
@@ -95,7 +104,7 @@ if [ $elapsed -ge $max_wait ]; then
     echo "Warning: Timeout reached without detecting output."
 fi
 
-# Create a placeholder if output directory is empty
+# Create a placeholder file if output directory is still empty
 if [ -z "$(ls -A /workspace/output)" ]; then
     echo "No output files detected. Creating placeholder file."
     touch /workspace/output/restler.complete
@@ -105,17 +114,5 @@ fi
 # DEBUG: List directories after execution
 echo "----- LS of /workspace AFTER execution -----"
 ls -la /workspace
-
-echo "----- LS of /workspace/Test -----"
-ls -la /workspace/Test || true
-
-echo "----- LS of /workspace/FuzzLean -----"
-ls -la /workspace/FuzzLean || true
-
-echo "----- LS of /workspace/Fuzz -----"
-ls -la /workspace/Fuzz || true
-
-echo "----- LS of /workspace/output -----"
-ls -la /workspace/output || true
 
 echo "RESTler execution completed!"
