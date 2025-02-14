@@ -111,12 +111,17 @@ jobs:
         run: |
           mkdir -p services/restler/output
           chmod -R 777 services/restler/output
+          echo "=== Initial output directory structure ==="
+          ls -la services/restler/output
 
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
-          ls -la output || true
+          echo "=== Listing output directory structure ==="
+          ls -R output || true
+          echo "=== Detailed output directory listing ==="
+          find output -type f -exec ls -l {} \; || true
 
       - name: Check Container Logs
         if: always()
