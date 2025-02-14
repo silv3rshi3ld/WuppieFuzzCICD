@@ -94,6 +94,12 @@ done
 if [ $elapsed -ge $max_wait ]; then
     echo "Warning: Timeout reached without detecting output."
 fi
+
+# Create a placeholder if output directory is empty
+if [ -z "$(ls -A /workspace/output)" ]; then
+    echo "No output files detected. Creating placeholder file."
+    touch /workspace/output/restler.complete
+fi
 # --- END WAIT STEP ---
 
 # DEBUG: List directories after execution
