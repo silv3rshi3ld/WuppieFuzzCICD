@@ -1,13 +1,15 @@
 FROM python:3.11-alpine as builder
-RUN apk --update add bash nano g++
+RUN apk --update add bash nano g++ sqlite
 COPY ./requirements.txt /vampi/requirements.txt
 WORKDIR /vampi
 RUN pip install -r requirements.txt
 
 # Build a fresh container, copying across files & compiled parts
 FROM python:3.11-alpine
+RUN apk --update add sqlite
 COPY . /vampi
 WORKDIR /vampi
+RUN mkdir -p database
 COPY --from=builder /usr/local/lib /usr/local/lib
 COPY --from=builder /usr/local/bin /usr/local/bin
 ENV vulnerable=1
