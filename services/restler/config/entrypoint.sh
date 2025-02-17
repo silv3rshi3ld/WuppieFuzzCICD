@@ -51,6 +51,9 @@ fi
 # Define the full path to the RESTler DLL.
 RESTLER_DLL="/restler_bin/restler/Restler.dll"
 
+# Create artifacts directory
+mkdir -p "$BASE_DIR/artifacts"
+
 # Change to the base directory (mounted GitHub Actions workspace).
 cd "$BASE_DIR"
 
@@ -71,6 +74,11 @@ case "$COMMAND" in
         fi
         echo "Running fuzz-lean..."
         dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
+        # Copy coverage failures file to artifacts directory if it exists
+        if [ -f "RestlerResults/coverage_failures_to_investigate.txt" ]; then
+            cp "RestlerResults/coverage_failures_to_investigate.txt" "$BASE_DIR/artifacts/"
+            echo "Coverage failures file has been copied to artifacts directory"
+        fi
         ;;
     fuzz)
         if [ -z "$TIME_BUDGET" ]; then
