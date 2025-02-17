@@ -11,20 +11,20 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         echo "VAmPI API is ready!"
         break
     fi
-    
+
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
         echo "Error: VAmPI API failed to become ready after $((MAX_RETRIES * RETRY_INTERVAL)) seconds"
         exit 1
     fi
-    
+
     echo "Attempt $RETRY_COUNT of $MAX_RETRIES - Waiting for VAmPI API..."
     sleep $RETRY_INTERVAL
 done
 
 echo "Starting Schemathesis test execution..."
 
-# Run Schemathesis with configured parameters
+# Run Schemathesis with configured parameters (removed --report-type html)
 schemathesis run /app/openapi3.yml \
     --stateful=links \
     --hypothesis-deadline=1000 \
@@ -33,7 +33,6 @@ schemathesis run /app/openapi3.yml \
     --workers auto \
     --base-url http://${TARGET_IP}:${TARGET_PORT} \
     --report \
-    --report-type html \
     --verbosity debug \
     --show-errors \
     --validate-schema \
