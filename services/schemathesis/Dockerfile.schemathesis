@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+# Install dependencies
+RUN pip install --no-cache-dir schemathesis==3.19.7
+
+# Set working directory
+WORKDIR /app
+
+# Create output directory
+RUN mkdir -p /app/output
+
+# Copy entrypoint script
+COPY config/entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV SCHEMATHESIS_REPORT_DIR=/app/output
+
+ENTRYPOINT ["/app/entrypoint.sh"]

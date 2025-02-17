@@ -1,4 +1,4 @@
-name: Fuzz VAmPI with WuppieFuzz, EvoMaster, and Restler
+name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler, and Schemathesis
 
 on:
   push:
@@ -144,3 +144,34 @@ jobs:
         with:
           name: restler-fuzz-results
           path: ${{ github.workspace }}/services/restler/output/Fuzz/
+
+  schemathesis:
+    runs-on: ubuntu-latest
+    env:
+      BASE_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Environment
+        run: |
+          mkdir -p $BASE_DIR/services/schemathesis/output
+          chmod -R 777 $BASE_DIR/services/schemathesis/output
+
+      - name: Run Schemathesis and VAmPI
+        run: |
+          cd services/schemathesis
+          docker compose -f docker-compose.schemathesis.yml up --abort-on-container-exit
+
+      - name: Check Container Logs
+        if: always()
+        run: |
+          docker compose -f services/schemathesis/docker-compose.schemathesis.yml logs vampi || true
+          docker compose -f services/schemathesis/docker-compose.schemathesis.yml logs schemathesis || true
+          docker compose -f services/schemathesis/docker-compose.schemathesis.yml logs init-vampi || true
+
+      - name: Upload Schemathesis Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: schemathesis-results
+          path: ${{ github.workspace }}/services/schemathesis/output/
