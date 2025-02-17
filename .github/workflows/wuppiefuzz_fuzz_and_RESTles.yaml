@@ -177,4 +177,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: schemathesis-results
-          path: services/schemathesis/results
+          path: services/schemathesis/output
