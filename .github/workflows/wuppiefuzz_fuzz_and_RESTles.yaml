@@ -99,7 +99,7 @@ jobs:
   restler:
     runs-on: ubuntu-latest
     env:
-      BASE_DIR: ${{ github.workspace }}
+      BASE_DIR: /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -108,24 +108,32 @@ jobs:
         run: |
           mkdir -p $BASE_DIR/services/restler/output
           chmod -R 777 $BASE_DIR/services/restler/output
+          echo "=== Initial output directory structure ==="
+          ls -la $BASE_DIR/services/restler/output
 
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
+          echo "=== Listing output directory structure ==="
+          ls -R $BASE_DIR/services/restler/output || true
+          echo "=== Detailed output directory listing ==="
+          find $BASE_DIR/services/restler/output -type f -exec ls -l {} \; || true
 
-      - name: Check Container Logs
-        if: always()
-        run: |
-          docker compose -f services/restler/docker-compose.restler.yml logs vampi || true
-          docker compose -f services/restler/docker-compose.restler.yml logs restler || true
-          docker compose -f services/restler/docker-compose.restler.yml logs init-vampi || true
-
-      - name: Upload RESTler Results
+      - name: Upload RESTler Test Results
         uses: actions/upload-artifact@v4
         with:
-          name: restler-results
-          path: |
-            $BASE_DIR/services/restler/output/Test/RestlerResults/
-            $BASE_DIR/services/restler/output/FuzzLean/RestlerResults/
-            $BASE_DIR/services/restler/output/Fuzz/RestlerResults/
+          name: restler-test-results
+          path: $BASE_DIR/services/restler/output/Test/
+
+      - name: Upload RESTler FuzzLean Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-fuzzlean-results
+          path: $BASE_DIR/services/restler/output/FuzzLean/
+
+      - name: Upload RESTler Fuzz Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: restler-fuzz-results
+          path: $BASE_DIR/services/restler/output/Fuzz/

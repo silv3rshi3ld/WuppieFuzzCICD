@@ -12,15 +12,17 @@ FUZZ_TIME_BUDGET="${FUZZ_TIME_BUDGET:-300}"
 echo "Using TARGET_IP: $TARGET_IP, TARGET_PORT: $TARGET_PORT"
 echo "FUZZ_LEAN_TIME_BUDGET: $FUZZ_LEAN_TIME_BUDGET, FUZZ_TIME_BUDGET: $FUZZ_TIME_BUDGET"
 
+# Define output directories
+OUTPUT_DIR="/workspace/output"
+TEST_DIR="$OUTPUT_DIR/Test"
+FUZZLEAN_DIR="$OUTPUT_DIR/FuzzLean"
+FUZZ_DIR="$OUTPUT_DIR/Fuzz"
+
 # Create required directories for output and intermediate results
-mkdir -p /workspace/output /workspace/Test /workspace/Fuzz /workspace/FuzzLean
+mkdir -p "$TEST_DIR" "$FUZZLEAN_DIR" "$FUZZ_DIR"
 
 # Change to the workspace directory
 cd /workspace
-
-# DEBUG: List workspace contents before compilation
-echo "----- LS of /workspace BEFORE compilation -----"
-ls -la /workspace
 
 # Compile API specification
 echo "Compiling API specification..."
@@ -48,6 +50,13 @@ dotnet /restler_bin/restler/Restler.dll test \
     --target_port "$TARGET_PORT" \
     --no_ssl
 
+# Move test results to the designated output directory
+if [ -d "/workspace/Test/RestlerResults" ]; then
+    mv /workspace/Test/RestlerResults/* "$TEST_DIR/"
+else
+    echo "No test results found."
+fi
+
 # Optionally run fuzz-lean testing if enabled
 if [ "$RUN_FUZZ_LEAN" = "true" ]; then
     echo "Starting fuzz-lean testing..."
@@ -59,6 +68,13 @@ if [ "$RUN_FUZZ_LEAN" = "true" ]; then
         --target_ip "$TARGET_IP" \
         --target_port "$TARGET_PORT" \
         --no_ssl
+
+    # Move fuzz-lean results to the designated output directory
+    if [ -d "/workspace/FuzzLean/RestlerResults" ]; then
+        mv /workspace/FuzzLean/RestlerResults/* "$FUZZLEAN_DIR/"
+    else
+        echo "No fuzz-lean results found."
+    fi
 fi
 
 # Optionally run full fuzzing if enabled
@@ -72,25 +88,13 @@ if [ "$RUN_FUZZ" = "true" ]; then
         --target_ip "$TARGET_IP" \
         --target_port "$TARGET_PORT" \
         --no_ssl
-fi
 
-# Copy results to the output directory (if they exist)
-echo "Copying results to output directory..."
-for dir in Test FuzzLean Fuzz; do
-    if [ -d "/workspace/${dir}/RestlerResults" ]; then
-        mkdir -p "/workspace/output/${dir}"
-        cp -r "/workspace/${dir}/RestlerResults" "/workspace/output/${dir}/RestlerResults"
+    # Move fuzz results to the designated output directory
+    if [ -d "/workspace/Fuzz/RestlerResults" ]; then
+        mv /workspace/Fuzz/RestlerResults/* "$FUZZ_DIR/"
     else
-        echo "No results directory found for phase ${dir}"
+        echo "No fuzz results found."
     fi
-done
-
-# DEBUG: List output folder contents
-echo "----- LS of /workspace/output AFTER copying -----"
-ls -la /workspace/output
-
-# Create a completion marker to ensure the output folder isn’t empty
-echo "Creating completion marker file..."
-touch /workspace/output/restler.complete
+fi
 
 echo "RESTler execution completed!"
