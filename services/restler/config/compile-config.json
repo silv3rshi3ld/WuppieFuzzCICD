@@ -1,6 +1,6 @@
 {
-    "SwaggerSpecFilePath": "/RESTler/results/openapi3.json",
-    "GrammarOutputDirectoryPath": "/RESTler/Compile",
+    "SwaggerSpecFilePath": "/workspace/openapi3.yml",
+    "GrammarOutputDirectoryPath": "/workspace/Compile",
     "CustomDictionaryFilePath": null,
     "IncludeOptionalParameters": true,
     "UseHeaderExamples": true,
@@ -9,5 +9,7 @@
     "ResolveQueryDependencies": true,
     "MaxCombinations": 20,
     "DiscoverExamples": true,
-    "DataFuzzing": true
+    "DataFuzzing": true,
+    "Host": "vampi",
+    "Port": 5000
 }
