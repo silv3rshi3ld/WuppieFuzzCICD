@@ -108,17 +108,11 @@ jobs:
         run: |
           mkdir -p $BASE_DIR/services/restler/output
           chmod -R 777 $BASE_DIR/services/restler/output
-          echo "=== Initial output directory structure ==="
-          ls -la $BASE_DIR/services/restler/output
 
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
-          echo "=== Listing output directory structure ==="
-          ls -R $BASE_DIR/services/restler/output || true
-          echo "=== Detailed output directory listing ==="
-          find $BASE_DIR/services/restler/output -type f -exec ls -l {} \; || true
 
       - name: Check Container Logs
         if: always()
@@ -127,13 +121,11 @@ jobs:
           docker compose -f services/restler/docker-compose.restler.yml logs restler || true
           docker compose -f services/restler/docker-compose.restler.yml logs init-vampi || true
 
-      - name: Verify RESTler Output Directory
-        run: |
-          echo "Verifying RESTler output directory before artifact upload:"
-          ls -la $BASE_DIR/services/restler/output
-
       - name: Upload RESTler Results
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: $BASE_DIR/services/restler/output
+          path: |
+            $BASE_DIR/services/restler/output/Test/RestlerResults/
+            $BASE_DIR/services/restler/output/FuzzLean/RestlerResults/
+            $BASE_DIR/services/restler/output/Fuzz/RestlerResults/
