@@ -62,11 +62,11 @@ cd "$BASE_DIR"
 case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
-        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC"
+        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC" --settings /service/config/compile-config.json
         ;;
     test)
         echo "Running tests..."
-        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings Compile/engine_settings.json
+        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/test-config.json
         ;;
     fuzz-lean)
         if [ -z "$TIME_BUDGET" ]; then
@@ -74,7 +74,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running fuzz-lean..."
-        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings Compile/engine_settings.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-lean-config.json --time_budget "$TIME_BUDGET"
         ;;
     fuzz)
         if [ -z "$TIME_BUDGET" ]; then
@@ -82,7 +82,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running full fuzzing..."
-        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings Compile/engine_settings.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-lean-config.json --time_budget "$TIME_BUDGET"
         ;;
     *)
         echo "Unknown command: $COMMAND"

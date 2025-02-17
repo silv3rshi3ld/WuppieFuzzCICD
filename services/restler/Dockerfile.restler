@@ -26,9 +26,9 @@ ENV PATH="/restler_bin/restler:${PATH}"
 # Set the working directory to /workspace where the GitHub Actions workspace will be mounted
 WORKDIR /workspace
 
-# Create service directory and copy the entrypoint script
+# Create service directory and copy configuration files
 RUN mkdir -p /service/config
-COPY config/entrypoint.sh /service/config/entrypoint.sh
+COPY config/* /service/config/
 RUN chmod +x /service/config/entrypoint.sh
 
 # Set the container entrypoint
