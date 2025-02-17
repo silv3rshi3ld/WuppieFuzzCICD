@@ -7,7 +7,7 @@ RETRY_COUNT=0
 
 echo "Waiting for VAmPI API to be ready..."
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if curl -s -f http://${TARGET_IP}:${TARGET_PORT}/health > /dev/null; then
+    if curl -s -f http://${TARGET_IP}:${TARGET_PORT}/createdb > /dev/null; then
         echo "VAmPI API is ready!"
         break
     fi
