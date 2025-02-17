@@ -62,7 +62,7 @@ cd "$BASE_DIR"
 case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
-        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC" --settings /service/config/compile-config.json
+        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC"
         ;;
     test)
         echo "Running tests..."
