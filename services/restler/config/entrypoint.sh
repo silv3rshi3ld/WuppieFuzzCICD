@@ -82,7 +82,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running full fuzzing..."
-        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-lean-config.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-config.json --time_budget "$TIME_BUDGET"
         ;;
     *)
         echo "Unknown command: $COMMAND"
