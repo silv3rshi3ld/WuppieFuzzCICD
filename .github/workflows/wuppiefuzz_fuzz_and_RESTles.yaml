@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler, and Schemathesis
 
 on:
   push:
-    branches: [Less-dependent-build]
+    branches: [main]
   pull_request:
-    branches: [Less-dependent-build]
+    branches: [main]
 
 jobs:
   evomaster:
@@ -147,16 +147,19 @@ jobs:
 
   schemathesis:
     runs-on: ubuntu-latest
-    env:
-      BASE_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Prepare Environment
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and Push Docker Image
         run: |
-          mkdir -p $BASE_DIR/services/schemathesis/output
-          chmod -R 777 $BASE_DIR/services/schemathesis/output
+          docker buildx build \
+            --file services/schemathesis/Dockerfile.schemathesis \
+            --tag schemathesis:latest \
+            --load .
 
       - name: Run Schemathesis and VAmPI
         run: |
@@ -174,4 +177,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: schemathesis-results
-          path: ${{ github.workspace }}/services/schemathesis/output/
+          path: services/schemathesis/results
