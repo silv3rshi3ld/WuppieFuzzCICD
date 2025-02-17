@@ -35,9 +35,7 @@ services:
       - TARGET_IP=vampi
       - TARGET_PORT=5000
       - RUN_FUZZ_LEAN=true
-      - FUZZ_LEAN_TIME_BUDGET=0.05
-      - RUN_FUZZ=true
-      - FUZZ_TIME_BUDGET=3600
+      - FUZZ_LEAN_TIME_BUDGET=3600
     entrypoint: ["/service/config/entrypoint.sh"]
 
 networks:
