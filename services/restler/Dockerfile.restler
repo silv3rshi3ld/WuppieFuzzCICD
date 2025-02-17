@@ -27,7 +27,7 @@ ENV PATH="/restler_bin/restler:${PATH}"
 WORKDIR /workspace
 
 # Copy the entrypoint script into the container and ensure it is executable
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY config/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set the container entrypoint
