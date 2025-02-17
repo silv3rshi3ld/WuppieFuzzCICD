@@ -1,6 +1,7 @@
-FROM python:3.8-slim-bullseye
+# Use Python 3.12 slim on Debian Bullseye
+FROM python:3.12-slim-bullseye
 
-# Install system dependencies and the .NET SDK 8.0.
+# Install required system dependencies and .NET SDK 8.0
 RUN apt-get update && apt-get install -y \
     wget \
     apt-transport-https \
@@ -14,26 +15,20 @@ RUN apt-get update && apt-get install -y \
     apt-get install -y dotnet-sdk-8.0 && \
     rm -rf /var/lib/apt/lists/* packages-microsoft-prod.deb
 
-# Clone the official RESTler repository.
-RUN git clone https://github.com/microsoft/restler-fuzzer.git /restler
-
-# Build RESTler using the provided Python script.
+# Clone the RESTler repository and build RESTler
 WORKDIR /restler
-RUN python ./build-restler.py --dest_dir /restler_bin
+RUN git clone https://github.com/microsoft/restler-fuzzer.git . && \
+    python3 build-restler.py --dest_dir /restler_bin
 
-# Install RESTler-related Python dependencies.
-RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
+# Add RESTler binaries to the PATH
+ENV PATH="/restler_bin/restler:${PATH}"
 
-# Set up the workspace directories
+# Set the working directory to /workspace where the GitHub Actions workspace will be mounted
 WORKDIR /workspace
-RUN mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz /service/config
 
-# Copy configuration files
-COPY config/entrypoint.sh /service/config/
-COPY config/*.json /workspace/
+# Copy the entrypoint script into the container and ensure it is executable
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Make entrypoint script executable
-RUN chmod +x /service/config/entrypoint.sh
-
-# Set the entrypoint
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+# Set the container entrypoint
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
