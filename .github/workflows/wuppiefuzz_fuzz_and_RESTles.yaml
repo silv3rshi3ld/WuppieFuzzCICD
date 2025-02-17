@@ -137,7 +137,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: restler-coverage-report
-          path: ${{ github.workspace }}/services/restler/output/Test/coverage_failures_to_investigate.txt
+          path: |
+            ${{ github.workspace }}/services/restler/output/Test/coverage_failures_to_investigate.txt
+            ${{ github.workspace }}/services/restler/output/Test/*/coverage_failures_to_investigate.txt
           if-no-files-found: warn
 
       - name: Upload RESTler FuzzLean Results
