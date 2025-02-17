@@ -24,16 +24,16 @@ RUN python ./build-restler.py --dest_dir /restler_bin
 # Install RESTler-related Python dependencies.
 RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicationinsights
 
-# Set up the workspace (including directories for output, FuzzLean, Test and Fuzz).
+# Set up the workspace directories
 WORKDIR /workspace
 RUN mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz
 
-# Copy RESTler configuration files and the entrypoint script.
-# (Assuming the configuration folder is located at services/restler/config.)
-COPY config /service/config
+# Copy configuration files
+COPY config/entrypoint.sh /workspace/
+COPY config/*.json /workspace/
 
-# Ensure config files have Unix line endings and are executable.
-RUN chmod -R +x /service/config/ && find /service/config -type f -exec sed -i 's/\r$//g' {} \;
+# Make entrypoint script executable
+RUN chmod +x /workspace/entrypoint.sh
 
-# Set the container entrypoint.
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+# Set the entrypoint
+ENTRYPOINT ["/workspace/entrypoint.sh"]

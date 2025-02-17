@@ -99,29 +99,26 @@ jobs:
   restler:
     runs-on: ubuntu-latest
     env:
-      MODE: "all"  # Run all RESTler modes in sequence
-      # Valid values: test, fuzz-lean, fuzz, all
-      BASE_DIR: /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD
-      NETWORK_SUFFIX: ${{ github.run_id }}
+      BASE_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Prepare Environment
         run: |
-          mkdir -p /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output
-          chmod -R 777 /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output
+          mkdir -p $BASE_DIR/services/restler/output
+          chmod -R 777 $BASE_DIR/services/restler/output
           echo "=== Initial output directory structure ==="
-          ls -la /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output
+          ls -la $BASE_DIR/services/restler/output
 
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
           echo "=== Listing output directory structure ==="
-          ls -R /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output || true
+          ls -R $BASE_DIR/services/restler/output || true
           echo "=== Detailed output directory listing ==="
-          find /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output -type f -exec ls -l {} \; || true
+          find $BASE_DIR/services/restler/output -type f -exec ls -l {} \; || true
 
       - name: Check Container Logs
         if: always()
@@ -130,8 +127,13 @@ jobs:
           docker compose -f services/restler/docker-compose.restler.yml logs restler || true
           docker compose -f services/restler/docker-compose.restler.yml logs init-vampi || true
 
-      - name: Upload Restler Results
+      - name: Verify RESTler Output Directory
+        run: |
+          echo "Verifying RESTler output directory before artifact upload:"
+          ls -la $BASE_DIR/services/restler/output
+
+      - name: Upload RESTler Results
         uses: actions/upload-artifact@v4
         with:
           name: restler-results
-          path: /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD/services/restler/output
+          path: $BASE_DIR/services/restler/output

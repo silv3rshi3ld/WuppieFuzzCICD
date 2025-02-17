@@ -85,34 +85,12 @@ for dir in Test FuzzLean Fuzz; do
     fi
 done
 
-# --- NEW WAIT STEP ---
-# Wait until output files are created (up to 60 seconds)
-echo "Waiting for output files to be created..."
-max_wait=60  # maximum seconds to wait
-elapsed=0
-while [ $elapsed -lt $max_wait ]; do
-    if [ -d "/workspace/output" ] && [ "$(ls -A /workspace/output)" ]; then
-        echo "Output detected."
-        break
-    else
-        echo "Output not found yet, sleeping 5 seconds..."
-        sleep 5
-        elapsed=$((elapsed+5))
-    fi
-done
-if [ $elapsed -ge $max_wait ]; then
-    echo "Warning: Timeout reached without detecting output."
-fi
+# DEBUG: List output folder contents
+echo "----- LS of /workspace/output AFTER copying -----"
+ls -la /workspace/output
 
-# Create a placeholder file if output directory is still empty
-if [ -z "$(ls -A /workspace/output)" ]; then
-    echo "No output files detected. Creating placeholder file."
-    touch /workspace/output/restler.complete
-fi
-# --- END WAIT STEP ---
-
-# DEBUG: List directories after execution
-echo "----- LS of /workspace AFTER execution -----"
-ls -la /workspace
+# Create a completion marker to ensure the output folder isn’t empty
+echo "Creating completion marker file..."
+touch /workspace/output/restler.complete
 
 echo "RESTler execution completed!"
