@@ -99,7 +99,7 @@ jobs:
   restler:
     runs-on: ubuntu-latest
     env:
-      BASE_DIR: /home/runner/work/WuppieFuzzCICD/WuppieFuzzCICD
+      BASE_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -120,20 +120,27 @@ jobs:
           echo "=== Detailed output directory listing ==="
           find $BASE_DIR/services/restler/output -type f -exec ls -l {} \; || true
 
+      - name: Check Container Logs
+        if: always()
+        run: |
+          docker compose -f services/restler/docker-compose.restler.yml logs vampi || true
+          docker compose -f services/restler/docker-compose.restler.yml logs restler || true
+          docker compose -f services/restler/docker-compose.restler.yml logs init-vampi || true
+
       - name: Upload RESTler Test Results
         uses: actions/upload-artifact@v4
         with:
           name: restler-test-results
-          path: $BASE_DIR/services/restler/output/Test/
+          path: ${{ github.workspace }}/services/restler/output/Test/
 
       - name: Upload RESTler FuzzLean Results
         uses: actions/upload-artifact@v4
         with:
           name: restler-fuzzlean-results
-          path: $BASE_DIR/services/restler/output/FuzzLean/
+          path: ${{ github.workspace }}/services/restler/output/FuzzLean/
 
       - name: Upload RESTler Fuzz Results
         uses: actions/upload-artifact@v4
         with:
           name: restler-fuzz-results
-          path: $BASE_DIR/services/restler/output/Fuzz/
+          path: ${{ github.workspace }}/services/restler/output/Fuzz/
