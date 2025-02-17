@@ -36,7 +36,8 @@ services:
       - TARGET_PORT=5000
       - RUN_FUZZ_LEAN=true
       - FUZZ_LEAN_TIME_BUDGET=0.05
-      # Optionally enable full fuzzing by setting RUN_FUZZ=true and FUZZ_TIME_BUDGET appropriately.
+      - RUN_FUZZ=true
+      - FUZZ_TIME_BUDGET=3600
     entrypoint: ["/service/config/entrypoint.sh"]
 
 networks:
