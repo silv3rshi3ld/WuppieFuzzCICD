@@ -26,14 +26,14 @@ RUN pip install --no-cache-dir azure-devtools jsonpickle six requests applicatio
 
 # Set up the workspace directories
 WORKDIR /workspace
-RUN mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz
+RUN mkdir -p /workspace/output /workspace/FuzzLean /workspace/Test /workspace/Fuzz /service/config
 
 # Copy configuration files
-COPY config/entrypoint.sh /workspace/
+COPY config/entrypoint.sh /service/config/
 COPY config/*.json /workspace/
 
 # Make entrypoint script executable
-RUN chmod +x /workspace/entrypoint.sh
+RUN chmod +x /service/config/entrypoint.sh
 
 # Set the entrypoint
-ENTRYPOINT ["/workspace/entrypoint.sh"]
+ENTRYPOINT ["/service/config/entrypoint.sh"]
