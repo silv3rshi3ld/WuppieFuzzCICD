@@ -1,10 +1,25 @@
 #!/bin/bash
 set -e
 
-# Wait for VAmPI to be ready
-until curl -s http://${TARGET_IP}:${TARGET_PORT}/health > /dev/null; do
-    echo "Waiting for VAmPI API to be ready..."
-    sleep 2
+MAX_RETRIES=30
+RETRY_INTERVAL=2
+RETRY_COUNT=0
+
+echo "Waiting for VAmPI API to be ready..."
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -s -f http://${TARGET_IP}:${TARGET_PORT}/health > /dev/null; then
+        echo "VAmPI API is ready!"
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "Error: VAmPI API failed to become ready after $((MAX_RETRIES * RETRY_INTERVAL)) seconds"
+        exit 1
+    fi
+    
+    echo "Attempt $RETRY_COUNT of $MAX_RETRIES - Waiting for VAmPI API..."
+    sleep $RETRY_INTERVAL
 done
 
 echo "Starting Schemathesis test execution..."
@@ -26,4 +41,6 @@ schemathesis run /app/openapi3.yml \
     --max-response-time=1000 \
     --wait-for-schema=60
 
-echo "Schemathesis test execution completed."
+EXIT_CODE=$?
+echo "Schemathesis test execution completed with exit code: $EXIT_CODE"
+exit $EXIT_CODE
