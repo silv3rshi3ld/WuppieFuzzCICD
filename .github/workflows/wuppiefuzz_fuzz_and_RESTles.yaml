@@ -156,8 +156,9 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
+          cd services/schemathesis
           docker buildx build \
-            --file services/schemathesis/Dockerfile.schemathesis \
+            --file Dockerfile.schemathesis \
             --tag schemathesis:latest \
             --load .
 
