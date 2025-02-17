@@ -5,7 +5,7 @@ set -e
 BASE_DIR="${BASE_DIR:-/workspace}"
 
 usage() {
-    echo "Usage: $0 {compile|test|fuzz-lean|fuzz} --api_spec=<path_to_api_spec> [--dictionary=<path>] [--settings=<path>] [--time_budget=<seconds>]"
+    echo "Usage: $0 {compile|test|fuzz-lean|fuzz} --api_spec=<path_to_api_spec> [--dictionary=<path>] [--time_budget=<seconds>]"
     exit 1
 }
 
@@ -20,7 +20,6 @@ shift
 # Initialize parameters.
 API_SPEC=""
 DICTIONARY=""
-SETTINGS=""
 TIME_BUDGET=""
 
 # Parse command-line options.
@@ -31,9 +30,6 @@ while [ $# -gt 0 ]; do
             ;;
         --dictionary=*)
             DICTIONARY="${1#*=}"
-            ;;
-        --settings=*)
-            SETTINGS="${1#*=}"
             ;;
         --time_budget=*)
             TIME_BUDGET="${1#*=}"
@@ -66,7 +62,7 @@ case "$COMMAND" in
         ;;
     test)
         echo "Running tests..."
-        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/test-config.json
+        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
         ;;
     fuzz-lean)
         if [ -z "$TIME_BUDGET" ]; then
@@ -74,7 +70,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running fuzz-lean..."
-        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-lean-config.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
         ;;
     fuzz)
         if [ -z "$TIME_BUDGET" ]; then
@@ -82,7 +78,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running full fuzzing..."
-        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --settings /service/config/fuzz-config.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
         ;;
     *)
         echo "Unknown command: $COMMAND"
