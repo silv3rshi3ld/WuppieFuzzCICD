@@ -34,9 +34,8 @@ services:
     environment:
       - TARGET_IP=vampi
       - TARGET_PORT=5000
-      - RUN_FUZZ_LEAN=true
-      - FUZZ_LEAN_TIME_BUDGET=3600
-    entrypoint: ["/service/config/entrypoint.sh"]
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/service/config/entrypoint.sh compile --api_spec=/workspace/openapi3.yml && /service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --time_budget=3600"]
 
 networks:
   restler-net:
