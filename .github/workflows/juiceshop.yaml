@@ -35,19 +35,20 @@ jobs:
           timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
           sleep 5
 
-      - name: Run EvoMaster in Docker
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Run EvoMaster in Blackbox Mode
         run: |
-          docker run --rm \
-            --network host \
-            -v ${{ github.workspace }}/tools/evomaster:/evomaster \
-            -v ${{ github.workspace }}/generated_tests:/tests \
-            openjdk:11-jre \
-            java -jar /evomaster/evomaster.jar \
+          java -jar tools/evomaster/evomaster.jar \
             --blackBox true \
             --bbTargetUrl http://localhost:3000 \
             --outputFormat JAVASCRIPT_JEST \
             --maxTime 1h \
-            --outputFolder /tests/juiceshop \
+            --outputFolder generated_tests/juiceshop \
             --testSuiteFileName juiceshop_test \
             --maxTestSize 100
 
