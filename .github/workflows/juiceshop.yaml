@@ -51,7 +51,7 @@ jobs:
             --blackBox true \
             --bbTargetUrl http://localhost:3000 \
             --outputFormat JAVASCRIPT_JEST \
-            --maxTime 3600 \
+            --maxTime 1h \
             --outputFolder generated_tests/juiceshop \
             --testSuiteFileName juiceshop_test \
             --maxTestSize 100

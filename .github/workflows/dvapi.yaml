@@ -57,7 +57,7 @@ jobs:
             --blackBox true \
             --bbTargetUrl http://localhost:3000 \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 3600 \
+            --maxTime 1h \
             --outputFolder generated_tests/dvapi \
             --testSuiteFileName dvapi_test \
             --maxTestSize 100

@@ -14,17 +14,30 @@ services:
       TARGET_PORT: ${TARGET_PORT:-3000}
       TARGET_SCHEMA: ${TARGET_SCHEMA:-http}
       TARGET_SWAGGER_PATH: ${TARGET_SWAGGER_PATH:-/swagger.json}
+    entrypoint: /bin/bash
     command: >
-      st run
-      --base-url ${TARGET_SCHEMA:-http}://${TARGET_HOST:-localhost}:${TARGET_PORT:-3000}
-      --checks all
-      --stateful=links
-      --workers=4
-      --report
-      --report-file /app/output/report.html
-      --show-errors-tracebacks
-      --validate-schema
-      /app/swagger.yml
+      -c "
+      echo 'Waiting for API to be ready...' &&
+      for i in {1..120}; do
+        if curl -s ${TARGET_SCHEMA:-http}://${TARGET_HOST:-localhost}:${TARGET_PORT:-3000}/health >/dev/null; then
+          echo 'API is ready!' &&
+          st run \
+            --base-url ${TARGET_SCHEMA:-http}://${TARGET_HOST:-localhost}:${TARGET_PORT:-3000} \
+            --checks all \
+            --stateful=links \
+            --workers=4 \
+            --report \
+            --report-file /app/output/report.html \
+            --show-errors-tracebacks \
+            --validate-schema \
+            /app/swagger.yml;
+          exit $?;
+        fi;
+        echo 'Waiting for API... attempt' $i;
+        sleep 1;
+      done;
+      echo 'API failed to become ready';
+      exit 1"
     networks:
       - ${TARGET_NAME:-target}_network
 

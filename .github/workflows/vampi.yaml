@@ -58,7 +58,7 @@ jobs:
             --blackBox true \
             --bbSwaggerUrl targets/vampi/openapi_specs/openapi3.yml \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 3600 \
+            --maxTime 1h \
             --outputFolder generated_tests/vampi \
             --testSuiteFileName vampi_test \
             --maxTestSize 100
