@@ -3,13 +3,13 @@ version: '3.8'
 services:
   restler:
     build:
-      context: .
-      dockerfile: Dockerfile.restler
+      context: ../..
+      dockerfile: fuzzers/restler/Dockerfile.restler
     container_name: restler
     volumes:
       - ./output:/RESTler/output
       - ./config:/RESTler/config
-      - ${SWAGGER_FILE:-../targets/vampi/openapi_specs/openapi3.yml}:/RESTler/swagger.yml:ro
+      - ${SWAGGER_FILE}:/RESTler/swagger.yml:ro
     environment:
       TARGET_HOST: ${TARGET_HOST:-localhost}
       TARGET_PORT: ${TARGET_PORT:-3000}
