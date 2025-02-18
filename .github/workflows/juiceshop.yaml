@@ -126,6 +126,7 @@ jobs:
         shell: bash
     env:
       BASE_DIR: ${{ github.workspace }}
+      SWAGGER_FILE: ${{ github.workspace }}/targets/juiceshop/swagger.yml
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

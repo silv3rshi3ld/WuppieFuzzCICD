@@ -144,6 +144,7 @@ jobs:
         shell: bash
     env:
       BASE_DIR: ${{ github.workspace }}
+      SWAGGER_FILE: ${{ github.workspace }}/targets/vampi/openapi_specs/openapi3.yml
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
