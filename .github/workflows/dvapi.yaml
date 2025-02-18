@@ -55,11 +55,12 @@ jobs:
         run: |
           java -jar evomaster.jar \
             --blackBox true \
-            --bbTargetUrl "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}" \
+            --bbTargetUrl http://localhost:3000 \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 1h \
+            --maxTime 3600 \
             --outputFolder generated_tests/dvapi \
-            --ratePerMinute 60
+            --testSuiteFileName dvapi_test \
+            --maxTestSize 100
 
       - name: Upload EvoMaster Results
         uses: actions/upload-artifact@v4
@@ -111,15 +112,22 @@ jobs:
           cd WuppieFuzz
           cargo build --release
 
+      - name: Generate Initial Corpus
+        run: |
+          cd WuppieFuzz
+          ./target/release/wuppiefuzz output-corpus \
+            --openapi-spec http://localhost:3000/swagger \
+            corpus_directory
+
       - name: Run WuppieFuzz Fuzzing Campaign
         run: |
           cd WuppieFuzz
           ./target/release/wuppiefuzz fuzz \
             --report \
             --log-level info \
-            --timeout 60 \
-            --target-url "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}" \
-            "${SWAGGER_FILE}"
+            --initial-corpus corpus_directory \
+            --timeout 3600 \
+            http://localhost:3000/swagger
 
       - name: Upload Fuzzing Report
         uses: actions/upload-artifact@v4

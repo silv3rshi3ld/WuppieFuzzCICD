@@ -16,6 +16,13 @@ services:
       TARGET_SCHEMA: ${TARGET_SCHEMA:-http}
       TARGET_SWAGGER_PATH: ${TARGET_SWAGGER_PATH:-/swagger.json}
       RESTLER_TELEMETRY_OPTOUT: 1
+    command: >
+      bash -c "
+        python ./restler/Restler.py compile --api_spec /RESTler/swagger.yml &&
+        python ./restler/Restler.py test --grammar_file ./RestlerGrammar/grammar.py &&
+        python ./restler/Restler.py fuzz-lean --grammar_file ./RestlerGrammar/grammar.py --settings /RESTler/config/fuzz-lean-config.json &&
+        python ./restler/Restler.py fuzz --grammar_file ./RestlerGrammar/grammar.py --settings /RESTler/config/fuzz-config.json
+      "
     networks:
       - ${TARGET_NAME:-target}_network
 
