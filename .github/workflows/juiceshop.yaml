@@ -41,13 +41,9 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Download EvoMaster
-        run: |
-          curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
-
       - name: Run EvoMaster in Blackbox Mode
         run: |
-          java -jar evomaster.jar \
+          java -jar tools/evomaster/evomaster.jar \
             --blackBox true \
             --bbTargetUrl http://localhost:3000 \
             --outputFormat JAVASCRIPT_JEST \

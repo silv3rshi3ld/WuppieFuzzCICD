@@ -15,10 +15,10 @@ RUN apt-get update && apt-get install -y \
     apt-get install -y dotnet-sdk-8.0 && \
     rm -rf /var/lib/apt/lists/* packages-microsoft-prod.deb
 
-# Clone the RESTler repository and build RESTler
+# Copy the local RESTler repository and build RESTler
 WORKDIR /restler
-RUN git clone https://github.com/microsoft/restler-fuzzer.git . && \
-    python3 build-restler.py --dest_dir /restler_bin
+COPY tools/restler/ .
+RUN python3 build-restler.py --dest_dir /restler_bin
 
 # Add RESTler binaries to the PATH
 ENV PATH="/restler_bin/restler:${PATH}"
@@ -31,7 +31,7 @@ ENV DOCKER_NETWORK="restler-net"
 
 # Create service directory and copy configuration files
 RUN mkdir -p /service/config
-COPY config/* /service/config/
+COPY fuzzers/restler/config/* /service/config/
 RUN chmod +x /service/config/entrypoint.sh
 
 # Set the container entrypoint
