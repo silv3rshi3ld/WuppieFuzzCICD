@@ -58,9 +58,9 @@ jobs:
             --blackBox true \
             --bbSwaggerUrl "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}${TARGET_SWAGGER_PATH}" \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime "${FUZZING_DURATION}" \
+            --maxTime 1h \
             --outputFolder generated_tests/vampi \
-            --ratePerMinute "${REQUESTS_PER_MINUTE}"
+            --ratePerMinute 60
 
       - name: Upload EvoMaster Results
         uses: actions/upload-artifact@v4
@@ -119,7 +119,7 @@ jobs:
           ./target/release/wuppiefuzz fuzz \
             --report \
             --log-level info \
-            --timeout "${FUZZING_DURATION}" \
+            --timeout 60 \
             --target-url "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}" \
             "${SWAGGER_FILE}"
 
