@@ -100,7 +100,7 @@ jobs:
         run: |
           cd WuppieFuzz
           ./target/release/wuppiefuzz output-corpus \
-            --openapi-spec http://localhost:3000/b2b/v2 \
+            --openapi-spec ../targets/juiceshop/swagger.yml \
             corpus_directory
 
       - name: Run WuppieFuzz Fuzzing Campaign
@@ -111,7 +111,7 @@ jobs:
             --log-level info \
             --initial-corpus corpus_directory \
             --timeout 3600 \
-            http://localhost:3000/b2b/v2
+            http://localhost:3000
 
       - name: Upload Fuzzing Report
         uses: actions/upload-artifact@v4
