@@ -26,6 +26,9 @@ ENV PATH="/restler_bin/restler:${PATH}"
 # Set the working directory to /workspace where the GitHub Actions workspace will be mounted
 WORKDIR /workspace
 
+# Ensure the container uses the same network as other services
+ENV DOCKER_NETWORK="restler-net"
+
 # Create service directory and copy configuration files
 RUN mkdir -p /service/config
 COPY config/* /service/config/
