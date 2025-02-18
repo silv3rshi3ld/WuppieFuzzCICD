@@ -7,7 +7,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - fuzzing-network
+      - juiceshop_network
     healthcheck:
       test: ["CMD", "wget", "--spider", "http://localhost:3000"]
       interval: 10s
@@ -15,5 +15,5 @@ services:
       retries: 3
 
 networks:
-  fuzzing-network:
-    name: fuzzing-network
+  juiceshop_network:
+    name: juiceshop_network

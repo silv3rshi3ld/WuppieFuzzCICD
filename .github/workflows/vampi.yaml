@@ -28,17 +28,19 @@ jobs:
             fi
           done < targets/vampi/config.env
 
-      - name: Setup Docker Network
-        run: |
-          sudo docker network create fuzzing-network || true
-
       - name: Start VAmPI Container
         run: |
           docker compose -f targets/vampi/docker-compose.vampi.yml up -d
-          sleep 10
+          echo "Waiting for VAmPI to be ready..."
+          timeout 30 bash -c 'until curl -s http://localhost:5000/health; do sleep 1; done'
+          sleep 5
 
       - name: Initialize VAmPI Database
-        run: curl -s http://localhost:5000/createdb
+        run: |
+          echo "Checking VAmPI container status..."
+          docker ps
+          echo "Attempting to initialize database..."
+          curl -v http://localhost:5000/createdb
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -83,17 +85,19 @@ jobs:
             fi
           done < targets/vampi/config.env
 
-      - name: Setup Docker Network
-        run: |
-          sudo docker network create fuzzing-network || true
-
       - name: Start VAmPI Container
         run: |
           docker compose -f targets/vampi/docker-compose.vampi.yml up -d
-          sleep 10
+          echo "Waiting for VAmPI to be ready..."
+          timeout 30 bash -c 'until curl -s http://localhost:5000/health; do sleep 1; done'
+          sleep 5
 
       - name: Initialize VAmPI Database
-        run: curl -s http://localhost:5000/createdb
+        run: |
+          echo "Checking VAmPI container status..."
+          docker ps
+          echo "Attempting to initialize database..."
+          curl -v http://localhost:5000/createdb
 
       - name: Set up Rust Toolchain
         uses: actions-rs/toolchain@v1
@@ -144,9 +148,19 @@ jobs:
             fi
           done < targets/vampi/config.env
 
-      - name: Setup Docker Network
+      - name: Start VAmPI Container
         run: |
-          sudo docker network create fuzzing-network || true
+          docker compose -f targets/vampi/docker-compose.vampi.yml up -d
+          echo "Waiting for VAmPI to be ready..."
+          timeout 30 bash -c 'until curl -s http://localhost:5000/health; do sleep 1; done'
+          sleep 5
+
+      - name: Initialize VAmPI Database
+        run: |
+          echo "Checking VAmPI container status..."
+          docker ps
+          echo "Attempting to initialize database..."
+          curl -v http://localhost:5000/createdb
 
       - name: Prepare Environment
         run: |
@@ -184,9 +198,19 @@ jobs:
             fi
           done < targets/vampi/config.env
 
-      - name: Setup Docker Network
+      - name: Start VAmPI Container
         run: |
-          sudo docker network create fuzzing-network || true
+          docker compose -f targets/vampi/docker-compose.vampi.yml up -d
+          echo "Waiting for VAmPI to be ready..."
+          timeout 30 bash -c 'until curl -s http://localhost:5000/health; do sleep 1; done'
+          sleep 5
+
+      - name: Initialize VAmPI Database
+        run: |
+          echo "Checking VAmPI container status..."
+          docker ps
+          echo "Attempting to initialize database..."
+          curl -v http://localhost:5000/createdb
 
       - name: Run Schemathesis
         run: |

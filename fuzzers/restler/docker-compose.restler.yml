@@ -1,11 +1,5 @@
 version: '3.8'
 
-x-target-env: &target-env
-  TARGET_HOST: ${TARGET_HOST:-localhost}
-  TARGET_PORT: ${TARGET_PORT:-3000}
-  TARGET_SCHEMA: ${TARGET_SCHEMA:-http}
-  TARGET_SWAGGER_PATH: ${TARGET_SWAGGER_PATH:-/swagger.json}
-
 services:
   restler:
     build:
@@ -17,30 +11,21 @@ services:
       - ./config:/RESTler/config
       - ${SWAGGER_FILE:-../targets/vampi/openapi_specs/openapi3.yml}:/RESTler/swagger.yml:ro
     environment:
-      <<: *target-env
+      TARGET_HOST: ${TARGET_HOST:-localhost}
+      TARGET_PORT: ${TARGET_PORT:-3000}
+      TARGET_SCHEMA: ${TARGET_SCHEMA:-http}
+      TARGET_SWAGGER_PATH: ${TARGET_SWAGGER_PATH:-/swagger.json}
       RESTLER_TELEMETRY_OPTOUT: 1
     networks:
-      - fuzzing-network
-    depends_on:
-      target:
-        condition: service_healthy
-
-  target:
-    image: ${TARGET_IMAGE}
-    container_name: ${TARGET_NAME:-target-app}
-    ports:
-      - "${TARGET_PORT:-3000}:${TARGET_PORT:-3000}"
-    environment:
-      <<: *target-env
-    networks:
-      - fuzzing-network
-    healthcheck:
-      test: ${HEALTH_CHECK:-["CMD", "curl", "-f", "http://localhost:3000"]}
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      - ${TARGET_NAME:-target}_network
 
 networks:
-  fuzzing-network:
-    name: fuzzing-network
+  vampi_network:
+    name: vampi_network
+    external: true
+  juiceshop_network:
+    name: juiceshop_network
+    external: true
+  dvapi_network:
+    name: dvapi_network
     external: true

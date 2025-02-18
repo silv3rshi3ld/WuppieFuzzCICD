@@ -8,11 +8,11 @@ services:
     container_name: dvapi
     ports:
       - "3000:3000"
-    networks:
-      - fuzzing-network
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
+    networks:
+      - dvapi_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s
@@ -20,5 +20,5 @@ services:
       retries: 3
 
 networks:
-  fuzzing-network:
-    name: fuzzing-network
+  dvapi_network:
+    name: dvapi_network

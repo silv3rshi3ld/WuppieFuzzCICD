@@ -28,14 +28,12 @@ jobs:
             fi
           done < targets/juiceshop/config.env
 
-      - name: Setup Docker Network
-        run: |
-          sudo docker network create fuzzing-network || true
-
       - name: Start Juice Shop Container
         run: |
           docker compose -f targets/juiceshop/docker-compose.yml up -d
-          sleep 10
+          echo "Waiting for Juice Shop to be ready..."
+          timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
+          sleep 5
 
       - name: Set up Java
         uses: actions/setup-java@v3
@@ -80,14 +78,12 @@ jobs:
             fi
           done < targets/juiceshop/config.env
 
-      - name: Setup Docker Network
-        run: |
-          sudo docker network create fuzzing-network || true
-
       - name: Start Juice Shop Container
         run: |
           docker compose -f targets/juiceshop/docker-compose.yml up -d
-          sleep 10
+          echo "Waiting for Juice Shop to be ready..."
+          timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
+          sleep 5
 
       - name: Set up Rust Toolchain
         uses: actions-rs/toolchain@v1
@@ -138,9 +134,12 @@ jobs:
             fi
           done < targets/juiceshop/config.env
 
-      - name: Setup Docker Network
+      - name: Start Juice Shop Container
         run: |
-          sudo docker network create fuzzing-network || true
+          docker compose -f targets/juiceshop/docker-compose.yml up -d
+          echo "Waiting for Juice Shop to be ready..."
+          timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
+          sleep 5
 
       - name: Prepare Environment
         run: |
@@ -178,9 +177,12 @@ jobs:
             fi
           done < targets/juiceshop/config.env
 
-      - name: Setup Docker Network
+      - name: Start Juice Shop Container
         run: |
-          sudo docker network create fuzzing-network || true
+          docker compose -f targets/juiceshop/docker-compose.yml up -d
+          echo "Waiting for Juice Shop to be ready..."
+          timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
+          sleep 5
 
       - name: Run Schemathesis
         run: |
