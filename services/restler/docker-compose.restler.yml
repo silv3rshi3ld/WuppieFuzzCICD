@@ -1,23 +1,37 @@
+version: '3.8'
+
 services:
-  vampi:
-    image: erev0s/vampi:latest
-    container_name: vampi-restler
+  vampi-secure:
+    build: ../vampi
+    container_name: vampi-secure
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
-      - vulnerable=1
-      - tokentimetolive=300
+      - vulnerable=0
+    volumes:
+      - ../vampi/openapi_specs:/app/openapi_specs
     networks:
       - restler-net
-    command: ["app.py"]
+
+  vampi-vulnerable:
+    build: ../vampi
+    container_name: vampi-vulnerable  
+    ports:
+      - "5002:5000"
+    environment:
+      - vulnerable=1
+    volumes:
+      - ../vampi/openapi_specs:/app/openapi_specs
+    networks:
+      - restler-net
 
   init-vampi:
     image: curlimages/curl:latest
     depends_on:
-      - vampi
+      - vampi-vulnerable
     networks:
       - restler-net
-    command: ["sh", "-c", "until curl -s http://vampi:5000/createdb; do sleep 2; done"]
+    command: ["sh", "-c", "until curl -s http://vampi-vulnerable:5000/createdb; do sleep 2; done"]
 
   restler:
     build:
@@ -31,7 +45,7 @@ services:
     networks:
       - restler-net
     environment:
-      - TARGET_IP=vampi
+      - TARGET_IP=vampi-vulnerable
       - TARGET_PORT=5000
       - VULNERABLE_MODE=1
     entrypoint: ["/bin/sh", "-c"]
