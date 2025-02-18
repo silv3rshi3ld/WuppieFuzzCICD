@@ -10,5 +10,9 @@
     "ignore_dependencies": false,
     "garbage_collection_interval": 300,
     "fuzzing_jobs": 4,
-    "save_results_in_fixed_dirname": true
+    "save_results_in_fixed_dirname": true,
+    "host": "vampi",
+    "port": 5000,
+    "target_ip": "vampi",
+    "target_port": 5000
 }

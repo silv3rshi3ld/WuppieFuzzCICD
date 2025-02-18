@@ -37,8 +37,10 @@ RUN mkdir -p /service/config
 COPY config/* /service/config/
 RUN chmod +x /service/config/entrypoint.sh && \
     chmod +x /service/config/refresh_token.sh && \
+    chmod +x /service/config/run-restler.sh && \
     dos2unix /service/config/entrypoint.sh && \
-    dos2unix /service/config/refresh_token.sh
+    dos2unix /service/config/refresh_token.sh && \
+    dos2unix /service/config/run-restler.sh
 
 # Default command
 CMD ["/service/config/entrypoint.sh"]

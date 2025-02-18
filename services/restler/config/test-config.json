@@ -7,5 +7,9 @@
     "producer_timing_delay": 1,
     "dyn_objects_cache_size": 10,
     "ignore_feedback": false,
-    "ignore_dependencies": false
+    "ignore_dependencies": false,
+    "host": "vampi",
+    "port": 5000,
+    "target_ip": "vampi",
+    "target_port": 5000
 }
