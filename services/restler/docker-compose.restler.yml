@@ -1,21 +1,9 @@
 version: '3.8'
 
 services:
-  vampi-secure:
+  vampi:
     build: ../vampi
-    container_name: vampi-secure
-    ports:
-      - "5001:5000"
-    environment:
-      - vulnerable=0
-    volumes:
-      - ../vampi/openapi_specs:/app/openapi_specs
-    networks:
-      - restler-net
-
-  vampi-vulnerable:
-    build: ../vampi
-    container_name: vampi-vulnerable  
+    container_name: vampi
     ports:
       - "5002:5000"
     environment:
@@ -28,10 +16,10 @@ services:
   init-vampi:
     image: curlimages/curl:latest
     depends_on:
-      - vampi-vulnerable
+      - vampi
     networks:
       - restler-net
-    command: ["sh", "-c", "until curl -s http://vampi-vulnerable:5000/createdb; do sleep 2; done"]
+    command: ["sh", "-c", "until curl -s http://vampi:5000/createdb; do sleep 2; done"]
 
   restler:
     build:
@@ -39,17 +27,19 @@ services:
       dockerfile: Dockerfile.restler
     depends_on:
       - init-vampi
+    user: root  # Ensure we have permissions to write to output
     volumes:
-      - ../vampi/openapi_specs/openapi3.yml:/workspace/openapi3.yml:ro
-      - ${BASE_DIR}/services/restler/output:/workspace/output:rw
+      - ./openapi3.yml:/workspace/openapi3.yml:ro
+      - ./output:/workspace/output:rw
+      - ./config:/service/config:rw
     networks:
       - restler-net
     environment:
-      - TARGET_IP=vampi-vulnerable
+      - TARGET_IP=vampi
       - TARGET_PORT=5000
       - VULNERABLE_MODE=1
-    entrypoint: ["/bin/sh", "-c"]
-    command: ["/service/config/entrypoint.sh compile --api_spec=/workspace/openapi3.yml && /service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --time_budget=3600"]
+      - BASE_DIR=/workspace
+    command: ["bash", "-c", "/service/config/run-restler.sh"]
 
 networks:
   restler-net:

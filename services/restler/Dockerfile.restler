@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     build-essential \
-    libssl-dev && \
+    libssl-dev \
+    dos2unix && \
     wget https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
     dpkg -i packages-microsoft-prod.deb && \
     apt-get update && \
@@ -18,7 +19,9 @@ RUN apt-get update && apt-get install -y \
 # Clone the RESTler repository and build RESTler
 WORKDIR /restler
 RUN git clone https://github.com/microsoft/restler-fuzzer.git . && \
-    python3 build-restler.py --dest_dir /restler_bin
+    python3 build-restler.py --dest_dir /restler_bin && \
+    ls -la /restler_bin/restler && \
+    chmod -R 755 /restler_bin/restler
 
 # Add RESTler binaries to the PATH
 ENV PATH="/restler_bin/restler:${PATH}"
@@ -32,7 +35,10 @@ ENV DOCKER_NETWORK="restler-net"
 # Create service directory and copy configuration files
 RUN mkdir -p /service/config
 COPY config/* /service/config/
-RUN chmod +x /service/config/entrypoint.sh
+RUN chmod +x /service/config/entrypoint.sh && \
+    chmod +x /service/config/refresh_token.sh && \
+    dos2unix /service/config/entrypoint.sh && \
+    dos2unix /service/config/refresh_token.sh
 
-# Set the container entrypoint
-ENTRYPOINT ["/service/config/entrypoint.sh"]
+# Default command
+CMD ["/service/config/entrypoint.sh"]
