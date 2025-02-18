@@ -30,7 +30,6 @@ services:
       - ${BASE_DIR}/services/restler/output:/workspace/output:rw
     networks:
       - restler-net
-    network_mode: service:vampi
     environment:
       - TARGET_IP=vampi
       - TARGET_PORT=5000
