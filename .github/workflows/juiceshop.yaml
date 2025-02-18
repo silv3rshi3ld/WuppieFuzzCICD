@@ -104,7 +104,7 @@ jobs:
         run: |
           cd WuppieFuzz
           ./target/release/wuppiefuzz output-corpus \
-            --openapi-spec http://localhost:3000/swagger.json \
+            --openapi-spec http://localhost:3000/b2b/v2 \
             corpus_directory
 
       - name: Run WuppieFuzz Fuzzing Campaign
@@ -115,7 +115,7 @@ jobs:
             --log-level info \
             --initial-corpus corpus_directory \
             --timeout 3600 \
-            http://localhost:3000/swagger.json
+            http://localhost:3000/b2b/v2
 
       - name: Upload Fuzzing Report
         uses: actions/upload-artifact@v4
@@ -168,38 +168,3 @@ jobs:
             ${{ github.workspace }}/fuzzers/restler/Test/
             ${{ github.workspace }}/fuzzers/restler/FuzzLean/
             ${{ github.workspace }}/fuzzers/restler/Fuzz/
-
-  schemathesis:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Load Environment Variables
-        run: |
-          while IFS= read -r line; do
-            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
-              echo "$line" >> $GITHUB_ENV
-            fi
-          done < targets/juiceshop/config.env
-
-      - name: Start Juice Shop Container
-        run: |
-          docker compose -f targets/juiceshop/docker-compose.yml up -d
-          echo "Waiting for Juice Shop to be ready..."
-          timeout 30 bash -c 'until wget --spider http://localhost:3000 2>/dev/null; do sleep 1; done'
-          sleep 5
-
-      - name: Run Schemathesis
-        run: |
-          cd fuzzers/schemathesis
-          docker compose -f docker-compose.schemathesis.yml up --abort-on-container-exit
-
-      - name: Upload Schemathesis Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: juiceshop-schemathesis-results
-          path: fuzzers/schemathesis/output
