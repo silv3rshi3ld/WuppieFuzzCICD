@@ -18,10 +18,16 @@ services:
       RESTLER_TELEMETRY_OPTOUT: 1
     entrypoint: /bin/bash
     command: >
-      -c "/service/config/entrypoint.sh compile --api_spec /RESTler/swagger.yml &&
-          /service/config/entrypoint.sh test --api_spec /RESTler/swagger.yml --time_budget 600 &&
-          /service/config/entrypoint.sh fuzz-lean --api_spec /RESTler/swagger.yml --time_budget 1800 &&
-          /service/config/entrypoint.sh fuzz --api_spec /RESTler/swagger.yml --time_budget 3600"
+      -c "
+      echo 'Step 1: Compile grammar' &&
+      dotnet /RESTler/restler/Restler.dll compile --api_spec /RESTler/swagger.yml &&
+      echo 'Step 2: Test' &&
+      dotnet /RESTler/restler/Restler.dll test --grammar_file Compile/grammar.py --no_ssl --host ${TARGET_HOST} --port ${TARGET_PORT} &&
+      echo 'Step 3: Fuzz-Lean' &&
+      dotnet /RESTler/restler/Restler.dll fuzz-lean --grammar_file Compile/grammar.py --no_ssl --host ${TARGET_HOST} --port ${TARGET_PORT} &&
+      echo 'Step 4: Fuzz' &&
+      dotnet /RESTler/restler/Restler.dll fuzz --grammar_file Compile/grammar.py --no_ssl --host ${TARGET_HOST} --port ${TARGET_PORT}
+      "
     networks:
       - ${TARGET_NAME:-target}_network
 

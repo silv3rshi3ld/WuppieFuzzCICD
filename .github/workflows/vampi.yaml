@@ -175,7 +175,7 @@ jobs:
           mkdir -p "$BASE_DIR/fuzzers/restler/output"
           sudo chmod -R 777 "$BASE_DIR/fuzzers/restler/output"
 
-      - name: Run RESTler and VAmPI
+      - name: Run RESTler
         run: |
           cd fuzzers/restler
           docker compose -f docker-compose.restler.yml up --abort-on-container-exit
@@ -185,9 +185,10 @@ jobs:
         with:
           name: vampi-restler-results
           path: |
-            ${{ github.workspace }}/fuzzers/restler/output/Test/
-            ${{ github.workspace }}/fuzzers/restler/output/FuzzLean/
-            ${{ github.workspace }}/fuzzers/restler/output/Fuzz/
+            ${{ github.workspace }}/fuzzers/restler/Compile/
+            ${{ github.workspace }}/fuzzers/restler/Test/
+            ${{ github.workspace }}/fuzzers/restler/FuzzLean/
+            ${{ github.workspace }}/fuzzers/restler/Fuzz/
 
   schemathesis:
     runs-on: ubuntu-latest
