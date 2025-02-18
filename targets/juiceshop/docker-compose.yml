@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  juiceshop:
+    image: bkimminich/juice-shop
+    container_name: juiceshop
+    ports:
+      - "3000:3000"
+    networks:
+      - fuzzing-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fuzzing-network:
+    name: fuzzing-network

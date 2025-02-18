@@ -1,0 +1,17 @@
+version: '3.8'
+
+# Base configuration for all fuzzing services
+x-fuzzer-base: &fuzzer-base
+  networks:
+    - fuzzing-network
+  environment: &fuzzer-env
+    TARGET_HOST: ${TARGET_HOST:-localhost}
+    TARGET_PORT: ${TARGET_PORT:-3000}
+    TARGET_SCHEMA: ${TARGET_SCHEMA:-http}
+    TARGET_SWAGGER_PATH: ${TARGET_SWAGGER_PATH:-/swagger.json}
+    FUZZING_DURATION: ${FUZZING_DURATION:-1h}
+    REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-60}
+
+networks:
+  fuzzing-network:
+    name: fuzzing-network

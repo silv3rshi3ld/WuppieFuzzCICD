@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  dvapi:
+    image: appsecco/dvapi
+    container_name: dvapi
+    ports:
+      - "5000:5000"
+    networks:
+      - fuzzing-network
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fuzzing-network:
+    name: fuzzing-network

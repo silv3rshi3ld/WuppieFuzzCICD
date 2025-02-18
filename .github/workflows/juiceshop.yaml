@@ -1,0 +1,152 @@
+name: Fuzz OWASP Juice Shop with Multiple Tools
+
+on:
+  push:
+    branches: [More-endpoints]
+  pull_request:
+    branches: [More-endpoints]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  evomaster:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Environment Variables
+        run: |
+          while IFS= read -r line; do
+            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+              echo "$line" >> $GITHUB_ENV
+            fi
+          done < targets/juiceshop/config.env
+
+      - name: Setup Docker Network
+        run: |
+          sudo docker network create fuzzing-network || true
+
+      - name: Start Juice Shop Container
+        run: |
+          docker compose -f targets/juiceshop/docker-compose.yml up -d
+          sleep 10
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Download EvoMaster
+        run: |
+          curl -L -o evomaster.jar https://github.com/EMResearch/EvoMaster/releases/download/v3.4.0/evomaster.jar
+
+      - name: Run EvoMaster in Blackbox Mode
+        run: |
+          java -jar evomaster.jar \
+            --blackBox true \
+            --bbTargetUrl "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}" \
+            --outputFormat JAVASCRIPT_JEST \
+            --maxTime "${FUZZING_DURATION}" \
+            --outputFolder generated_tests/juiceshop \
+            --ratePerMinute "${REQUESTS_PER_MINUTE}"
+
+      - name: Upload EvoMaster Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: juiceshop-evomaster-results
+          path: generated_tests/juiceshop
+
+  wuppiefuzz:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Environment Variables
+        run: |
+          while IFS= read -r line; do
+            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+              echo "$line" >> $GITHUB_ENV
+            fi
+          done < targets/juiceshop/config.env
+
+      - name: Setup Docker Network
+        run: |
+          sudo docker network create fuzzing-network || true
+
+      - name: Start Juice Shop Container
+        run: |
+          docker compose -f targets/juiceshop/docker-compose.yml up -d
+          sleep 10
+
+      - name: Set up Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Clone WuppieFuzz Repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
+
+      - name: Build WuppieFuzz
+        run: |
+          cd WuppieFuzz
+          cargo build --release
+
+      - name: Run WuppieFuzz Fuzzing Campaign
+        run: |
+          cd WuppieFuzz
+          ./target/release/wuppiefuzz fuzz \
+            --report \
+            --log-level info \
+            --timeout "${FUZZING_DURATION}" \
+            --target-url "${TARGET_SCHEMA}://${TARGET_HOST}:${TARGET_PORT}" \
+            "${SWAGGER_FILE}"
+
+      - name: Upload Fuzzing Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: juiceshop-fuzzing-report
+          path: WuppieFuzz/reports/
+
+  schemathesis:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Environment Variables
+        run: |
+          while IFS= read -r line; do
+            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+              echo "$line" >> $GITHUB_ENV
+            fi
+          done < targets/juiceshop/config.env
+
+      - name: Setup Docker Network
+        run: |
+          sudo docker network create fuzzing-network || true
+
+      - name: Run Schemathesis
+        run: |
+          cd fuzzers/schemathesis
+          docker compose -f docker-compose.schemathesis.yml up --abort-on-container-exit
+
+      - name: Upload Schemathesis Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: juiceshop-schemathesis-results
+          path: fuzzers/schemathesis/output
