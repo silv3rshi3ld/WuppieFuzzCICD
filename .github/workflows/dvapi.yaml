@@ -32,9 +32,15 @@ jobs:
         run: |
           sudo docker network create fuzzing-network || true
 
+      - name: Clone DVAPI Repository
+        run: |
+          cd targets/dvapi
+          git clone https://github.com/payatu/DVAPI.git
+
       - name: Start DVAPI Container
         run: |
-          docker compose -f targets/dvapi/docker-compose.yml up -d
+          cd targets/dvapi
+          docker compose up -d --build
           sleep 10
 
       - name: Set up Java
@@ -84,9 +90,15 @@ jobs:
         run: |
           sudo docker network create fuzzing-network || true
 
+      - name: Clone DVAPI Repository
+        run: |
+          cd targets/dvapi
+          git clone https://github.com/payatu/DVAPI.git
+
       - name: Start DVAPI Container
         run: |
-          docker compose -f targets/dvapi/docker-compose.yml up -d
+          cd targets/dvapi
+          docker compose up -d --build
           sleep 10
 
       - name: Set up Rust Toolchain
@@ -119,6 +131,59 @@ jobs:
           name: dvapi-fuzzing-report
           path: WuppieFuzz/reports/
 
+  restler:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      BASE_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Environment Variables
+        run: |
+          while IFS= read -r line; do
+            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+              echo "$line" >> $GITHUB_ENV
+            fi
+          done < targets/dvapi/config.env
+
+      - name: Setup Docker Network
+        run: |
+          sudo docker network create fuzzing-network || true
+
+      - name: Clone DVAPI Repository
+        run: |
+          cd targets/dvapi
+          git clone https://github.com/payatu/DVAPI.git
+
+      - name: Start DVAPI Container
+        run: |
+          cd targets/dvapi
+          docker compose up -d --build
+          sleep 10
+
+      - name: Prepare Environment
+        run: |
+          mkdir -p "$BASE_DIR/fuzzers/restler/output"
+          sudo chmod -R 777 "$BASE_DIR/fuzzers/restler/output"
+
+      - name: Run RESTler and DVAPI
+        run: |
+          cd fuzzers/restler
+          docker compose -f docker-compose.restler.yml up --abort-on-container-exit
+
+      - name: Upload RESTler Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvapi-restler-results
+          path: |
+            ${{ github.workspace }}/fuzzers/restler/output/Test/
+            ${{ github.workspace }}/fuzzers/restler/output/FuzzLean/
+            ${{ github.workspace }}/fuzzers/restler/output/Fuzz/
+
   schemathesis:
     runs-on: ubuntu-latest
     defaults:
@@ -139,6 +204,17 @@ jobs:
       - name: Setup Docker Network
         run: |
           sudo docker network create fuzzing-network || true
+
+      - name: Clone DVAPI Repository
+        run: |
+          cd targets/dvapi
+          git clone https://github.com/payatu/DVAPI.git
+
+      - name: Start DVAPI Container
+        run: |
+          cd targets/dvapi
+          docker compose up -d --build
+          sleep 10
 
       - name: Run Schemathesis
         run: |

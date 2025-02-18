@@ -119,6 +119,48 @@ jobs:
           name: juiceshop-fuzzing-report
           path: WuppieFuzz/reports/
 
+  restler:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      BASE_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Load Environment Variables
+        run: |
+          while IFS= read -r line; do
+            if [[ ! "$line" =~ ^#.*$ ]] && [[ ! -z "$line" ]]; then
+              echo "$line" >> $GITHUB_ENV
+            fi
+          done < targets/juiceshop/config.env
+
+      - name: Setup Docker Network
+        run: |
+          sudo docker network create fuzzing-network || true
+
+      - name: Prepare Environment
+        run: |
+          mkdir -p "$BASE_DIR/fuzzers/restler/output"
+          sudo chmod -R 777 "$BASE_DIR/fuzzers/restler/output"
+
+      - name: Run RESTler and Juice Shop
+        run: |
+          cd fuzzers/restler
+          docker compose -f docker-compose.restler.yml up --abort-on-container-exit
+
+      - name: Upload RESTler Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: juiceshop-restler-results
+          path: |
+            ${{ github.workspace }}/fuzzers/restler/output/Test/
+            ${{ github.workspace }}/fuzzers/restler/output/FuzzLean/
+            ${{ github.workspace }}/fuzzers/restler/output/Fuzz/
+
   schemathesis:
     runs-on: ubuntu-latest
     defaults:
