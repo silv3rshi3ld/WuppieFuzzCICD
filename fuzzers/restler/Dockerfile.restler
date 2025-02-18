@@ -17,7 +17,9 @@ RUN apt-get update && apt-get install -y \
 
 # Copy the local RESTler repository and build RESTler
 WORKDIR /restler
-COPY tools/restler/ .
+COPY tools/restler/build-restler.py /restler/
+COPY tools/restler/restler/ /restler/restler/
+COPY tools/restler/src/ /restler/src/
 RUN python3 build-restler.py --dest_dir /restler_bin
 
 # Add RESTler binaries to the PATH
