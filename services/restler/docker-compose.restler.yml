@@ -33,6 +33,7 @@ services:
     environment:
       - TARGET_IP=vampi
       - TARGET_PORT=5000
+      - VULNERABLE_MODE=1
     entrypoint: ["/bin/sh", "-c"]
     command: ["/service/config/entrypoint.sh compile --api_spec=/workspace/openapi3.yml && /service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --time_budget=3600"]
 
