@@ -1,9 +1,0 @@
-{
-    "id": "bug2",
-    "endpoint": "/api/endpoint2",
-    "method": "POST",
-    "status": 400,
-    "type": "miss",
-    "request": "POST /api/endpoint2 { 'invalid': 'data' }",
-    "response": "Bad Request"
-}
