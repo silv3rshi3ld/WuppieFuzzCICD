@@ -60,6 +60,7 @@ mkdir -p "$BASE_DIR/output/Fuzz"
 cd "$BASE_DIR"
 
 # Generate RESTler configuration files
+# This step generates the restlerConfig directory with config.json, dict.json, etc.
 echo "Generating RESTler configuration files..."
 dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC"
 
@@ -67,6 +68,7 @@ dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC"
 case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
+        # Compile the API spec using the generated config.json file
         dotnet "$RESTLER_DLL" compile --config_file restlerConfig/config.json
         # Copy compile results to output directory
         cp -r Compile/* "$BASE_DIR/output/Test/"
