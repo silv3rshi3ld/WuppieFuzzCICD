@@ -62,7 +62,7 @@ cd "$BASE_DIR"
 # Generate RESTler configuration files
 # This step generates the restlerConfig directory with config.json, dict.json, etc.
 echo "Generating RESTler configuration files..."
-dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC"
+dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC" --output_dir restlerConfig
 
 # Execute the appropriate RESTler command.
 case "$COMMAND" in
@@ -75,7 +75,7 @@ case "$COMMAND" in
         ;;
     test)
         echo "Running tests..."
-        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
+        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --no_ssl
         # Copy test results including coverage file to output directory
         cp -r Test/* "$BASE_DIR/output/Test/"
         if [ -f "Test/coverage_failures_to_investigate.txt" ]; then
@@ -88,7 +88,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running fuzz-lean..."
-        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET" --no_ssl
         # Copy fuzz-lean results to output directory
         cp -r FuzzLean/* "$BASE_DIR/output/FuzzLean/"
         ;;
@@ -98,7 +98,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running full fuzzing..."
-        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
+        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET" --no_ssl
         # Copy fuzz results to output directory
         cp -r Fuzz/* "$BASE_DIR/output/Fuzz/"
         ;;
