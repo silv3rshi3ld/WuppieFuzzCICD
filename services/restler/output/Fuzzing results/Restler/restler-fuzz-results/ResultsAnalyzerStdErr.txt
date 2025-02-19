@@ -1,0 +1,84 @@
+Warning: could not parse response in line 4947: { "status": "fail", "message": "User not found"}
+Warning: could not parse request in line 5040: GET /users/v1/_Y Ve]\t!_91}\tA}KO\r HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5043: GET /users/v1/_Y Ve]\t!_91}\tA}KO\r HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5059: { "status": "fail", "message": "User not found"}
+Warning: could not parse request in line 5068: GET /users/v1/3>1-Q"Vg!e*Az[~bHG &E HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5071: GET /users/v1/3>1-Q"Vg!e*Az[~bHG &E HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5087: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'S\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse response in line 5115: { "status": "fail", "message": "User not found"}
+Warning: could not parse request in line 5124: GET /users/v1/B /^(t(O~Nh&g8\n+Fh,*J`i HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5127: GET /users/v1/B /^(t(O~Nh&g8\n+Fh,*J`i HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5129: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'/^(t(O~Nh&amp;g8\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse response in line 5199: {\n  "detail": "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.",\n  "status": 404,\n  "title": "Not Found",\n  "type": "about:blank"\n}\n
+Warning: could not parse request in line 5236: GET /users/v1/o 0x<JOyY<O&TS$Kc\nApDc;4 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5239: GET /users/v1/o 0x<JOyY<O&TS$Kc\nApDc;4 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5241: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'0x&lt;JOyY&lt;O&amp;TS$Kc\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse request in line 5292: GET /users/v1/XG+7k_o0 7*2x2xIVg;u5M|8}!HM?Cs9 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5295: GET /users/v1/XG+7k_o0 7*2x2xIVg;u5M|8}!HM?Cs9 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5311: {\n  "detail": "The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.",\n  "status": 404,\n  "title": "Not Found",\n  "type": "about:blank"\n}\n
+Warning: could not parse response in line 5325: { "status": "fail", "message": "User not found"}
+Warning: could not parse request in line 5334: GET /users/v1/cPGnjeR$B55iIeR&qvI))(p?:~JKyA )7f+ HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5337: GET /users/v1/cPGnjeR$B55iIeR&qvI))(p?:~JKyA )7f+ HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5353: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'ghh0B&gt;7V.\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse response in line 5409: { "status": "fail", "message": "User not found"}
+Warning: could not parse response in line 5423: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'X*]\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse response in line 5465: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'d"\\\'p\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse request in line 5488: GET /users/v1/5{5W}JqtMG:|\x0c52<?kzrT"6ZW\nT(\t95y-WzH)C\tuwf#ki> dY8 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5491: GET /users/v1/5{5W}JqtMG:|\x0c52<?kzrT"6ZW\nT(\t95y-WzH)C\tuwf#ki> dY8 HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse response in line 5493: <!DOCTYPE HTML>\n<html lang="en">\n    <head>\n        <meta charset="utf-8">\n        <title>Error response</title>\n    </head>\n    <body>\n        <h1>Error response</h1>\n        <p>Error code: 400</p>\n        <p>Message: Bad request version (\'52&lt;?kzrT"6ZW\').</p>\n        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>\n    </body>\n</html>\n
+Warning: could not parse request in line 5530: GET /users/v1/4sbPu u|9ElgA?G6rj(+7 H3-@\x0bC6XHb#PCF0"y\x0cgQzD~7? HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5533: GET /users/v1/4sbPu u|9ElgA?G6rj(+7 H3-@\x0bC6XHb#PCF0"y\x0cgQzD~7? HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5558: GET /users/v1/I_>~3KBOwLa$/df>1 5jsW MR5pwNxdG{s*n2]4*_PY*CT HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Warning: could not parse request in line 5561: GET /users/v1/I_>~3KBOwLa$/df>1 5jsW MR5pwNxdG{s*n2]4*_PY*CT HTTP/1.1\r\nAccept: application/json\r\nHost: vampi:5000\r\nContent-Length: 0\r\nUser-Agent: restler/9.3.1\r\n\r\n
+Unhandled exception. System.Exception: Unexpected response without prior request at 02/19/2025 11:42:10: { version = "HTTP/1.1"
+  statusCode = 400
+  statusDescription = "Bad request syntax ("GET /users/v1/Z\	.\'Il(p HTTP/1.1")"
+  headers =
+           map
+             [("Connection", "close"); ("Content-Length", "387");
+              ("Content-Type", "text/html;charset=utf-8");
+              ("Date", "Wed, 19 Feb 2025 11:42:10 GMT");
+              ("Server", "Werkzeug/2.2.3 Python/3.11.11")]
+  body =
+        "<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Error response</title>
+    </head>
+    <body>
+        <h1>Error response</h1>
+        <p>Error code: 400</p>
+        <p>Message: Bad request syntax ("GET /users/v1/Z\	.\'Il(p HTTP/1.1").</p>
+        <p>Error code explanation: 400 - Bad request syntax or unsupported method.</p>
+    </body>
+</html>
+"
+  str = None }
+   at Microsoft.FSharp.Core.PrintfModule.PrintFormatToStringThenFail@1639.Invoke(String message) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\printf.fs:line 1639
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.choose@171.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 179
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.map@75.DoMoveNext(b& curr) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 77
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.MapEnumerator`1.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 64
+   at Microsoft.FSharp.Core.CompilerServices.RuntimeHelpers.takeInner@266[T,TResult](ConcatEnumerator`2 x, Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seqcore.fs:line 268
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.map@75.DoMoveNext(b& curr) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 77
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.MapEnumerator`1.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 64
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.map@75.DoMoveNext(b& curr) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 77
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.MapEnumerator`1.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 64
+   at Microsoft.FSharp.Core.CompilerServices.RuntimeHelpers.takeInner@266[T,TResult](ConcatEnumerator`2 x, Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seqcore.fs:line 268
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.next@193[T](FSharpFunc`2 f, IEnumerator`1 e, FSharpRef`1 started, Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 194
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.filter@188.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 196
+   at Microsoft.FSharp.Collections.SeqModule.oneStepTo@987[T](IEnumerable`1 source, List`1 prefix, FSharpRef`1 enumeratorR, Int32 i) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 996
+   at Microsoft.FSharp.Collections.SeqModule.action@4164-1[T](IEnumerable`1 source, List`1 prefix, FSharpRef`1 enumeratorR, Int32 i, Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 1011
+   at Microsoft.FSharp.Collections.SeqModule.result@1003.Invoke(Int32 i)
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.unfold@205.DoMoveNext(b& curr) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 207
+   at Microsoft.FSharp.Collections.Internal.IEnumerator.MapEnumerator`1.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 64
+   at Microsoft.FSharp.Collections.SeqModule.Iterate[T](FSharpFunc`2 action, IEnumerable`1 source) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 496
+   at Microsoft.FSharp.Collections.SeqModule.groupByValueType[T,TKey](FSharpFunc`2 keyf, IEnumerable`1 seq) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 1068
+   at Microsoft.FSharp.Collections.SeqModule.GroupBy@1076.Invoke(Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 1076
+   at Microsoft.FSharp.Collections.SeqModule.mkDelayedSeq@471.Invoke(Unit unitVar0) in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seq.fs:line 471
+   at Restler.ResultsAnalyzer.Analyze.Buckets.getBuckets@98.GenerateNext(IEnumerable`1& next) in /restler/src/ResultsAnalyzer/Analyze/Buckets.fs:line 98
+   at Microsoft.FSharp.Core.CompilerServices.GeneratedSequenceBase`1.MoveNextImpl() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seqcore.fs:line 371
+   at Microsoft.FSharp.Core.CompilerServices.GeneratedSequenceBase`1.System-Collections-IEnumerator-MoveNext() in F:\workspace\_work\1\s\src\fsharp\FSharp.Core\seqcore.fs:line 403
+   at Microsoft.FSharp.Collections.SeqModule.ToList[T](IEnumerable`1 source)
+   at Restler.ResultsAnalyzer.Analyze.Main.main(AnalyzeArgs args) in /restler/src/ResultsAnalyzer/Analyze/Main.fs:line 103
+   at Restler.ResultsAnalyzer.Program.main(String[] argv) in /restler/src/ResultsAnalyzer/Program.fs:line 223

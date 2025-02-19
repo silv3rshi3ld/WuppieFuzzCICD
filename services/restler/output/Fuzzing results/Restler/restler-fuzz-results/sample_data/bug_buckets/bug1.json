@@ -1,0 +1,9 @@
+{
+    "id": "bug1",
+    "endpoint": "/api/endpoint1",
+    "method": "GET",
+    "status": 500,
+    "type": "critical",
+    "request": "GET /api/endpoint1",
+    "response": "Internal Server Error"
+}
