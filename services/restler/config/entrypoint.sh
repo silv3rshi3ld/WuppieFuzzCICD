@@ -69,7 +69,7 @@ case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
         # Compile the API spec using the generated config.json file
-        dotnet "$RESTLER_DLL" compile --config_file restlerConfig/config.json
+        dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC" --output_dir restlerConfig
         # Copy compile results to output directory
         cp -r Compile/* "$BASE_DIR/output/Test/"
         ;;
