@@ -71,7 +71,7 @@ case "$COMMAND" in
         # Compile the API spec using the generated config.json file
         dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC" --output_dir restlerConfig
         # Copy compile results to output directory
-        cp -r Compile/* "$BASE_DIR/output/Test/"
+        cp -r restlerConfig/* "$BASE_DIR/output/Test/"
         ;;
     test)
         echo "Running tests..."
