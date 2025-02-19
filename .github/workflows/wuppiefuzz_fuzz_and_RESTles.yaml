@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler, and Schemathesis
 
 on:
   push:
-    branches: [Less-dependent-build]
+    branches: [Less-dependent-build-erieketest]
   pull_request:
-    branches: [Less-dependent-build]
+    branches: [Less-dependent-build-erieketest]
 
 jobs:
   evomaster:
@@ -37,7 +37,7 @@ jobs:
             --blackBox true \
             --bbSwaggerUrl services/vampi/openapi_specs/openapi3.yml \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 1h \
+            --maxTime 60s \
             --outputFolder generated_tests \
             --ratePerMinute 60
 

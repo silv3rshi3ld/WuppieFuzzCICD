@@ -52,6 +52,7 @@ fi
 RESTLER_DLL="/restler_bin/restler/Restler.dll"
 
 # Create output directory structure
+mkdir -p "$BASE_DIR/output/Compile"
 mkdir -p "$BASE_DIR/output/Test"
 mkdir -p "$BASE_DIR/output/FuzzLean"
 mkdir -p "$BASE_DIR/output/Fuzz"
@@ -59,23 +60,17 @@ mkdir -p "$BASE_DIR/output/Fuzz"
 # Change to the base directory (mounted GitHub Actions workspace).
 cd "$BASE_DIR"
 
-# Generate RESTler configuration files
-# This step generates the restlerConfig directory with config.json, dict.json, etc.
-echo "Generating RESTler configuration files..."
-dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC" --output_dir restlerConfig
-
 # Execute the appropriate RESTler command.
 case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
-        # Compile the API spec using the generated config.json file
-        dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC" --output_dir restlerConfig
+        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC"
         # Copy compile results to output directory
-        cp -r restlerConfig/* "$BASE_DIR/output/Test/"
+        cp -r Compile/* "$BASE_DIR/output/Compile/"
         ;;
     test)
         echo "Running tests..."
-        dotnet "$RESTLER_DLL" test --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --no_ssl
+        dotnet "$RESTLER_DLL" test --no_ssl --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json
         # Copy test results including coverage file to output directory
         cp -r Test/* "$BASE_DIR/output/Test/"
         if [ -f "Test/coverage_failures_to_investigate.txt" ]; then
@@ -88,7 +83,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running fuzz-lean..."
-        dotnet "$RESTLER_DLL" fuzz-lean --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET" --no_ssl
+        dotnet "$RESTLER_DLL" fuzz-lean --no_ssl --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
         # Copy fuzz-lean results to output directory
         cp -r FuzzLean/* "$BASE_DIR/output/FuzzLean/"
         ;;
@@ -98,7 +93,7 @@ case "$COMMAND" in
             usage
         fi
         echo "Running full fuzzing..."
-        dotnet "$RESTLER_DLL" fuzz --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET" --no_ssl
+        dotnet "$RESTLER_DLL" fuzz --no_ssl --grammar_file Compile/grammar.py --dictionary_file Compile/dict.json --time_budget "$TIME_BUDGET"
         # Copy fuzz results to output directory
         cp -r Fuzz/* "$BASE_DIR/output/Fuzz/"
         ;;
