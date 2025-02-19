@@ -59,11 +59,15 @@ mkdir -p "$BASE_DIR/output/Fuzz"
 # Change to the base directory (mounted GitHub Actions workspace).
 cd "$BASE_DIR"
 
+# Generate RESTler configuration files
+echo "Generating RESTler configuration files..."
+dotnet "$RESTLER_DLL" generate_config --specs "$API_SPEC"
+
 # Execute the appropriate RESTler command.
 case "$COMMAND" in
     compile)
         echo "Compiling API specification..."
-        dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC"
+        dotnet "$RESTLER_DLL" compile --config_file restlerConfig/config.json
         # Copy compile results to output directory
         cp -r Compile/* "$BASE_DIR/output/Test/"
         ;;
