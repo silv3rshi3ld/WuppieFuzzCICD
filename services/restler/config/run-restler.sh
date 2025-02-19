@@ -20,14 +20,14 @@ if [ ! -d "Test" ]; then
 fi
 
 echo "Step 3: Fuzz-lean"
-/service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=60
+/service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=0.017
 if [ ! -d "FuzzLean" ]; then
     echo "Error: FuzzLean directory not created"
     exit 1
 fi
 
 echo "Step 4: Fuzz"
-/service/config/entrypoint.sh fuzz --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=60
+/service/config/entrypoint.sh fuzz --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=0.017
 if [ ! -d "Fuzz" ]; then
     echo "Error: Fuzz directory not created"
     exit 1
