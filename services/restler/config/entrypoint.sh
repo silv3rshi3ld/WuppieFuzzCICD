@@ -65,7 +65,7 @@ case "$COMMAND" in
         echo "Compiling API specification..."
         dotnet "$RESTLER_DLL" compile --api_spec "$API_SPEC"
         # Copy compile results to output directory
-        cp -r Compile/* "$BASE_DIR/output/Test/"
+        cp -r Compile/* "$BASE_DIR/output/Compile/"
         ;;
     test)
         echo "Running tests..."
