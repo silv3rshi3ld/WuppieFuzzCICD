@@ -2,10 +2,10 @@
     "SwaggerSpecFilePath": ["/workspace/openapi3.yml"],
     "GrammarOutputDirectoryPath": "/workspace/Compile",
     "CustomDictionaryFilePath": "/service/config/restler-custom-dictionary.json",
-    "IncludeOptionalParameters": true,
-    "UseHeaderExamples": true,
-    "UseQueryExamples": true,
-    "ResolveBodyDependencies": true,
-    "ResolveQueryDependencies": true,
-    "DiscoverExamples": true
+    "IncludeOptionalParameters": false,
+    "UseHeaderExamples": false,
+    "UseQueryExamples": false,
+    "ResolveBodyDependencies": false,
+    "ResolveQueryDependencies": false,
+    "DiscoverExamples": false
 }

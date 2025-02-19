@@ -1,356 +1,356 @@
-[02/18/2025 21:29:22] Generating grammar...
-[02/18/2025 21:29:23] Getting requests...
-[02/18/2025 21:29:23] Getting dependencies...
-[02/18/2025 21:29:23] Getting path consumers...
-[02/18/2025 21:29:23] Getting query consumers...
-[02/18/2025 21:29:23] Getting header consumers...
-[02/18/2025 21:29:23] Getting body consumers...
-[02/18/2025 21:29:23] Getting producers...
-[02/18/2025 21:29:23] Done processing producers
-[02/18/2025 21:29:23] Compute dependencies
-[[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
+[02/19/2025 08:30:16] Generating grammar...
+[02/19/2025 08:30:16] Getting requests...
+[02/19/2025 08:30:16] Getting dependencies...
+[02/19/2025 08:30:16] Getting path consumers...
+[02/19/2025 08:30:16] Getting query consumers...
+[02/19/2025 08:30:16] Getting header consumers...
+[02/19/2025 08:30:16] Getting body consumers...
+[02/19/2025 08:30:16] Getting producers...
+[02/19/2025 08:30:16] Done processing producers
+[02/19/2025 08:30:16] Compute dependencies
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Delete }[
+02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/register"
   xMsPath = None
   method = Post }
-[[02/18/2025 21:29:2302/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
   xMsPath = None
   method = Get }
-[[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
+[[02/19/2025 08:30:16] [[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1"
   xMsPath = None
   method = Get }
-[[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/me"
+02/19/2025 08:30:16[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/createdb"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+] Second pass dependencies for request { endpoint = "/users/v1/{username}"
   xMsPath = None
   method = Get }
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
+[[[[02/19/2025 08:30:16] [02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/me"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+[02/19/2025 08:30:1602/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
+  xMsPath = None
+  method = Put }] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+
+02/19/2025 08:30:16] Second pass dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+02/19/2025 08:30:16[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }
+02/19/2025 08:30:16[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+Second pass dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }[02/19/2025 08:30:16Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
+  xMsPath = None
+  method = Get }] Done dependencies for request { endpoint = "/users/v1/{username}"
   xMsPath = None
   method = Delete }
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = ""
+[02/19/2025 08:30:16[] Done dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }[02/19/2025 08:30:16] ] Done dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+
+[02/19/2025 08:30:16
+] Done dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Delete }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/password"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+[[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Delete }02/19/2025 08:30:16] Done dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }
+
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1/{book_title}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+[[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] [Done dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+
+[[[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16
+] Done dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }[02/19/2025 08:30:16] Done dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16
+] [02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Delete }
+
+
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16[] Done dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+[[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Delete }
+
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/_debug"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/me"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = ""
+  xMsPath = None
+  method = Get }
+[[[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }02/19/2025 08:30:1602/19/2025 08:30:16] 
+] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+[[02/19/2025 08:30:16Done dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }] Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
+  xMsPath = None
+  method = Put }
+
+[02/19/2025 08:30:16] [02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/password"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
   xMsPath = None
   method = Get }[
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1"
+02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
   xMsPath = None
   method = Get }
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }[
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-] Second pass dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }[
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }[02/18/2025 21:29:23] 
-Done dependencies for request { endpoint = "/users/v1/{username}/password"
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
   xMsPath = None
   method = Put }
-[[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }02/18/2025 21:29:23] Done dependencies for request { endpoint = "/me"
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/createdb"
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1/{book_title}"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }
+[[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/email"
+  xMsPath = None
+  method = Put }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1/{book_title}"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/password"
+  xMsPath = None
+  method = Put }
+[[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Post }
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/login"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/register"
+  xMsPath = None
+  method = Post }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/createdb"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1"
+  xMsPath = None
+  method = Get }
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}"
   xMsPath = None
   method = Delete }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = ""
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
   xMsPath = None
   method = Get }
-
-[[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/createdb"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
+[02/19/2025 08:30:16] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
   xMsPath = None
-  method = Get }
-
-02/18/2025 21:29:23] Done dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = ""
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-] Second pass dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
+  method = Put }
+[02/19/2025 08:30:16[] Done dependencies for request { endpoint = "/users/v1/{username}"
   xMsPath = None
   method = Delete }
-
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
+02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = ""
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/books/v1/{book_title}"
   xMsPath = None
   method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = ""
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Delete }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Delete }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = ""
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
+[02/19/2025 08:30:16] Done dependencies for request { endpoint = "/users/v1/{username}/password"
   xMsPath = None
   method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Delete }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = ""
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }[
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-[[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = ""
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-] Done dependencies for request { endpoint = "/me"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/_debug"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-[[02/18/2025 21:29:23] 02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-Done dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/email"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23[] Done dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/register"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23
-] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Delete }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/createdb"
-  xMsPath = None
-  method = Get }
-[[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1/{book_title}"
-  xMsPath = None
-  method = Get }
-02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}"
-  xMsPath = None
-  method = Delete }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/books/v1"
-  xMsPath = None
-  method = Get }
-[02/18/2025 21:29:23] Second pass dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/{username}/password"
-  xMsPath = None
-  method = Put }
-[02/18/2025 21:29:23] Done dependencies for request { endpoint = "/users/v1/login"
-  xMsPath = None
-  method = Post }
-[02/18/2025 21:29:23] Assigning equality constraints...
-[02/18/2025 21:29:23] Getting ordering constraints...
-[02/18/2025 21:29:23] Dependency analysis completed.
-[02/18/2025 21:29:23] Generating request primitives...
+[02/19/2025 08:30:16] Assigning equality constraints...
+[02/19/2025 08:30:16] Getting ordering constraints...
+[02/19/2025 08:30:16] Dependency analysis completed.
+[02/19/2025 08:30:16] Generating request primitives...
 Writing new dictionary to /workspace/Compile/dict.json
-[02/18/2025 21:29:23] Generating python grammar...
-[02/18/2025 21:29:23] Get requests
-[02/18/2025 21:29:23] Done get requests
-[02/18/2025 21:29:23] Done generating python grammar.
+[02/19/2025 08:30:16] Generating python grammar...
+[02/19/2025 08:30:16] Get requests
+[02/19/2025 08:30:16] Done get requests
+[02/19/2025 08:30:16] Done generating python grammar.
 Workflow completed.  See /workspace/Compile for REST-ler grammar.
