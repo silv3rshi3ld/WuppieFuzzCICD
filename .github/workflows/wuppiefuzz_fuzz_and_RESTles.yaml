@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler, and Schemathesis
 
 on:
   push:
-    branches: [Less-dependent-build]
+    branches: [Less-dependent-build-erieketest]
   pull_request:
-    branches: [Less-dependent-build]
+    branches: [Less-dependent-build-erieketest]
 
 jobs:
   evomaster:
