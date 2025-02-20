@@ -1,0 +1,224 @@
+// evomaster Data
+const fuzzerData = {
+  "metadata": {
+    "duration": "0:00:00",
+    "total_requests": 12,
+    "unique_bugs": 5,
+    "critical_issues": 0,
+    "fuzzer": "Evomaster"
+  },
+  "endpoints": [
+    {
+      "path": "/books/v1/{book_title}",
+      "methods": {
+        "GET": [
+          {
+            "status": "401",
+            "type": "miss",
+            "request": "{}\n",
+            "response": "assert res_0.json()['type'] == 'about:blank'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/me",
+      "methods": {
+        "GET": [
+          {
+            "status": "401",
+            "type": "miss",
+            "request": "{}\n",
+            "response": "assert res_0.json()['type'] == 'about:blank'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/books/v1",
+      "methods": {
+        "POST": [
+          {
+            "status": "401",
+            "type": "miss",
+            "request": "{}\n{}\n' { ' + ' \"book_title\": \"tg\", ' + ' \"secret\": \"5q\" ' + ' } '\n",
+            "response": "assert res_0.json()['type'] == 'about:blank'"
+          }
+        ],
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['Books'][2]['user'] == 'admin'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1/{username}/password",
+      "methods": {
+        "PUT": [
+          {
+            "status": "401",
+            "type": "miss",
+            "request": "{}\n{}\n' { ' + ' \"password\": \"C3kJwCH0Ik\" ' + ' } '\n",
+            "response": "assert res_0.json()['type'] == 'about:blank'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1/{username}/email",
+      "methods": {
+        "PUT": [
+          {
+            "status": "401",
+            "type": "miss",
+            "request": "{}\n{}\n' { ' + ' \"email\": \"pn_QKlE4S\" ' + ' } '\n",
+            "response": "assert res_0.json()['type'] == 'about:blank'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1/_debug",
+      "methods": {
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['users'][2]['username'] == 'admin'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1",
+      "methods": {
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['users'][2]['username'] == 'admin'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/",
+      "methods": {
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['vulnerable'] == 1.0"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/createdb",
+      "methods": {
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['message'] == 'Database populated.'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1/{username}",
+      "methods": {
+        "GET": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n",
+            "response": "assert res_0.json()['email'] == 'mail1@mail.com'"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/users/v1/login",
+      "methods": {
+        "POST": [
+          {
+            "status": "200",
+            "type": "hit",
+            "request": "{}\n{}\n' { ' + ' \"username\": \"qR\", ' + ' \"password\": \"wp22sirx2YkPyT\" ' + ' } '\n",
+            "response": "assert res_0.json()['message'] == 'Username does not exist'"
+          }
+        ]
+      }
+    }
+  ],
+  "stats": {
+    "statusDistribution": [
+      {
+        "name": "Hits",
+        "value": 7,
+        "color": "#22c55e"
+      },
+      {
+        "name": "Misses",
+        "value": 5,
+        "color": "#ef4444"
+      },
+      {
+        "name": "Unspecified",
+        "value": 0,
+        "color": "#f59e0b"
+      }
+    ],
+    "methodCoverage": [
+      {
+        "method": "GET",
+        "hits": 6,
+        "misses": 2,
+        "unspecified": 0
+      },
+      {
+        "method": "POST",
+        "hits": 1,
+        "misses": 1,
+        "unspecified": 0
+      },
+      {
+        "method": "PUT",
+        "hits": 0,
+        "misses": 2,
+        "unspecified": 0
+      }
+    ],
+    "statusCodes": [
+      {
+        "status": "200",
+        "count": 7
+      },
+      {
+        "status": "401",
+        "count": 5
+      },
+      {
+        "status": "404",
+        "count": 0
+      },
+      {
+        "status": "500",
+        "count": 0
+      },
+      {
+        "status": "204",
+        "count": 0
+      }
+    ]
+  }
+};

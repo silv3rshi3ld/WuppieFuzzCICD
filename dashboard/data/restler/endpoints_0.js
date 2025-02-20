@@ -1,0 +1,16 @@
+window.RestlerEndpoints0 = [
+  {
+    "path": "/api/products",
+    "method": "GET",
+    "total_requests": 25,
+    "success_rate": 95,
+    "type": "hit"
+  },
+  {
+    "path": "/api/orders",
+    "method": "POST",
+    "total_requests": 15,
+    "success_rate": 85,
+    "type": "hit"
+  }
+];

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuzzing Results Dashboard</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    
+    <!-- JavaScript Dependencies - Load in correct order -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="dashboard.js"></script>
+    
+    <!-- Initialize Data Before Alpine Loads -->
+    <script>
+        window.fuzzerData = {
+            metadata: {
+                duration: "2h 15m",
+                totalRequests: 33,
+                uniqueBugs: 8,
+                criticalIssues: 4
+            },
+            endpoints: [
+                {
+                    path: '/api/adminAuth',
+                    methods: {
+                        POST: [
+                            { status: '200', type: 'miss' },
+                            { status: '401', type: 'miss' },
+                            { 
+                                status: '500', 
+                                type: 'unspecified',
+                                request: 'curl http://localhost:3001/api/adminAuth',
+                                response: 'Server Error'
+                            }
+                        ]
+                    }
+                },
+                {
+                    path: '/api/categories/{id}',
+                    methods: {
+                        GET: [
+                            { status: '200', type: 'miss' },
+                            { status: '404', type: 'hit' }
+                        ],
+                        DELETE: [
+                            { status: '204', type: 'miss' },
+                            { status: '404', type: 'hit' }
+                        ]
+                    }
+                }
+            ],
+            stats: {
+                statusDistribution: [
+                    { name: 'Hits', value: 3, color: '#22c55e' },
+                    { name: 'Misses', value: 35, color: '#ef4444' },
+                    { name: 'Unspecified', value: 4, color: '#f59e0b' }
+                ],
+                methodCoverage: [
+                    { method: 'POST', hits: 0, misses: 12, unspecified: 2 },
+                    { method: 'GET', hits: 2, misses: 8, unspecified: 1 },
+                    { method: 'PUT', hits: 0, misses: 8, unspecified: 1 },
+                    { method: 'DELETE', hits: 1, misses: 7, unspecified: 0 }
+                ],
+                statusCodes: [
+                    { status: '200', count: 12 },
+                    { status: '401', count: 8 },
+                    { status: '404', count: 6 },
+                    { status: '500', count: 4 },
+                    { status: '204', count: 3 }
+                ]
+            }
+        };
+
+        // Process endpoints into a flat list of bugs
+        window.allBugs = [];
+        window.fuzzerData.endpoints.forEach(endpoint => {
+            Object.entries(endpoint.methods).forEach(([method, statuses]) => {
+                statuses.forEach((status, idx) => {
+                    window.allBugs.push({
+                        id: `${endpoint.path}-${method}-${idx}`,
+                        endpoint: endpoint.path,
+                        method: method,
+                        ...status
+                    });
+                });
+            });
+        });
+
+        // Define dashboard function before Alpine loads
+        function dashboard() {
+            return {
+                endpoints: window.fuzzerData.endpoints,
+                selectedEndpoint: null,
+                searchQuery: '',
+                bugs: window.allBugs,
+                filteredBugs: window.allBugs,
+                filters: {
+                    hits: true,
+                    misses: true,
+                    unspecified: true
+                },
+                charts: {},
+
+                init() {
+                    // Initialize icons first
+                    initializeIcons();
+
+                    // Initialize charts after a small delay to ensure DOM is ready
+                    this.$nextTick(() => {
+                        setTimeout(() => {
+                            const coverageChart = document.getElementById('coverageChart');
+                            const methodChart = document.getElementById('methodChart');
+                            const statusChart = document.getElementById('statusChart');
+
+                            if (coverageChart && methodChart && statusChart) {
+                                initializeCharts(this.charts);
+                            }
+                        }, 100);
+                    });
+
+                    // Watch for changes that require icon updates
+                    this.$watch('filteredBugs', () => {
+                        setTimeout(initializeIcons, 50);
+                    });
+                },
+
+                filterBugs() {
+                    this.filteredBugs = filterBugs(this.bugs, this.searchQuery);
+                },
+
+                getStatusIcon(type, small = false) {
+                    const size = small ? 16 : 20;
+                    switch (type) {
+                        case 'hit':
+                            return `<i data-feather="check-circle" class="icon-success" width="${size}" height="${size}"></i>`;
+                        case 'miss':
+                            return `<i data-feather="x-circle" class="icon-error" width="${size}" height="${size}"></i>`;
+                        case 'unspecified':
+                            return `<i data-feather="alert-triangle" class="icon-warning" width="${size}" height="${size}"></i>`;
+                        default:
+                            return '';
+                    }
+                },
+
+                getStatusClass,
+                getStatusDescription,
+
+                getTotalRequests() {
+                    return window.fuzzerData.metadata.totalRequests;
+                },
+
+                getCriticalErrors() {
+                    return window.fuzzerData.metadata.criticalIssues;
+                },
+
+                getUniqueEndpoints() {
+                    return window.fuzzerData.endpoints.length;
+                },
+
+                getSuccessRate() {
+                    const successCodes = window.fuzzerData.stats.statusCodes
+                        .filter(item => parseInt(item.status) >= 200 && parseInt(item.status) < 300)
+                        .reduce((sum, item) => sum + item.count, 0);
+                    const total = this.getTotalRequests();
+                    return total > 0 ? Math.round((successCodes / total) * 100) : 0;
+                }
+            };
+        }
+    </script>
+
+    <!-- Load Alpine.js last -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50" x-data="dashboard()" x-init="init">
+    <div>
+        <!-- Header -->
+        <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
+            <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
+                <h1 class="text-xl font-semibold">Fuzzing Results Dashboard</h1>
+                <div class="flex items-center gap-4">
+                    <template x-for="(enabled, type) in filters" :key="type">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                x-model="filters[type]"
+                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            >
+                            <span x-html="getStatusIcon(type)"></span>
+                            <span x-text="type.charAt(0).toUpperCase() + type.slice(1)"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex mt-16">
+            <!-- Left Sidebar: Endpoint Tree -->
+            <div class="w-72 border-r border-gray-200 overflow-y-auto h-[calc(100vh-4rem)] bg-gray-50 fixed">
+                <div class="p-4">
+                    <template x-for="(endpoint, idx) in endpoints" :key="idx">
+                        <div class="mb-6">
+                            <div class="text-sm font-mono font-medium text-gray-700 mb-2" x-text="endpoint.path"></div>
+                            <template x-for="(statuses, method) in endpoint.methods" :key="method">
+                                <div class="pl-4">
+                                    <div class="text-xs font-medium text-gray-500 mb-1" x-text="method"></div>
+                                    <div class="space-y-2">
+                                        <template x-for="(status, statusIdx) in statuses" :key="statusIdx">
+                                            <template x-if="filters[status.type === 'hit' ? 'hits' : status.type === 'miss' ? 'misses' : 'unspecified']">
+                                                <button
+                                                    @click="selectedEndpoint = status"
+                                                    class="w-full text-left p-2 text-xs flex items-center gap-2 hover:bg-gray-200 rounded transition-colors duration-150"
+                                                    :class="{'bg-gray-200': selectedEndpoint === status}"
+                                                >
+                                                    <span x-html="getStatusIcon(status.type, true)"></span>
+                                                    <span class="font-mono" 
+                                                          :class="getStatusClass(status.status)"
+                                                          :data-status-tooltip="getStatusDescription(status.status)"
+                                                          x-text="status.status"></span>
+                                                </button>
+                                            </template>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="ml-72 p-6 flex-1 max-w-screen-2xl">
+                <!-- Overall Statistics Section -->
+                <div class="mb-8">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                            Overall Statistics
+                        </h2>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <div class="stats-card">
+                            <div class="stats-value" x-text="getTotalRequests()"></div>
+                            <div class="stats-label">Total Requests</div>
+                        </div>
+                        <div class="stats-card">
+                            <div class="stats-value critical-error" x-text="getCriticalErrors()"></div>
+                            <div class="stats-label">Critical Errors (500+)</div>
+                        </div>
+                        <div class="stats-card">
+                            <div class="stats-value" x-text="getUniqueEndpoints()"></div>
+                            <div class="stats-label">Unique Endpoints</div>
+                        </div>
+                        <div class="stats-card">
+                            <div class="stats-value" 
+                                 :class="getSuccessRate() >= 80 ? 'text-green-600' : getSuccessRate() >= 50 ? 'text-yellow-600' : 'text-red-600'"
+                                 x-text="getSuccessRate() + '%'"></div>
+                            <div class="stats-label">Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="mb-8">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                            Response Analysis
+                        </h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Coverage Distribution -->
+                        <div class="chart-card">
+                            <h3 class="chart-title">
+                                <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                                Coverage Distribution
+                            </h3>
+                            <div class="chart-container">
+                                <canvas id="coverageChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Coverage by Method -->
+                        <div class="chart-card">
+                            <h3 class="chart-title">
+                                <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                                Coverage by Method
+                            </h3>
+                            <div class="chart-container">
+                                <canvas id="methodChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Status Codes -->
+                        <div class="chart-card">
+                            <h3 class="chart-title">
+                                <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                                Status Code Distribution
+                            </h3>
+                            <div class="chart-container">
+                                <canvas id="statusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bug List Section -->
+                <div class="mb-8">
+                    <div class="section-header">
+                        <div class="flex-1">
+                            <h2 class="section-title">
+                                <i data-feather="alert-circle" class="h-6 w-6 text-gray-400"></i>
+                                All Issues
+                            </h2>
+                            <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredBugs.length + ' total)'"></p>
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="Search issues..."
+                            class="search-input"
+                            x-model="searchQuery"
+                            @input="filterBugs"
+                        >
+                    </div>
+                    <div class="bug-list-container">
+                        <table class="bug-list">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Endpoint</th>
+                                    <th>Method</th>
+                                    <th>Type</th>
+                                    <th>Request</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="bug in filteredBugs" :key="bug.id">
+                                    <tr 
+                                        @click="selectedEndpoint = bug" 
+                                        class="cursor-pointer"
+                                        :class="{'critical': parseInt(bug.status) >= 500}"
+                                    >
+                                        <td>
+                                            <span 
+                                                :class="getStatusClass(bug.status)"
+                                                :data-status-tooltip="getStatusDescription(bug.status)"
+                                                x-text="bug.status"
+                                            ></span>
+                                        </td>
+                                        <td class="font-mono text-sm" x-text="bug.endpoint"></td>
+                                        <td class="font-mono text-sm" x-text="bug.method"></td>
+                                        <td>
+                                            <span x-html="getStatusIcon(bug.type, true)"></span>
+                                        </td>
+                                        <td class="font-mono text-sm truncate max-w-md" x-text="bug.request"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Request/Response Section -->
+                <template x-if="selectedEndpoint">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="chart-card">
+                            <h3 class="chart-title">
+                                <i data-feather="arrow-right" class="h-5 w-5 text-gray-400"></i>
+                                Request
+                            </h3>
+                            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.request || 'No request data available'"></pre>
+                        </div>
+                        
+                        <div class="chart-card">
+                            <h3 class="chart-title">
+                                <i data-feather="arrow-left" class="h-5 w-5 text-gray-400"></i>
+                                Response
+                            </h3>
+                            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.response || 'No response data available'"></pre>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!selectedEndpoint">
+                    <div class="chart-card">
+                        <div class="text-center py-12 text-gray-500">
+                            <i data-feather="info" class="h-6 w-6 mx-auto mb-2"></i>
+                            Select an endpoint to view details
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!-- Header -->
+<div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
+    <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
+        <h1 class="text-xl font-semibold">Fuzzing Results Dashboard</h1>
+        <div class="flex items-center gap-4">
+            <template x-for="(enabled, type) in filters" :key="type">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                        type="checkbox"
+                        x-model="filters[type]"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    >
+                    <span x-html="getStatusIcon(type)"></span>
+                    <span x-text="type.charAt(0).toUpperCase() + type.slice(1)"></span>
+                </label>
+            </template>
+        </div>
+    </div>
+</div>

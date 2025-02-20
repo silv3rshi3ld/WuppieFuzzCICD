@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WuppieFuzz Results</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="../styles.css" rel="stylesheet">
+    
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex items-center mb-8">
+            <a href="../index.html" class="text-gray-500 hover:text-gray-700 mr-4 flex items-center gap-2">
+                <i data-feather="arrow-left" class="h-6 w-6"></i>
+                <span>Back to Overview</span>
+            </a>
+            <h1 class="text-2xl font-bold flex items-center">
+                <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+                WuppieFuzz Results
+            </h1>
+            <div class="ml-auto text-gray-500" id="duration">Duration: -</div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading-state hidden">
+            <i data-feather="loader" class="h-12 w-12 text-gray-400"></i>
+            <p class="text-lg">Loading fuzzer data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="error-state hidden">
+            <i data-feather="alert-triangle" class="h-12 w-12"></i>
+            <p class="text-lg font-medium mb-2">Error Loading Data</p>
+            <p id="errorMessage" class="text-gray-600">Unable to load fuzzer data. Please try refreshing the page.</p>
+        </div>
+
+        <!-- Content (hidden until data loads) -->
+        <div id="content" class="hidden">
+            <!-- Overall Statistics -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                        Overall Statistics
+                    </h2>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="stats-card">
+                        <div class="stats-value" id="totalRequests">-</div>
+                        <div class="stats-label">Total Requests</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value critical-error" id="criticalErrors">-</div>
+                        <div class="stats-label">Critical Errors (500+)</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="uniqueEndpoints">-</div>
+                        <div class="stats-label">Unique Endpoints</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="successRate">-</div>
+                        <div class="stats-label">Success Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Analysis -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                        Response Analysis
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Coverage Distribution -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                            Coverage Distribution
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="coverageChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Method Coverage -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                            Method Coverage
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="methodChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Status Codes -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                            Status Code Distribution
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoint Tree -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="git-merge" class="h-6 w-6 text-gray-400"></i>
+                        Endpoint Tree
+                    </h2>
+                    <input 
+                        type="text" 
+                        placeholder="Search endpoints..."
+                        class="search-input"
+                        id="endpointSearch"
+                    >
+                </div>
+                <div id="endpointTree" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <!-- Endpoint tree will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Issues Found -->
+            <div>
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="alert-triangle" class="h-6 w-6 text-gray-400"></i>
+                        Issues Found
+                    </h2>
+                </div>
+                <div id="bugList" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <!-- Bug list will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Libraries -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/core/data-loader.js"></script>
+    <script src="../js/core/state-manager.js"></script>
+    <script src="../js/components/endpoint-tree.js"></script>
+    <script src="../js/components/bug-list.js"></script>
+    <script src="../js/components/charts.js"></script>
+    
+    <!-- Data Files -->
+    <script src="../data/wuppiefuzz/metadata.js"></script>
+    <script src="../data/wuppiefuzz/coverage.js"></script>
+    <script src="../data/wuppiefuzz/endpoints_0.js"></script>
+    
+    <!-- Initialize Components -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize icons
+            feather.replace();
+            
+            // Show loading state
+            document.getElementById('loadingState').classList.remove('hidden');
+            
+            try {
+                // Initialize state manager
+                const stateManager = new StateManager('WuppieFuzz');
+                window.currentStateManager = stateManager;
+                
+                // Initialize components
+                new EndpointTree('endpointTree', stateManager);
+                new BugList('bugList', stateManager);
+                new Charts(stateManager);
+                
+                // Initialize state
+                stateManager.initialize();
+                
+                // Add search functionality
+                const searchInput = document.getElementById('endpointSearch');
+                searchInput.addEventListener('input', (e) => {
+                    stateManager.setSearchQuery(e.target.value);
+                });
+                
+                // Hide loading state and show content
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                
+            } catch (error) {
+                // Hide loading state and show error
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorState').classList.remove('hidden');
+                console.error('Error initializing dashboard:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+window.RestlerCoverage = {
+  "status_distribution": {
+    "hits": 2,
+    "misses": 2,
+    "unspecified": 0
+  },
+  "method_coverage": {
+    "GET": 1,
+    "POST": 1
+  },
+  "status_codes": [
+    {
+      "status": "200",
+      "count": 23
+    },
+    {
+      "status": "404",
+      "count": 1
+    },
+    {
+      "status": "500",
+      "count": 1
+    },
+    {
+      "status": "201",
+      "count": 13
+    },
+    {
+      "status": "400",
+      "count": 1
+    },
+    {
+      "status": "500",
+      "count": 1
+    }
+  ]
+};

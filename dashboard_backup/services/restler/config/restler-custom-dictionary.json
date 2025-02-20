@@ -1,0 +1,23 @@
+{
+    "restler_custom_payload": {
+        "authentication": {
+            "register_user": {
+                "username": "restler_fuzzer",
+                "password": "restler_password",
+                "email": "restler@test.com"
+            },
+            "login_user": {
+                "username": "restler_fuzzer",
+                "password": "restler_password"
+            }
+        }
+    },
+    "restler_custom_authentication": {
+        "token_refresh_interval": 300,
+        "token_refresh_cmd": "/bin/bash /service/config/refresh_token.sh",
+        "authentication_token_location": {
+            "header": "Authorization",
+            "prefix": "Bearer "
+        }
+    }
+}

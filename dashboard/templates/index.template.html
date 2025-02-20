@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuzzing Results Dashboard</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex items-center mb-12">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+                Fuzzing Results Dashboard
+            </h1>
+        </div>
+
+        <!-- Overall Summary -->
+        <div class="mb-12">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                    Overall Summary
+                </h2>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="stats-card">
+                    <div class="stats-value" id="totalRequests">{{total_requests}}</div>
+                    <div class="stats-label">Total Requests</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value critical-error" id="criticalErrors">{{critical_issues}}</div>
+                    <div class="stats-label">Critical Errors (500+)</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value" id="uniqueEndpoints">{{unique_endpoints}}</div>
+                    <div class="stats-label">Unique Endpoints</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value" id="successRate">{{success_rate}}%</div>
+                    <div class="stats-label">Success Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fuzzer Results -->
+        <div class="mb-12">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="zap" class="h-6 w-6 text-gray-400"></i>
+                    Fuzzer Results
+                    <span class="text-sm font-normal text-gray-500 ml-2">(Click for details)</span>
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {{fuzzer_cards}}
+            </div>
+        </div>
+
+        <!-- Response Analysis -->
+        <div class="mb-12">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                    Response Analysis
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Coverage Distribution -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                        Coverage Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="coverageChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Method Coverage -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                        Method Coverage
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="methodChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Status Codes -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                        Status Code Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Files -->
+    <script src="data/summary.js"></script>
+    
+    <!-- Initialize -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize icons
+            feather.replace();
+            
+            // Initialize charts
+            initializeCharts();
+        });
+
+        function initializeCharts() {
+            const data = window.summaryData || {};
+            
+            // Coverage Distribution Chart
+            new Chart(document.getElementById('coverageChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Hits', 'Misses', 'Unspecified'],
+                    datasets: [{
+                        data: [data.hits || 0, data.misses || 0, data.unspecified || 0],
+                        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Method Coverage Chart
+            new Chart(document.getElementById('methodChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['GET', 'POST', 'PUT', 'DELETE'],
+                    datasets: [{
+                        label: 'Hits',
+                        data: [data.get_hits || 0, data.post_hits || 0, data.put_hits || 0, data.delete_hits || 0],
+                        backgroundColor: '#22c55e'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Status Code Distribution Chart
+            new Chart(document.getElementById('statusChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['2xx', '4xx', '5xx'],
+                    datasets: [{
+                        data: [data.status_2xx || 0, data.status_4xx || 0, data.status_5xx || 0],
+                        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

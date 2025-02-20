@@ -1,0 +1,15 @@
+export const endpoints = [
+  {
+    "path": "/users/v1/login",
+    "methods": {
+      "POST": [
+        {
+          "status": "200",
+          "type": "hit",
+          "request": "{}\n{}\n' { ' + ' \"username\": \"qR\", ' + ' \"password\": \"wp22sirx2YkPyT\" ' + ' } '\n",
+          "response": "assert res_0.json()['message'] == 'Username does not exist'"
+        }
+      ]
+    }
+  }
+];

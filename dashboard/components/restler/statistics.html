@@ -1,0 +1,28 @@
+<!-- Restler statistics Component -->
+
+            <div class="stats-section mb-8">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <i data-feather="bar-chart-2" class="h-5 w-5 text-gray-400"></i>
+                        Restler Statistics
+                    </h3>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="stats-card">
+                        <div class="stats-value" x-text="fuzzerData['restler'].metadata.totalRequests"></div>
+                        <div class="stats-label">Total Requests</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value critical-error" x-text="fuzzerData['restler'].metadata.criticalIssues"></div>
+                        <div class="stats-label">Critical Errors</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" x-text="fuzzerData['restler'].endpoints.length"></div>
+                        <div class="stats-label">Unique Endpoints</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" x-text="getSuccessRate('restler') + '%'"></div>
+                        <div class="stats-label">Success Rate</div>
+                    </div>
+                </div>
+            </div>

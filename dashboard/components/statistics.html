@@ -1,0 +1,73 @@
+<!-- Overall Statistics Section -->
+<div class="mb-8">
+    <div class="section-header">
+        <h2 class="section-title">
+            <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+            Overall Statistics
+        </h2>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="stats-card">
+            <div class="stats-value" x-text="getTotalRequests()"></div>
+            <div class="stats-label">Total Requests</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-value critical-error" x-text="getCriticalErrors()"></div>
+            <div class="stats-label">Critical Errors (500+)</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-value" x-text="getUniqueEndpoints()"></div>
+            <div class="stats-label">Unique Endpoints</div>
+        </div>
+        <div class="stats-card">
+            <div class="stats-value" 
+                 :class="getSuccessRate() >= 80 ? 'text-green-600' : getSuccessRate() >= 50 ? 'text-yellow-600' : 'text-red-600'"
+                 x-text="getSuccessRate() + '%'"></div>
+            <div class="stats-label">Success Rate</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="mb-8">
+    <div class="section-header">
+        <h2 class="section-title">
+            <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+            Response Analysis
+        </h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Coverage Distribution -->
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                Coverage Distribution
+            </h3>
+            <div class="chart-container">
+                <canvas id="coverageChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Coverage by Method -->
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                Coverage by Method
+            </h3>
+            <div class="chart-container">
+                <canvas id="methodChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Status Codes -->
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                Status Code Distribution
+            </h3>
+            <div class="chart-container">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>

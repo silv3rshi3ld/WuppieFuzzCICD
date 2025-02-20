@@ -1,0 +1,18 @@
+{
+    "max_sequence_length": 100,
+    "max_request_execution_time": 30,
+    "no_ssl": true,
+    "include_user_agent": true,
+    "enable_checkers": ["*"],
+    "producer_timing_delay": 1,
+    "dyn_objects_cache_size": 50,
+    "ignore_feedback": false,
+    "ignore_dependencies": false,
+    "garbage_collection_interval": 300,
+    "fuzzing_jobs": 4,
+    "save_results_in_fixed_dirname": true,
+    "host": "vampi",
+    "port": 5000,
+    "target_ip": "vampi",
+    "target_port": 5000
+}
