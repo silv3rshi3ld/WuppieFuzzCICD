@@ -2,7 +2,7 @@
   {
     "path": "/books/v1",
     "method": "POST",
-    "total_requests": 80,
+    "total_requests": 233,
     "success_requests": 80,
     "status_codes": {
       "200": 80
@@ -16,12 +16,12 @@
       "medium": 0,
       "low": 80
     },
-    "success_rate": 100.0
+    "success_rate": 34.33
   },
   {
     "path": "/users/v1/login",
     "method": "POST",
-    "total_requests": 223,
+    "total_requests": 392,
     "success_requests": 223,
     "status_codes": {
       "200": 223
@@ -35,12 +35,12 @@
       "medium": 0,
       "low": 223
     },
-    "success_rate": 100.0
+    "success_rate": 56.89
   },
   {
     "path": "/users/v1/register",
     "method": "POST",
-    "total_requests": 118,
+    "total_requests": 280,
     "success_requests": 118,
     "status_codes": {
       "200": 118
@@ -54,12 +54,12 @@
       "medium": 0,
       "low": 118
     },
-    "success_rate": 100.0
+    "success_rate": 42.14
   },
   {
     "path": "/users/v1/{username}/email",
     "method": "PUT",
-    "total_requests": 128,
+    "total_requests": 259,
     "success_requests": 128,
     "status_codes": {
       "200": 128
@@ -73,12 +73,12 @@
       "medium": 0,
       "low": 128
     },
-    "success_rate": 100.0
+    "success_rate": 49.42
   },
   {
     "path": "/me",
     "method": "GET",
-    "total_requests": 14,
+    "total_requests": 263,
     "success_requests": 14,
     "status_codes": {
       "200": 14
@@ -92,12 +92,12 @@
       "medium": 0,
       "low": 14
     },
-    "success_rate": 100.0
+    "success_rate": 5.32
   },
   {
     "path": "/books/v1",
     "method": "GET",
-    "total_requests": 29,
+    "total_requests": 271,
     "success_requests": 29,
     "status_codes": {
       "200": 29
@@ -111,12 +111,12 @@
       "medium": 0,
       "low": 29
     },
-    "success_rate": 100.0
+    "success_rate": 10.7
   },
   {
     "path": "/users/v1/{username}/password",
     "method": "PUT",
-    "total_requests": 93,
+    "total_requests": 214,
     "success_requests": 93,
     "status_codes": {
       "200": 93
@@ -130,12 +130,12 @@
       "medium": 0,
       "low": 93
     },
-    "success_rate": 100.0
+    "success_rate": 43.46
   },
   {
     "path": "/books/v1/{book_title}",
     "method": "GET",
-    "total_requests": 14,
+    "total_requests": 243,
     "success_requests": 14,
     "status_codes": {
       "200": 14
@@ -149,12 +149,12 @@
       "medium": 0,
       "low": 14
     },
-    "success_rate": 100.0
+    "success_rate": 5.76
   },
   {
     "path": "/users/v1/_debug",
     "method": "GET",
-    "total_requests": 14,
+    "total_requests": 441,
     "success_requests": 14,
     "status_codes": {
       "200": 14
@@ -168,12 +168,12 @@
       "medium": 0,
       "low": 14
     },
-    "success_rate": 100.0
+    "success_rate": 3.17
   },
   {
     "path": "/users/v1/{username}",
     "method": "DELETE",
-    "total_requests": 15,
+    "total_requests": 314,
     "success_requests": 15,
     "status_codes": {
       "200": 15
@@ -187,12 +187,12 @@
       "medium": 0,
       "low": 15
     },
-    "success_rate": 100.0
+    "success_rate": 4.78
   },
   {
     "path": "/createdb",
     "method": "GET",
-    "total_requests": 23,
+    "total_requests": 857,
     "success_requests": 23,
     "status_codes": {
       "200": 23
@@ -206,12 +206,12 @@
       "medium": 0,
       "low": 23
     },
-    "success_rate": 100.0
+    "success_rate": 2.68
   },
   {
     "path": "/users/v1",
     "method": "GET",
-    "total_requests": 13,
+    "total_requests": 1440,
     "success_requests": 13,
     "status_codes": {
       "200": 13
@@ -225,12 +225,12 @@
       "medium": 0,
       "low": 13
     },
-    "success_rate": 100.0
+    "success_rate": 0.9
   },
   {
     "path": "/",
     "method": "GET",
-    "total_requests": 11,
+    "total_requests": 1340,
     "success_requests": 11,
     "status_codes": {
       "200": 11
@@ -244,12 +244,12 @@
       "medium": 0,
       "low": 11
     },
-    "success_rate": 100.0
+    "success_rate": 0.82
   },
   {
     "path": "/users/v1/{username}",
     "method": "GET",
-    "total_requests": 15,
+    "total_requests": 612,
     "success_requests": 15,
     "status_codes": {
       "200": 15
@@ -263,6 +263,6 @@
       "medium": 0,
       "low": 15
     },
-    "success_rate": 100.0
+    "success_rate": 2.45
   }
 ]

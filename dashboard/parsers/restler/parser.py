@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 from ..base.parser import BaseParser
+from ..base.zip_handler import ZipHandler
 
 class RestlerParser(BaseParser):
     """Parser for Restler results."""
@@ -32,6 +33,25 @@ class RestlerParser(BaseParser):
             "ResponseBuckets/errorBuckets.json",
             "ResponseBuckets/runSummary.json"
         ]
+    
+    def parse_zip(self, zip_path: str) -> Dict[str, Any]:
+        """Parse Restler results directly from ZIP file.
+        
+        Args:
+            zip_path: Path to the ZIP file
+            
+        Returns:
+            Dictionary containing parsed data
+        """
+        with ZipHandler(zip_path) as handler:
+            # Extract required files
+            files = handler.extract_fuzzer_data('restler')
+            
+            if 'summary' not in files:
+                raise FileNotFoundError("Required testing summary file not found in ZIP")
+                
+            # Parse the extracted data
+            return self.parse_results(os.path.dirname(os.path.dirname(os.path.dirname(files['summary']))))
     
     def parse_results(self, input_path: str) -> Dict[str, Any]:
         """Parse Restler results from a directory.
@@ -71,21 +91,19 @@ class RestlerParser(BaseParser):
         # Add tracked endpoints to data
         self.data["endpoints"] = list(self.endpoint_map.values())
         
-        # Update method coverage
-        self.data["stats"]["methodCoverage"] = self.method_counts
-        
-        # Update status distribution
-        self.data["stats"]["statusDistribution"] = {
-            "hits": self.hits,
-            "misses": self.misses,
-            "unspecified": 0  # We can determine all statuses
-        }
-        
-        # Update status codes
-        self.data["stats"]["statusCodes"] = [
-            {"status": status, "count": count}
-            for status, count in self.status_counts.items()
-        ]
+        # Update stats
+        self.data["stats"].update({
+            "methodCoverage": self.method_counts,
+            "statusDistribution": {
+                "hits": self.hits,
+                "misses": self.misses,
+                "unspecified": 0  # We can determine all statuses
+            },
+            "statusCodes": [
+                {"status": status, "count": count}
+                for status, count in self.status_counts.items()
+            ]
+        })
         
         return self.data
     
@@ -123,16 +141,19 @@ class RestlerParser(BaseParser):
                     stmt_total=total
                 )
                 
-                # Update request stats
-                self.data["stats"]["total_requests"] = request_count
+                # Update metadata
+                self.data["metadata"].update({
+                    "timestamp": datetime.now().isoformat(),
+                    "duration": summary.get('total_time', '00:00:00'),
+                    "fuzzer": "Restler"
+                })
                 
-                # Update bug stats
-                bug_buckets = summary.get('bug_buckets', {})
-                total_bugs = sum(bug_buckets.values())
-                self.data["stats"]["critical_issues"] = total_bugs
-                
-                # Update unique endpoints count
-                self.data["stats"]["unique_endpoints"] = total
+                # Update stats
+                self.data["stats"].update({
+                    "total_requests": request_count,
+                    "critical_issues": sum(summary.get('bug_buckets', {}).values()),
+                    "unique_endpoints": total
+                })
                 
         except Exception as e:
             print(f"Error parsing testing summary: {e}")
@@ -341,7 +362,13 @@ def parse_restler_results(input_path: str) -> tuple[dict, dict]:
         Tuple of (report, dashboard) dictionaries
     """
     parser = RestlerParser()
-    dashboard = parser.parse_results(input_path)
+    
+    # Handle both ZIP and directory input
+    if input_path.endswith('.zip'):
+        dashboard = parser.parse_zip(input_path)
+    else:
+        dashboard = parser.parse_results(input_path)
+        
     # For now, return the same data as both report and dashboard
     # Can be modified later if report needs different structure
     return dashboard, dashboard

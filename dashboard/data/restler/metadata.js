@@ -1,7 +1,7 @@
 window.RestlerMetadata = {
   "name": "Restler",
   "version": "1.0.0",
-  "timestamp": "",
+  "timestamp": "2025-02-21T22:52:54.631583",
   "duration": "00:00:00",
   "fuzzer": "Restler",
   "total_endpoints": 1,

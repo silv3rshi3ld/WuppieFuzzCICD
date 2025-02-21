@@ -1,7 +1,7 @@
 {
-  "total_requests": 5188,
+  "total_requests": 5173,
   "critical_issues": 10,
-  "unique_endpoints": 29,
+  "unique_endpoints": 28,
   "success_rate": 15,
   "hits": 790,
   "misses": 12,
@@ -20,7 +20,7 @@
       "total_requests": 790,
       "critical_issues": 0,
       "unique_endpoints": 14,
-      "duration": "00:00:00"
+      "duration": "0:00:59.993000"
     },
     {
       "name": "Restler",
@@ -33,9 +33,9 @@
     {
       "name": "Evomaster",
       "id": "evomaster",
-      "total_requests": 15,
+      "total_requests": 0,
       "critical_issues": 0,
-      "unique_endpoints": 1,
+      "unique_endpoints": 0,
       "duration": "00:00:00"
     }
   ]

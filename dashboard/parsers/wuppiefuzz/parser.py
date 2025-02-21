@@ -4,8 +4,10 @@ import os
 import json
 import sqlite3
 from typing import Dict, List, Any, Optional
+from datetime import datetime
 
 from ..base.parser import BaseParser
+from ..base.zip_handler import ZipHandler
 
 class WuppieFuzzParser(BaseParser):
     """Parser for WuppieFuzz results."""
@@ -16,6 +18,7 @@ class WuppieFuzzParser(BaseParser):
         self.data["metadata"]["name"] = "WuppieFuzz"
         self.conn = None
         self.cursor = None
+        self.handler = None  # Keep reference to ZipHandler
     
     def get_file_patterns(self) -> List[str]:
         """Get list of file patterns to extract from zip.
@@ -24,9 +27,36 @@ class WuppieFuzzParser(BaseParser):
             List of glob patterns
         """
         return [
-            "grafana/report.db",
-            "*/endpointcoverage/index.html"
+            "**/grafana/report.db",
+            "**/endpointcoverage/index.html"
         ]
+    
+    def parse_zip(self, zip_path: str) -> Dict[str, Any]:
+        """Parse WuppieFuzz results directly from ZIP file.
+        
+        Args:
+            zip_path: Path to the ZIP file
+            
+        Returns:
+            Dictionary containing parsed data
+        """
+        self.handler = ZipHandler(zip_path)
+        self.handler.keep_alive()  # Keep temp directory until parsing is done
+        
+        with self.handler:
+            # Extract required files
+            files = self.handler.extract_fuzzer_data('wuppiefuzz')
+            
+            if 'db' not in files:
+                raise FileNotFoundError("Required database file not found in ZIP")
+                
+            # Parse the extracted data
+            try:
+                return self.parse_results(os.path.dirname(os.path.dirname(files['db'])))
+            finally:
+                # Clean up temp directory
+                self.handler.cleanup()
+                self.handler = None
     
     def parse_results(self, input_path: str) -> Dict[str, Any]:
         """Parse WuppieFuzz results from a directory.
@@ -49,13 +79,41 @@ class WuppieFuzzParser(BaseParser):
             self.conn = sqlite3.connect(db_path)
             self.cursor = self.conn.cursor()
             
-            # Get latest run ID
-            self.cursor.execute("SELECT id, timestamp FROM runs ORDER BY timestamp DESC LIMIT 1")
+            # Get latest run ID and metadata
+            self.cursor.execute("""
+                SELECT id, timestamp
+                FROM runs
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """)
             run_id, timestamp = self.cursor.fetchone()
             print(f"Found run ID: {run_id} timestamp: {timestamp}")
             
+            # Calculate duration from request timestamps
+            duration = "00:00:00"
+            try:
+                self.cursor.execute("""
+                    SELECT MIN(timestamp), MAX(timestamp)
+                    FROM requests
+                    WHERE runid = ?
+                """, (run_id,))
+                min_time, max_time = self.cursor.fetchone()
+                if min_time and max_time:
+                    try:
+                        start = datetime.fromisoformat(min_time)
+                        end = datetime.fromisoformat(max_time)
+                        duration = str(end - start)
+                    except ValueError:
+                        pass
+            except sqlite3.Error:
+                pass
+            
             # Update metadata
-            self.data["metadata"]["timestamp"] = timestamp
+            self.data["metadata"].update({
+                "timestamp": timestamp,
+                "duration": duration,
+                "fuzzer": "WuppieFuzz"
+            })
             
             # Get coverage data
             self.cursor.execute("""
@@ -79,10 +137,14 @@ class WuppieFuzzParser(BaseParser):
             
             # Get request data
             self.cursor.execute("""
-                SELECT path, type, body, data, url, testcase
-                FROM requests
+                SELECT path, type, body, data, url, testcase,
+                       (SELECT COUNT(*) FROM requests r2 
+                        WHERE r2.path = r1.path 
+                        AND r2.type = r1.type 
+                        AND r2.runid = ?) as endpoint_requests
+                FROM requests r1
                 WHERE runid = ? AND body IS NOT NULL
-            """, (run_id,))
+            """, (run_id, run_id))
             requests = self.cursor.fetchall()
             print(f"Found {len(requests)} requests")
             
@@ -94,7 +156,7 @@ class WuppieFuzzParser(BaseParser):
             hits = 0
             misses = 0
             
-            for path, method, response_body, request_data, url, testcase in requests:
+            for path, method, response_body, request_data, url, testcase, endpoint_reqs in requests:
                 try:
                     # Safely decode data
                     response_str = self._safe_decode(response_body)
@@ -104,7 +166,6 @@ class WuppieFuzzParser(BaseParser):
                     try:
                         request_json = json.loads(request_str) if request_str else {}
                     except json.JSONDecodeError:
-                        # If request data isn't JSON, create basic structure
                         request_json = {
                             "method": method,
                             "path": path,
@@ -135,7 +196,7 @@ class WuppieFuzzParser(BaseParser):
                         endpoint_stats[endpoint_key] = {
                             "path": path,
                             "method": method,
-                            "total_requests": 0,
+                            "total_requests": endpoint_reqs,
                             "success_requests": 0,
                             "status_codes": {},
                             "responses": {},
@@ -148,7 +209,6 @@ class WuppieFuzzParser(BaseParser):
                         }
                     
                     endpoint = endpoint_stats[endpoint_key]
-                    endpoint["total_requests"] += 1
                     total_requests += 1
                     
                     # Update status code counts
@@ -189,21 +249,20 @@ class WuppieFuzzParser(BaseParser):
             for endpoint_data in endpoint_stats.values():
                 self.add_endpoint(endpoint_data)
             
-            # Update total requests
-            self.data["stats"]["total_requests"] = total_requests
-            
-            # Update method coverage
-            self.data["stats"]["methodCoverage"] = method_counts
-            
-            # Update status distribution
-            self.data["stats"]["statusDistribution"] = {
-                "hits": hits,
-                "misses": misses,
-                "unspecified": 0  # We can determine all statuses
-            }
-            
-            # Update status codes
-            self.data["stats"]["statusCodes"] = list(status_counts.values())
+            # Update stats
+            self.data["stats"].update({
+                "total_requests": total_requests,
+                "critical_issues": sum(1 for e in endpoint_stats.values() 
+                                    if e["severity_counts"]["critical"] > 0),
+                "unique_endpoints": len(endpoint_stats),
+                "methodCoverage": method_counts,
+                "statusDistribution": {
+                    "hits": hits,
+                    "misses": misses,
+                    "unspecified": 0
+                },
+                "statusCodes": list(status_counts.values())
+            })
             
             return self.data
                 
@@ -321,7 +380,13 @@ def parse_wuppiefuzz_results(input_path: str) -> tuple[dict, dict]:
         Tuple of (report, dashboard) dictionaries
     """
     parser = WuppieFuzzParser()
-    dashboard = parser.parse_results(input_path)
+    
+    # Handle both ZIP and directory input
+    if input_path.endswith('.zip'):
+        dashboard = parser.parse_zip(input_path)
+    else:
+        dashboard = parser.parse_results(input_path)
+        
     # For now, return the same data as both report and dashboard
     # Can be modified later if report needs different structure
     return dashboard, dashboard
