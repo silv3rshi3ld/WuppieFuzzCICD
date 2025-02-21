@@ -1,5 +1,5 @@
 """WuppieFuzz parser package."""
 
-from .parser import parse_wuppiefuzz_results
+from .parser import WuppieFuzzParser, parse_wuppiefuzz_results
 
-__all__ = ['parse_wuppiefuzz_results']
+__all__ = ['WuppieFuzzParser', 'parse_wuppiefuzz_results']

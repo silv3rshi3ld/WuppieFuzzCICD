@@ -1,11 +1,17 @@
 """Dashboard parsers package."""
 
-from .wuppiefuzz.parser import parse_wuppiefuzz_results
-from .restler.parser import parse_restler_results
-from .evomaster.parser import parse_evomaster_results
+from .generate_dashboards import (
+    save_fuzzer_data,
+    generate_fuzzer_page,
+    generate_summary,
+    generate_index_page,
+    main
+)
 
 __all__ = [
-    'parse_wuppiefuzz_results',
-    'parse_restler_results',
-    'parse_evomaster_results'
+    'save_fuzzer_data',
+    'generate_fuzzer_page',
+    'generate_summary',
+    'generate_index_page',
+    'main'
 ]

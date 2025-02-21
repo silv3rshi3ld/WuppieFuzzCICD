@@ -1,4 +1,7 @@
+"""Generate dashboard data and pages from fuzzer results."""
+
 import os
+import sys
 import json
 import shutil
 from dashboard.parsers.wuppiefuzz.parser import parse_wuppiefuzz_results
@@ -92,9 +95,9 @@ def generate_summary(dashboards, output_dir):
     """Generate summary data."""
     try:
         summary = {
-            'total_requests': sum(d['metadata'].get('total_requests', 0) for d in dashboards),
-            'critical_issues': sum(d['metadata'].get('critical_issues', 0) for d in dashboards),
-            'unique_endpoints': sum(d['metadata'].get('total_endpoints', 0) for d in dashboards),
+            'total_requests': sum(d['stats'].get('total_requests', 0) for d in dashboards),  # Changed from metadata to stats
+            'critical_issues': sum(d['stats'].get('critical_issues', 0) for d in dashboards),  # Changed from metadata to stats
+            'unique_endpoints': sum(d['stats'].get('unique_endpoints', 0) for d in dashboards),  # Changed from metadata to stats
             'success_rate': 0,
             'hits': 0,
             'misses': 0,
@@ -127,9 +130,9 @@ def generate_summary(dashboards, output_dir):
             fuzzer_data = {
                 'name': fuzzer_name,
                 'id': fuzzer_name.lower(),
-                'total_requests': dashboard['metadata'].get('total_requests', 0),
-                'critical_issues': dashboard['metadata'].get('critical_issues', 0),
-                'unique_endpoints': dashboard['metadata'].get('total_endpoints', 0),
+                'total_requests': dashboard['stats'].get('total_requests', 0),  # Changed from metadata to stats
+                'critical_issues': dashboard['stats'].get('critical_issues', 0),  # Changed from metadata to stats
+                'unique_endpoints': dashboard['stats'].get('unique_endpoints', 0),  # Changed from metadata to stats
                 'duration': dashboard['metadata'].get('duration', '0s')
             }
             summary['fuzzers'].append(fuzzer_data)
@@ -230,7 +233,7 @@ def setup_directory_structure(base_dir):
 
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    output_dir = os.path.join(base_dir, 'test_data')
+    output_dir = os.path.join(base_dir, 'output-fuzzers')  # Changed from 'test_data' to 'output-fuzzers'
     data_dir = os.path.join(base_dir, 'dashboard', 'data')
     pages_dir = os.path.join(base_dir, 'dashboard', 'pages')
     fuzzer_template_path = os.path.join(base_dir, 'dashboard', 'templates', 'fuzzer.html')
@@ -268,8 +271,8 @@ def main():
         print(f"\nProcessing {name} results...")
         
         # Try ZIP file first
-        zip_path = os.path.join(output_dir, name.lower(), fuzzer['zip_name'])
-        dir_path = os.path.join(output_dir, name.lower(), fuzzer['dir_name'])
+        zip_path = os.path.join(output_dir, name, fuzzer['zip_name'])  # Changed from name.lower() to name
+        dir_path = os.path.join(output_dir, name, fuzzer['dir_name'])  # Changed from name.lower() to name
         
         input_path = None
         temp_dir = None

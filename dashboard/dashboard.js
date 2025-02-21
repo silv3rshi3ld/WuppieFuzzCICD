@@ -1,6 +1,29 @@
 // Global chart instances
 let chartInstances = {};
 
+// Format duration string
+function formatDuration(timestamp) {
+    if (!timestamp) return '00:00:00';
+    
+    const start = new Date(timestamp);
+    const now = new Date();
+    const diff = Math.abs(now - start);
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// Update duration display
+function updateDuration() {
+    const durationElement = document.getElementById('duration');
+    if (durationElement && window.fuzzerData && window.fuzzerData.metadata) {
+        durationElement.textContent = `Duration: ${formatDuration(window.fuzzerData.metadata.timestamp)}`;
+    }
+}
+
 // Enhanced chart initialization with better error handling
 function initializeCharts() {
     // Clean up existing charts
@@ -21,6 +44,10 @@ function initializeCharts() {
         chartInstances.coverage = createCoverageChart();
         chartInstances.method = createMethodChart();
         chartInstances.status = createStatusChart();
+        
+        // Start duration updates
+        updateDuration();
+        setInterval(updateDuration, 1000);
     } catch (error) {
         console.error('Error initializing charts:', error);
     }
@@ -238,3 +265,9 @@ function initializeIcons() {
         feather.replace();
     }
 }
+
+// Initialize everything when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    initializeIcons();
+    initializeCharts();
+});

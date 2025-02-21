@@ -1,8 +1,9 @@
 window.EvomasterMetadata = {
+  "name": "Evomaster",
+  "version": "1.0.0",
+  "timestamp": "2025-02-21T22:21:12.634965",
+  "duration": "00:00:00",
   "fuzzer": "Evomaster",
-  "total_requests": 4,
-  "critical_issues": 0,
-  "duration": "0:10:00",
-  "total_endpoints": 4,
+  "total_endpoints": 3,
   "total_chunks": 1
 };

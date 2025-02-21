@@ -1,30 +1,47 @@
 [
   {
-    "path": "/api/users/register",
-    "method": "POST",
-    "status_code": 200,
-    "type": "hit",
-    "name": "test_0"
-  },
-  {
-    "path": "/api/products/1",
+    "path": "/",
     "method": "GET",
-    "status_code": 200,
-    "type": "hit",
-    "name": "test_1"
+    "total_requests": 7,
+    "success_requests": 7,
+    "success_rate": 100.0,
+    "status_codes": {},
+    "responses": {},
+    "severity_counts": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 7
+    }
   },
   {
-    "path": "/api/users/register",
-    "method": "POST",
-    "status_code": 400,
-    "type": "miss",
-    "name": "test_0"
-  },
-  {
-    "path": "/api/admin/users",
+    "path": "/",
     "method": "GET",
-    "status_code": 401,
-    "type": "miss",
-    "name": "test_1"
+    "total_requests": 1,
+    "success_requests": 1,
+    "success_rate": 100.0,
+    "status_codes": {},
+    "responses": {},
+    "severity_counts": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 1
+    }
+  },
+  {
+    "path": "/",
+    "method": "GET",
+    "total_requests": 7,
+    "success_requests": 7,
+    "success_rate": 100.0,
+    "status_codes": {},
+    "responses": {},
+    "severity_counts": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 7
+    }
   }
 ]

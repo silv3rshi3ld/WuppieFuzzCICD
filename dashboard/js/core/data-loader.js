@@ -1,74 +1,70 @@
 /**
- * Data loader for loading fuzzer data from embedded JavaScript files
+ * Data loader class for handling fuzzing results data loading
  */
 class DataLoader {
     constructor(fuzzerName) {
-        this.fuzzerName = fuzzerName; // Keep original case
-        this.fuzzerDir = fuzzerName.toLowerCase(); // Use lowercase for directory
+        this.fuzzerName = fuzzerName;
+        this.dataPath = `../data/${fuzzerName.toLowerCase()}`;
     }
 
-    loadMetadata() {
-        const variableName = `${this.fuzzerName}Metadata`;
+    async loadCoverage() {
         try {
-            if (!(variableName in window)) {
-                console.error(`Metadata not found: window.${variableName} is undefined`);
-                return {};
-            }
-            const metadata = window[variableName];
-            console.log(`Successfully loaded metadata from window.${variableName}:`, metadata);
-            return metadata;
+            const response = await fetch(`${this.dataPath}/coverage.js`);
+            const text = await response.text();
+            eval(text); // This sets window[`${this.fuzzerName}Coverage`]
+            return window[`${this.fuzzerName}Coverage`];
         } catch (error) {
-            console.error(`Error loading metadata from window.${variableName}:`, error);
-            return {};
+            console.error('Error loading coverage data:', error);
+            return null;
         }
     }
 
-    loadCoverage() {
-        const variableName = `${this.fuzzerName}Coverage`;
+    async loadMetadata() {
         try {
-            if (!(variableName in window)) {
-                console.error(`Coverage data not found: window.${variableName} is undefined`);
-                return {};
-            }
-            const coverage = window[variableName];
-            console.log(`Successfully loaded coverage from window.${variableName}:`, coverage);
-            return coverage;
+            const response = await fetch(`${this.dataPath}/metadata.js`);
+            const text = await response.text();
+            eval(text); // This sets window[`${this.fuzzerName}Metadata`]
+            return window[`${this.fuzzerName}Metadata`];
         } catch (error) {
-            console.error(`Error loading coverage from window.${variableName}:`, error);
-            return {};
+            console.error('Error loading metadata:', error);
+            return null;
         }
     }
 
-    loadEndpointChunk(chunkIndex) {
-        const variableName = `${this.fuzzerName}Endpoints${chunkIndex}`;
+    async loadData() {
         try {
-            if (!(variableName in window)) {
-                console.error(`Endpoint chunk not found: window.${variableName} is undefined`);
-                return [];
-            }
-            const endpoints = window[variableName];
-            if (!Array.isArray(endpoints)) {
-                console.error(`Invalid endpoint data: window.${variableName} is not an array`);
-                return [];
-            }
-            console.log(`Successfully loaded ${endpoints.length} endpoints from window.${variableName}:`, endpoints);
-            return endpoints;
+            const response = await fetch(`${this.dataPath}/data.js`);
+            const text = await response.text();
+            eval(text); // This sets window[`${this.fuzzerName}Data`]
+            return window[`${this.fuzzerName}Data`];
         } catch (error) {
-            console.error(`Error loading endpoint chunk from window.${variableName}:`, error);
-            return [];
+            console.error('Error loading data:', error);
+            return null;
         }
     }
 
-    validateEndpoint(endpoint) {
-        return (
-            endpoint &&
-            typeof endpoint === 'object' &&
-            typeof endpoint.path === 'string' &&
-            typeof endpoint.method === 'string' &&
-            typeof endpoint.total_requests === 'number' &&
-            typeof endpoint.success_rate === 'number' &&
-            typeof endpoint.type === 'string'
-        );
+    async loadEndpointsMeta() {
+        try {
+            const response = await fetch(`${this.dataPath}/endpoints_meta.js`);
+            const text = await response.text();
+            eval(text); // This sets window[`${this.fuzzerName}EndpointsMeta`]
+            return window[`${this.fuzzerName}EndpointsMeta`];
+        } catch (error) {
+            console.error('Error loading endpoints meta:', error);
+            return null;
+        }
+    }
+
+    async loadEndpointsChunk(chunkIndex) {
+        try {
+            const response = await fetch(`${this.dataPath}/endpoints_${chunkIndex}.js`);
+            const text = await response.text();
+            eval(text); // This sets window[`${this.fuzzerName}Endpoints_${chunkIndex}`]
+            return window[`${this.fuzzerName}Endpoints_${chunkIndex}`];
+        } catch (error) {
+            console.error(`Error loading endpoints chunk ${chunkIndex}:`, error);
+            return null;
+        }
     }
 }
 

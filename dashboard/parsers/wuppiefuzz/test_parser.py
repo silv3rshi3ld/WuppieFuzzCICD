@@ -12,33 +12,43 @@ def test_wuppiefuzz_parser():
     # Get the absolute path to the zip file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-    zip_path = os.path.join(project_root, 'output-fuzzers', 'Wuppiefuzz', 'fuzzing-report.zip')
+    # Test with the test_data directory first
+    test_dir = os.path.join(project_root, 'test_data', 'wuppiefuzz', 'fuzzing-report')
     output_path = os.path.join(current_dir, 'wuppiefuzz_report.json')
     
-    # Parse results and save to file
+    # Test directory parsing first
     try:
-        report = parse_wuppiefuzz_results(zip_path, output_path)
+        print("\nTesting directory parsing...")
+        raw_report, dashboard_data = parse_wuppiefuzz_results(test_dir)
+        
+        # If directory parsing works, test zip file
+        print("\nTesting zip file parsing...")
+        zip_path = os.path.join(project_root, 'output-fuzzers', 'Wuppiefuzz', 'fuzzing-report.zip')
+        raw_report_zip, dashboard_data_zip = parse_wuppiefuzz_results(zip_path)
         print("\nWuppieFuzz Parser Test Results:")
         print("===============================")
         print(f"Metadata:")
-        print(f"- Duration: {report['metadata']['duration']}")
-        print(f"- Total Requests: {report['metadata']['total_requests']}")
-        print(f"- Unique Bugs: {report['metadata']['unique_bugs']}")
-        print(f"- Critical Issues: {report['metadata']['critical_issues']}")
+        print(f"- Duration: {dashboard_data['metadata']['duration']}")
+        print(f"- Total Requests: {dashboard_data['metadata']['total_requests']}")
+        print(f"- Critical Issues: {dashboard_data['metadata']['critical_issues']}")
         
-        print(f"\nEndpoints Tested: {report['kpi']['unique_endpoints']}")
-        print(f"Success Rate: {report['kpi']['success_rate']}%")
+        print("\nCoverage Statistics:")
+        coverage = dashboard_data['coverage']
+        print(f"- Overall Coverage: {coverage['percentages']['overall']}%")
+        print(f"- Line Coverage: {coverage['percentages']['lines']}%")
+        print(f"- Function Coverage: {coverage['percentages']['functions']}%")
         
-        print("\nStatus Code Distribution:")
-        for status, count in report['status_codes'].items():
-            if count > 0:
-                print(f"- {status}: {count}")
+        print("\nStatus Distribution:")
+        for status, percentage in coverage['status_distribution'].items():
+            print(f"- {status}: {percentage}%")
         
-        print("\nBugs Found:", len(report['bugs']))
-        for bug in report['bugs']:
-            print(f"- {bug['method']} {bug['endpoint']} -> {bug['status_code']}")
+        print("\nEndpoints:", len(dashboard_data['endpoints']))
+        for endpoint in dashboard_data['endpoints']:
+            print(f"- {endpoint['method']} {endpoint['path']} -> Success Rate: {endpoint['success_rate']}%")
         
-        print(f"\nDetailed report saved to: {output_path}")
+        print("\nBugs Found:", len(dashboard_data['crashes']))
+        for bug in dashboard_data['crashes']:
+            print(f"- {bug['method']} {bug['endpoint']} -> {bug['status_code']} ({bug['severity']})")
         return True
         
     except Exception as e:

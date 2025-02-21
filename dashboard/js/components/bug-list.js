@@ -1,46 +1,275 @@
 /**
- * Bug list component for displaying test failures and issues
+ * Bug list component for displaying crashes and issues
  */
-class BugList {
-    constructor(elementId, stateManager) {
-        this.element = document.getElementById(elementId);
-        this.stateManager = stateManager;
-        
-        this.stateManager.subscribe('endpoints', (data) => this.render(data));
+class BugListComponent {
+    constructor() {
+        this.container = document.getElementById('bugList');
+        this.bugs = [];
+        this.currentPage = 1;
+        this.bugsPerPage = 10;
     }
-    
-    render(data) {
-        if (!data || !data.items) {
-            this.element.innerHTML = '<div class="text-gray-500 text-center py-4">No issues found</div>';
-            return;
-        }
-        
-        const endpoints = data.items;
-        const issues = endpoints.filter(endpoint => endpoint.type === 'miss');
-        
-        if (issues.length === 0) {
-            this.element.innerHTML = '<div class="text-gray-500 text-center py-4">No issues found</div>';
-            return;
-        }
-        
-        const html = issues.map(issue => `
-            <div class="bug-item">
-                <div class="bug-header">
-                    <div class="bug-title">
-                        <span class="method-badge ${issue.method.toLowerCase()}">${issue.method}</span>
-                        <span class="bug-path">${issue.path}</span>
-                    </div>
-                    <div class="bug-status">
-                        <span class="status-code ${issue.status_code >= 500 ? 'error' : 'warning'}">${issue.status_code}</span>
-                    </div>
+
+    createBugList(bugs) {
+        if (!this.container) return;
+        this.bugs = bugs || [];
+        this.renderBugList();
+    }
+
+    renderBugList() {
+        if (!this.container) return;
+
+        if (this.bugs.length === 0) {
+            this.container.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <i data-feather="check-circle" class="w-12 h-12 mx-auto mb-4"></i>
+                    <p>No crashes or issues found</p>
                 </div>
-                ${issue.name ? `<div class="bug-description">${issue.name}</div>` : ''}
+            `;
+            if (window.feather) feather.replace();
+            return;
+        }
+
+        const startIndex = (this.currentPage - 1) * this.bugsPerPage;
+        const endIndex = startIndex + this.bugsPerPage;
+        const currentBugs = this.bugs.slice(startIndex, endIndex);
+
+        let html = `
+            <div class="space-y-4">
+                ${currentBugs.map((bug, index) => this.renderBugCard(bug, startIndex + index + 1)).join('')}
             </div>
-        `).join('');
-        
-        this.element.innerHTML = html;
+        `;
+
+        // Add pagination if needed
+        if (this.bugs.length > this.bugsPerPage) {
+            html += this.renderPagination();
+        }
+
+        this.container.innerHTML = html;
+
+        // Initialize feather icons
+        if (window.feather) feather.replace();
+
+        // Add event listeners
+        this.addEventListeners();
+    }
+
+    getSeverityStyles(severity) {
+        const styles = {
+            critical: {
+                card: 'bg-red-50 border-red-200 shadow-red-100',
+                badge: 'text-red-700 bg-red-100',
+                icon: 'alert-octagon',
+                animation: 'animate-pulse'
+            },
+            high: {
+                card: 'bg-orange-50 border-orange-200',
+                badge: 'text-orange-700 bg-orange-100',
+                icon: 'alert-triangle'
+            },
+            medium: {
+                card: 'bg-yellow-50 border-yellow-200',
+                badge: 'text-yellow-700 bg-yellow-100',
+                icon: 'alert-circle'
+            },
+            low: {
+                card: 'bg-blue-50 border-blue-200',
+                badge: 'text-blue-700 bg-blue-100',
+                icon: 'info'
+            }
+        };
+        return styles[severity] || styles.low;
+    }
+
+    formatTimestamps(timestamps) {
+        if (!Array.isArray(timestamps)) {
+            timestamps = [timestamps];
+        }
+        return timestamps
+            .map(ts => new Date(ts).toLocaleString())
+            .join('\n');
+    }
+
+    renderBugCard(bug, index) {
+        const styles = this.getSeverityStyles(bug.severity);
+        const detailsId = `bug-${index}`;
+        const occurrences = bug.occurrences || 1;
+
+        return `
+            <div class="bug-card ${styles.card} border rounded-lg p-4 ${styles.animation || ''}">
+                <div class="flex items-start justify-between cursor-pointer" data-toggle-details="${detailsId}">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="flex items-center gap-1 text-sm font-medium ${styles.badge} px-2 py-0.5 rounded">
+                                <i data-feather="${styles.icon}" class="w-4 h-4"></i>
+                                ${bug.severity.toUpperCase()}
+                            </span>
+                            <span class="text-sm text-gray-500">Bug #${index}</span>
+                            ${occurrences > 1 ? `
+                                <span class="text-sm font-medium text-purple-600 bg-purple-100 px-2 py-0.5 rounded">
+                                    ${occurrences} occurrences
+                                </span>
+                            ` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-medium">${bug.method}</span>
+                            <span class="text-gray-600">${bug.endpoint}</span>
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            Status: ${bug.status_code} | First seen: ${new Date(Array.isArray(bug.timestamps) ? bug.timestamps[0] : bug.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                    <button class="text-gray-400 hover:text-gray-600">
+                        <i data-feather="chevron-down"></i>
+                    </button>
+                </div>
+                <div class="bug-details hidden mt-4" id="${detailsId}">
+                    ${this.renderBugDetails(bug)}
+                </div>
+            </div>
+        `;
+    }
+
+    renderBugDetails(bug) {
+        return `
+            <div class="space-y-4 text-sm">
+                ${bug.occurrences > 1 ? `
+                    <div>
+                        <span class="font-medium">Occurrences:</span>
+                        <span class="text-gray-600">${bug.occurrences}</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Timestamps:</span>
+                        <pre class="mt-1 text-gray-600">${this.formatTimestamps(bug.timestamps)}</pre>
+                    </div>
+                ` : ''}
+                ${bug.has_stack_trace ? `
+                    <div class="flex items-center gap-2 text-red-600">
+                        <i data-feather="alert-triangle" class="w-4 h-4"></i>
+                        <span class="font-medium">Stack Trace Present</span>
+                    </div>
+                ` : ''}
+                <div>
+                    <span class="font-medium">Error Message:</span>
+                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.error)}</pre>
+                </div>
+                <div>
+                    <span class="font-medium">Request:</span>
+                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.request)}</pre>
+                </div>
+                <div>
+                    <span class="font-medium">Response:</span>
+                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.response)}</pre>
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button class="copy-button px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" data-copy="${this.escapeHtml(bug.request)}">
+                        <i data-feather="copy" class="w-4 h-4"></i>
+                        Copy Request
+                    </button>
+                    <button class="copy-button px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" data-copy="${this.escapeHtml(bug.response)}">
+                        <i data-feather="copy" class="w-4 h-4"></i>
+                        Copy Response
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderPagination() {
+        const totalPages = Math.ceil(this.bugs.length / this.bugsPerPage);
+        return `
+            <div class="flex items-center justify-between mt-6">
+                <div class="text-sm text-gray-500">
+                    Showing ${(this.currentPage - 1) * this.bugsPerPage + 1} to ${Math.min(this.currentPage * this.bugsPerPage, this.bugs.length)}
+                    of ${this.bugs.length} bugs
+                </div>
+                <div class="flex items-center gap-2">
+                    <button 
+                        class="pagination-prev px-3 py-1 rounded border ${this.currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}"
+                        ${this.currentPage === 1 ? 'disabled' : ''}
+                    >
+                        Previous
+                    </button>
+                    <button 
+                        class="pagination-next px-3 py-1 rounded border ${this.currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}"
+                        ${this.currentPage === totalPages ? 'disabled' : ''}
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    addEventListeners() {
+        // Add pagination listeners
+        const prevButton = this.container.querySelector('.pagination-prev');
+        const nextButton = this.container.querySelector('.pagination-next');
+        if (prevButton) {
+            prevButton.addEventListener('click', () => this.changePage(this.currentPage - 1));
+        }
+        if (nextButton) {
+            nextButton.addEventListener('click', () => this.changePage(this.currentPage + 1));
+        }
+
+        // Add bug details toggle listeners
+        const toggleHeaders = this.container.querySelectorAll('[data-toggle-details]');
+        toggleHeaders.forEach(header => {
+            header.addEventListener('click', (e) => {
+                const detailsId = header.dataset.toggleDetails;
+                const details = document.getElementById(detailsId);
+                if (details) {
+                    details.classList.toggle('hidden');
+                    const icon = header.querySelector('i');
+                    if (icon) {
+                        icon.setAttribute(
+                            'data-feather',
+                            details.classList.contains('hidden') ? 'chevron-down' : 'chevron-up'
+                        );
+                        if (window.feather) feather.replace();
+                    }
+                }
+            });
+        });
+
+        // Add copy button listeners
+        const copyButtons = this.container.querySelectorAll('.copy-button');
+        copyButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const text = button.dataset.copy;
+                navigator.clipboard.writeText(text).then(() => {
+                    const icon = button.querySelector('i');
+                    if (icon) {
+                        icon.setAttribute('data-feather', 'check');
+                        if (window.feather) feather.replace();
+                        setTimeout(() => {
+                            icon.setAttribute('data-feather', 'copy');
+                            if (window.feather) feather.replace();
+                        }, 1000);
+                    }
+                });
+            });
+        });
+    }
+
+    changePage(newPage) {
+        const totalPages = Math.ceil(this.bugs.length / this.bugsPerPage);
+        if (newPage >= 1 && newPage <= totalPages) {
+            this.currentPage = newPage;
+            this.renderBugList();
+        }
+    }
+
+    escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 }
 
 // Export for use in other modules
-window.BugList = BugList;
+window.BugListComponent = BugListComponent;

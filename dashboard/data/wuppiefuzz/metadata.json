@@ -1,8 +1,9 @@
 {
+  "name": "WuppieFuzz",
+  "version": "1.0.0",
+  "timestamp": "2025-02-19T13:53:50.022Z",
+  "duration": "00:00:00",
   "fuzzer": "WuppieFuzz",
-  "total_requests": 50,
-  "critical_issues": 2,
-  "duration": "0:05:00",
-  "total_endpoints": 2,
+  "total_endpoints": 14,
   "total_chunks": 1
 }

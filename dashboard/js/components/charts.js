@@ -1,128 +1,204 @@
 /**
- * Charts component for displaying coverage and statistics
+ * Charts component for handling all chart visualizations
  */
-class Charts {
-    constructor(stateManager) {
-        this.stateManager = stateManager;
-        this.charts = {
-            coverage: null,
-            method: null,
-            status: null
-        };
-        
-        this.stateManager.subscribe('coverage', () => this.render());
+class ChartsComponent {
+    constructor() {
+        this.charts = {};
     }
-    
-    render() {
-        const coverage = this.stateManager.coverage;
-        if (!coverage) return;
-        
-        this.renderCoverageChart(coverage.status_distribution);
-        this.renderMethodChart(coverage.method_coverage);
-        this.renderStatusChart(coverage.status_codes);
-    }
-    
-    renderCoverageChart(data) {
-        const ctx = document.getElementById('coverageChart');
-        if (!ctx || !data) return;
-        
-        if (this.charts.coverage) {
-            this.charts.coverage.destroy();
+
+    destroyChart(chartId) {
+        // Destroy existing chart instance
+        if (this.charts[chartId]) {
+            this.charts[chartId].destroy();
+            this.charts[chartId] = null;
         }
         
+        // Also destroy any Chart.js instances on the canvas
+        const canvas = document.getElementById(`${chartId}Chart`);
+        if (canvas) {
+            const existingChart = Chart.getChart(canvas);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+        }
+    }
+
+    createCoverageChart(data) {
+        this.destroyChart('coverage');
+        const ctx = document.getElementById('coverageChart');
+        if (!ctx) return;
+
+        const statusDist = data.status_distribution || [];
         this.charts.coverage = new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
-                labels: ['Hits', 'Misses', 'Unspecified'],
+                labels: statusDist.map(d => d.name),
                 datasets: [{
-                    data: [data.hits || 0, data.misses || 0, data.unspecified || 0],
-                    backgroundColor: ['#10B981', '#EF4444', '#6B7280']
+                    data: statusDist.map(d => d.value),
+                    backgroundColor: statusDist.map(d => d.color)
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: { size: 13 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                return `${context.label}: ${value.toFixed(1)}%`;
+                            }
+                        }
                     }
                 }
             }
         });
     }
-    
-    renderMethodChart(data) {
+
+    createMethodChart(data) {
+        this.destroyChart('method');
         const ctx = document.getElementById('methodChart');
-        if (!ctx || !data) return;
-        
-        if (this.charts.method) {
-            this.charts.method.destroy();
-        }
-        
-        const methods = Object.keys(data);
-        const values = methods.map(m => data[m]);
-        
+        if (!ctx) return;
+
+        const methodCoverage = data.method_coverage || [];
+        const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
+        const datasets = [
+            {
+                label: 'Hits',
+                data: methods.map(method => {
+                    const entry = methodCoverage.find(m => m.method === method);
+                    return entry ? entry.hits : 0;
+                }),
+                backgroundColor: '#22c55e'
+            },
+            {
+                label: 'Misses',
+                data: methods.map(method => {
+                    const entry = methodCoverage.find(m => m.method === method);
+                    return entry ? entry.misses : 0;
+                }),
+                backgroundColor: '#ef4444'
+            }
+        ];
+
         this.charts.method = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: methods,
-                datasets: [{
-                    label: 'Requests',
-                    data: values,
-                    backgroundColor: '#10B981'
-                }]
+                datasets: datasets
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
-                    y: {
-                        beginAtZero: true
+                    x: { 
+                        stacked: true,
+                        grid: { display: false }
+                    },
+                    y: { 
+                        stacked: true,
+                        beginAtZero: true,
+                        grid: { color: '#f3f4f6' }
                     }
                 },
                 plugins: {
                     legend: {
-                        display: false
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: { size: 13 }
+                        }
                     }
                 }
             }
         });
     }
-    
-    renderStatusChart(data) {
+
+    createStatusChart(data) {
+        this.destroyChart('status');
         const ctx = document.getElementById('statusChart');
-        if (!ctx || !data) return;
-        
-        if (this.charts.status) {
-            this.charts.status.destroy();
-        }
-        
-        const statusCodes = data.map(s => s.status);
-        const counts = data.map(s => s.count);
-        const colors = statusCodes.map(code => {
-            if (code >= 500) return '#EF4444';
-            if (code >= 400) return '#F59E0B';
-            if (code >= 300) return '#3B82F6';
-            return '#10B981';
-        });
-        
+        if (!ctx) return;
+
+        const statusCodes = data.status_codes || [];
+        const statusData = statusCodes.map(d => ({
+            status: d.status,
+            count: d.count,
+            color: parseInt(d.status) >= 500 ? '#dc2626' :
+                   parseInt(d.status) >= 400 ? '#f59e0b' :
+                   parseInt(d.status) >= 200 && parseInt(d.status) < 300 ? '#22c55e' :
+                   '#6b7280'
+        }));
+
         this.charts.status = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: statusCodes,
+                labels: statusData.map(d => d.status),
                 datasets: [{
-                    data: counts,
-                    backgroundColor: colors
+                    label: 'Count',
+                    data: statusData.map(d => d.count),
+                    backgroundColor: statusData.map(d => d.color),
+                    borderWidth: statusData.map(d => parseInt(d.status) >= 500 ? 3 : 1),
+                    borderColor: statusData.map(d => parseInt(d.status) >= 500 ? '#991b1b' : 'transparent'),
+                    barThickness: 40
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: (ctx) => parseInt(ctx.tick.label) >= 500 ? 'bold' : 'normal'
+                            }
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        grid: { color: '#f3f4f6' }
                     }
                 },
                 plugins: {
-                    legend: {
-                        display: false
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const status = context.label;
+                                const count = context.raw;
+                                let description = '';
+                                
+                                if (parseInt(status) >= 500) {
+                                    description = '⚠️ CRITICAL: Server Error!\nRequires immediate investigation';
+                                } else if (parseInt(status) >= 400) {
+                                    description = 'Client Error - Check Request Parameters';
+                                } else if (parseInt(status) >= 200 && parseInt(status) < 300) {
+                                    description = 'Success - Expected Response';
+                                } else if (parseInt(status) >= 300 && parseInt(status) < 400) {
+                                    description = 'Redirection - Check Location Header';
+                                }
+                                
+                                return [
+                                    `Count: ${count}`,
+                                    description
+                                ];
+                            }
+                        },
+                        titleFont: {
+                            size: 14,
+                            weight: (ctx) => parseInt(ctx.label) >= 500 ? 'bold' : 'normal'
+                        },
+                        bodyFont: { size: 13 },
+                        padding: 12
                     }
                 }
             }
@@ -131,4 +207,4 @@ class Charts {
 }
 
 // Export for use in other modules
-window.Charts = Charts;
+window.ChartsComponent = ChartsComponent;

@@ -7,6 +7,7 @@
     
     <!-- CSS Dependencies -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link href="styles.css" rel="stylesheet">
     
     <!-- JavaScript Dependencies - Load in correct order -->
@@ -29,12 +30,21 @@
     <!-- Load Alpine.js last -->
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
-<body class="bg-gray-50" x-data="dashboard()" x-init="init">
+<body class="bg-gray-50 font-sans" x-data="dashboard()" x-init="init">
     <div>
         <!-- Main Header -->
         <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
             <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
-                <h1 class="text-xl font-semibold">Fuzzing Results Dashboard</h1>
+                <div class="flex items-center gap-4">
+                    <h1 class="text-xl font-semibold flex items-center gap-2">
+                        <i data-feather="activity" class="h-6 w-6 text-blue-500"></i>
+                        Fuzzing Results Dashboard
+                    </h1>
+                    <div class="duration" id="duration">
+                        <i data-feather="clock"></i>
+                        Duration: 00:00:00
+                    </div>
+                </div>
                 <div class="flex items-center gap-4">
                     <template x-for="(enabled, type) in filters" :key="type">
                         <label class="flex items-center gap-2 text-sm cursor-pointer">
@@ -53,13 +63,13 @@
         </div>
 
         <!-- Fuzzer Tabs -->
-        <div class="mt-16 px-4 border-b border-gray-200">
+        <div class="mt-16 px-4 border-b border-gray-200 bg-white shadow-sm">
             <div class="max-w-screen-2xl mx-auto">
                 <div class="flex space-x-4" role="tablist">
                     <template x-for="fuzzer in Object.keys(fuzzerData)" :key="fuzzer">
                         <button
-                            class="px-4 py-2 text-sm font-medium"
-                            :class="selectedFuzzer === fuzzer ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                            class="px-6 py-3 text-sm font-medium transition-colors duration-200"
+                            :class="selectedFuzzer === fuzzer ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
                             @click="selectedFuzzer = fuzzer"
                             role="tab"
                             x-text="fuzzerData[fuzzer].name"
@@ -79,7 +89,7 @@
 
             <!-- Fuzzer Content -->
             <template x-if="!loading && selectedFuzzer">
-                <div>
+                <div class="space-y-8">
                     <!-- Fuzzer Header -->
                     <div x-html="getFuzzerComponent(selectedFuzzer, 'header')"></div>
 
@@ -112,5 +122,12 @@
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
     </template>
+
+    <!-- Initialize Feather Icons -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+        });
+    </script>
 </body>
 </html>

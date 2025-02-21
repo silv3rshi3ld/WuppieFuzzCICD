@@ -1,30 +1,60 @@
-<!-- WuppieFuzz charts Component -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Coverage Distribution -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Coverage Distribution</h3>
+        <div class="h-64">
+            <canvas id="coverageChart"></canvas>
+        </div>
+    </div>
 
-            <div class="charts-section mb-8">
-                <div class="section-header">
-                    <h3 class="section-title">
-                        <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
-                        WuppieFuzz Coverage Analysis
-                    </h3>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div class="chart-card">
-                        <h4 class="chart-title">Coverage Distribution</h4>
-                        <div class="chart-container">
-                            <canvas :id="'wuppiefuzz_coverage'"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <h4 class="chart-title">Method Coverage</h4>
-                        <div class="chart-container">
-                            <canvas :id="'wuppiefuzz_methods'"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <h4 class="chart-title">Status Codes</h4>
-                        <div class="chart-container">
-                            <canvas :id="'wuppiefuzz_status'"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Coverage Metrics -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Code Coverage Metrics</h3>
+        <div class="h-64">
+            <canvas id="coverageMetricsChart"></canvas>
+        </div>
+    </div>
+
+    <!-- HTTP Methods -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">HTTP Methods Distribution</h3>
+        <div class="h-64">
+            <canvas id="methodChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Status Codes -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Status Code Distribution</h3>
+        <div class="h-64">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Crashes and Issues -->
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-semibold">Crashes and Issues</h3>
+        <div class="flex items-center gap-4">
+            <span class="status-500 text-sm">Critical Issues: <span x-text="getFuzzerData().metadata.critical_issues"></span></span>
+            <span class="text-sm text-gray-600">Total Requests: <span x-text="getFuzzerData().metadata.total_requests"></span></span>
+        </div>
+    </div>
+    
+    <div class="bug-list-container" id="bugList">
+        <!-- Bug list will be populated by BugList component -->
+    </div>
+</div>
+
+<script>
+    // Initialize charts when component is loaded
+    document.addEventListener('alpine:init', () => {
+        const stateManager = window.stateManager;
+        if (!stateManager) return;
+
+        // Initialize chart components
+        new Charts(stateManager);
+        new BugList('bugList', stateManager);
+    });
+</script>

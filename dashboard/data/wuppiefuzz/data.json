@@ -1,0 +1,96 @@
+{
+  "crashes": [
+    {
+      "endpoint": "/api/users",
+      "method": "GET",
+      "status_code": 404,
+      "severity": "warning",
+      "test_case": null,
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/users",
+      "method": "GET",
+      "status_code": 500,
+      "severity": "critical",
+      "test_case": null,
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 401,
+      "severity": "warning",
+      "test_case": {
+        "id": "test_2",
+        "name": "Invalid credentials",
+        "endpoint": "/api/login",
+        "method": "POST",
+        "status": "fail",
+        "response_code": 401
+      },
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 401,
+      "severity": "warning",
+      "test_case": {
+        "id": "test_2",
+        "name": "Invalid credentials",
+        "endpoint": "/api/login",
+        "method": "POST",
+        "status": "fail",
+        "response_code": 401
+      },
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 401,
+      "severity": "warning",
+      "test_case": {
+        "id": "test_2",
+        "name": "Invalid credentials",
+        "endpoint": "/api/login",
+        "method": "POST",
+        "status": "fail",
+        "response_code": 401
+      },
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 401,
+      "severity": "warning",
+      "test_case": {
+        "id": "test_2",
+        "name": "Invalid credentials",
+        "endpoint": "/api/login",
+        "method": "POST",
+        "status": "fail",
+        "response_code": 401
+      },
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 500,
+      "severity": "critical",
+      "test_case": null,
+      "timestamp": "2025-02-20T14:42:00Z"
+    },
+    {
+      "endpoint": "/api/login",
+      "method": "POST",
+      "status_code": 500,
+      "severity": "critical",
+      "test_case": null,
+      "timestamp": "2025-02-20T14:42:00Z"
+    }
+  ]
+}

@@ -1,16 +1,20 @@
 window.RestlerEndpoints0 = [
   {
-    "path": "/api/products",
-    "method": "GET",
-    "total_requests": 25,
-    "success_rate": 95,
-    "type": "hit"
-  },
-  {
-    "path": "/api/orders",
-    "method": "POST",
-    "total_requests": 15,
-    "success_rate": 85,
-    "type": "hit"
+    "path": "",
+    "method": "",
+    "total_requests": 12,
+    "success_requests": 0,
+    "status_codes": {
+      "500": 12
+    },
+    "responses": {
+      "500": "{}"
+    },
+    "severity_counts": {
+      "critical": 0,
+      "high": 12,
+      "medium": 0,
+      "low": 0
+    }
   }
 ];

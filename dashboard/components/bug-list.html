@@ -1,52 +1,82 @@
-<!-- Bug List Section -->
+<!-- Enhanced Bug List Section with Detailed Crash Analysis -->
 <div class="mb-8">
     <div class="section-header">
         <div class="flex-1">
             <h2 class="section-title">
                 <i data-feather="alert-circle" class="h-6 w-6 text-gray-400"></i>
-                All Issues
+                Crashes and Issues
             </h2>
-            <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredBugs.length + ' total)'"></p>
+            <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredCrashes.length + ' total)'"></p>
         </div>
-        <input 
-            type="text" 
-            placeholder="Search issues..."
-            class="search-input"
-            x-model="searchQuery"
-            @input="filterBugs"
-        >
+        <div class="flex gap-4">
+            <select 
+                class="form-select"
+                x-model="severityFilter"
+                @change="filterCrashes"
+            >
+                <option value="all">All Severities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+            <input 
+                type="text" 
+                placeholder="Search crashes..."
+                class="search-input"
+                x-model="searchQuery"
+                @input="filterCrashes"
+            >
+        </div>
     </div>
     <div class="bug-list-container">
         <table class="bug-list">
             <thead>
                 <tr>
-                    <th>Status</th>
+                    <th>Severity</th>
+                    <th>Category</th>
                     <th>Endpoint</th>
                     <th>Method</th>
-                    <th>Type</th>
-                    <th>Request</th>
+                    <th>Status</th>
+                    <th>Occurrences</th>
+                    <th>Last Seen</th>
                 </tr>
             </thead>
             <tbody>
-                <template x-for="bug in filteredBugs" :key="bug.id">
+                <template x-for="crash in filteredCrashes" :key="crash.id">
                     <tr 
-                        @click="selectedEndpoint = bug" 
-                        class="cursor-pointer"
-                        :class="{'critical': parseInt(bug.status) >= 500}"
+                        @click="selectedCrash = crash" 
+                        class="cursor-pointer hover:bg-gray-50"
+                        :class="{
+                            'bg-red-50': crash.severity === 'Critical',
+                            'bg-orange-50': crash.severity === 'High',
+                            'bg-yellow-50': crash.severity === 'Medium',
+                            'bg-green-50': crash.severity === 'Low'
+                        }"
                     >
                         <td>
                             <span 
-                                :class="getStatusClass(bug.status)"
-                                :data-status-tooltip="getStatusDescription(bug.status)"
-                                x-text="bug.status"
+                                class="severity-badge"
+                                :class="{
+                                    'bg-red-100 text-red-800': crash.severity === 'Critical',
+                                    'bg-orange-100 text-orange-800': crash.severity === 'High',
+                                    'bg-yellow-100 text-yellow-800': crash.severity === 'Medium',
+                                    'bg-green-100 text-green-800': crash.severity === 'Low'
+                                }"
+                                x-text="crash.severity"
                             ></span>
                         </td>
-                        <td class="font-mono text-sm" x-text="bug.endpoint"></td>
-                        <td class="font-mono text-sm" x-text="bug.method"></td>
+                        <td x-text="crash.category"></td>
+                        <td class="font-mono text-sm" x-text="crash.endpoint"></td>
+                        <td class="font-mono text-sm" x-text="crash.method"></td>
                         <td>
-                            <span x-html="getStatusIcon(bug.type, true)"></span>
+                            <span 
+                                :class="getStatusClass(crash.status_code)"
+                                x-text="crash.status_code"
+                            ></span>
                         </td>
-                        <td class="font-mono text-sm truncate max-w-md" x-text="bug.request"></td>
+                        <td x-text="crash.occurrence_count"></td>
+                        <td x-text="formatDate(crash.last_seen)"></td>
                     </tr>
                 </template>
             </tbody>
@@ -54,31 +84,141 @@
     </div>
 </div>
 
-<!-- Request/Response Section -->
-<template x-if="selectedEndpoint">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Crash Details Section -->
+<template x-if="selectedCrash">
+    <div class="grid grid-cols-1 gap-6">
+        <!-- Overview -->
         <div class="chart-card">
             <h3 class="chart-title">
-                <i data-feather="arrow-right" class="h-5 w-5 text-gray-400"></i>
-                Request
+                <i data-feather="info" class="h-5 w-5 text-gray-400"></i>
+                Crash Overview
             </h3>
-            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.request || 'No request data available'"></pre>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                    <p class="text-sm text-gray-500">First Seen</p>
+                    <p class="font-medium" x-text="formatDate(selectedCrash.first_seen)"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Last Seen</p>
+                    <p class="font-medium" x-text="formatDate(selectedCrash.last_seen)"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total Occurrences</p>
+                    <p class="font-medium" x-text="selectedCrash.occurrence_count"></p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Category</p>
+                    <p class="font-medium" x-text="selectedCrash.category"></p>
+                </div>
+            </div>
         </div>
-        
+
+        <!-- Reproduction Steps -->
         <div class="chart-card">
             <h3 class="chart-title">
-                <i data-feather="arrow-left" class="h-5 w-5 text-gray-400"></i>
-                Response
+                <i data-feather="repeat" class="h-5 w-5 text-gray-400"></i>
+                Reproduction Steps
             </h3>
-            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.response || 'No response data available'"></pre>
+            <div class="mt-4">
+                <template x-if="selectedCrash.reproduction.prerequisites.length > 0">
+                    <div class="mb-4">
+                        <h4 class="font-medium mb-2">Prerequisites</h4>
+                        <ul class="list-disc list-inside">
+                            <template x-for="prereq in selectedCrash.reproduction.prerequisites">
+                                <li x-text="prereq"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+                <div class="mb-4">
+                    <h4 class="font-medium mb-2">Steps to Reproduce</h4>
+                    <ol class="list-decimal list-inside">
+                        <template x-for="step in selectedCrash.reproduction.steps">
+                            <li x-text="step"></li>
+                        </template>
+                    </ol>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">cURL Command</h4>
+                    <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedCrash.reproduction.curl_command"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evidence -->
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="file-text" class="h-5 w-5 text-gray-400"></i>
+                Evidence
+            </h3>
+            <div class="mt-4">
+                <template x-if="selectedCrash.evidence.stack_trace">
+                    <div class="mb-4">
+                        <h4 class="font-medium mb-2">Stack Trace</h4>
+                        <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedCrash.evidence.stack_trace"></pre>
+                    </div>
+                </template>
+                <template x-if="selectedCrash.evidence.error_message">
+                    <div class="mb-4">
+                        <h4 class="font-medium mb-2">Error Message</h4>
+                        <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedCrash.evidence.error_message"></pre>
+                    </div>
+                </template>
+                <template x-if="selectedCrash.evidence.pattern_matches.length > 0">
+                    <div>
+                        <h4 class="font-medium mb-2">Pattern Matches</h4>
+                        <ul class="list-disc list-inside">
+                            <template x-for="pattern in selectedCrash.evidence.pattern_matches">
+                                <li x-text="pattern"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 </template>
-<template x-if="!selectedEndpoint">
+
+<template x-if="!selectedCrash">
     <div class="chart-card">
         <div class="text-center py-12 text-gray-500">
             <i data-feather="info" class="h-6 w-6 mx-auto mb-2"></i>
-            Select an endpoint to view details
+            Select a crash to view details
         </div>
     </div>
 </template>
+
+<!-- Alpine.js Component Script -->
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('crashList', () => ({
+        crashes: [],
+        filteredCrashes: [],
+        selectedCrash: null,
+        searchQuery: '',
+        severityFilter: 'all',
+
+        init() {
+            this.crashes = this.dashboardData.crashes || [];
+            this.filterCrashes();
+        },
+
+        filterCrashes() {
+            this.filteredCrashes = this.crashes.filter(crash => {
+                const matchesSearch = !this.searchQuery || 
+                    crash.endpoint.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                    crash.category.toLowerCase().includes(this.searchQuery.toLowerCase());
+                
+                const matchesSeverity = this.severityFilter === 'all' || 
+                    crash.severity === this.severityFilter;
+
+                return matchesSearch && matchesSeverity;
+            });
+        },
+
+        formatDate(dateString) {
+            return new Date(dateString).toLocaleString();
+        }
+    }));
+});
+</script>

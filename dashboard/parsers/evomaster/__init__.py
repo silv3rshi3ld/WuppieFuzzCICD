@@ -1,5 +1,5 @@
-"""EvoMaster parser package."""
+"""Evomaster parser package."""
 
-from .parser import parse_evomaster_results
+from .parser import EvomasterParser, parse_evomaster_results
 
-__all__ = ['parse_evomaster_results']
+__all__ = ['EvomasterParser', 'parse_evomaster_results']
