@@ -1,14 +1,22 @@
 window.EvomasterCoverage = {
-  "status_distribution": {
-    "hits": 0,
-    "misses": 0,
-    "unspecified": 0
+  "lines": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
   },
-  "method_coverage": {
-    "GET": 0,
-    "POST": 0,
-    "PUT": 0,
-    "DELETE": 0
+  "functions": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
   },
-  "status_codes": []
+  "branches": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
+  },
+  "statements": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
+  }
 };

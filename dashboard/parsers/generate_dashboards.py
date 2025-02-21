@@ -27,8 +27,8 @@ def save_fuzzer_data(dashboard_data, output_dir, fuzzer_name):
     # Validate fuzzer name
     validate_fuzzer_name(fuzzer_name)
     
-    # Create directory using lowercase name
-    fuzzer_dir = os.path.join(output_dir, fuzzer_name.lower())
+    # Create directory with original case
+    fuzzer_dir = os.path.join(output_dir, fuzzer_name)
     os.makedirs(fuzzer_dir, exist_ok=True)
     
     try:
@@ -39,15 +39,26 @@ def save_fuzzer_data(dashboard_data, output_dir, fuzzer_name):
         chunker.save_metadata(dashboard_data['metadata'], fuzzer_dir, fuzzer_name)
         
         # Save coverage data with original case
-        coverage_data = {
-            'status_distribution': dashboard_data['stats']['statusDistribution'],
-            'method_coverage': dashboard_data['stats']['methodCoverage'],
-            'status_codes': dashboard_data['stats']['statusCodes']
-        }
+        coverage_data = dashboard_data['coverage']  # Use full coverage data
         chunker.save_coverage(coverage_data, fuzzer_dir, fuzzer_name)
+
+        # Save general data including stats and bugs
+        data = {
+            'stats': dashboard_data['stats'],
+            'crashes': dashboard_data.get('bugs', [])  # Map bugs to crashes for consistency
+        }
+        chunker.save_data(data, fuzzer_dir, fuzzer_name)
         
         # Save endpoints in chunks with original case
         chunk_info = chunker.chunk_endpoints(dashboard_data['endpoints'], fuzzer_dir, fuzzer_name)
+        
+        # Save endpoints metadata
+        endpoints_meta = {
+            'total_items': chunk_info['total_items'],
+            'total_chunks': chunk_info['total_chunks'],
+            'endpoints': dashboard_data['endpoints']  # Include full endpoints list for reference
+        }
+        chunker.save_endpoints_meta(endpoints_meta, fuzzer_dir, fuzzer_name)
         
         # Update metadata with chunk information
         metadata_path = os.path.join(fuzzer_dir, 'metadata.json')
@@ -60,11 +71,7 @@ def save_fuzzer_data(dashboard_data, output_dir, fuzzer_name):
         })
         
         # Save both JSON and JS versions with original case
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        
-        with open(os.path.join(fuzzer_dir, 'metadata.js'), 'w') as f:
-            f.write(f'window.{fuzzer_name}Metadata = {json.dumps(metadata, indent=2)};')
+        chunker.save_metadata(metadata, fuzzer_dir, fuzzer_name)
             
     except Exception as e:
         print(f"Error saving data for {fuzzer_name}: {str(e)}")
@@ -79,9 +86,9 @@ def generate_fuzzer_page(template_path, output_path, fuzzer_name, fuzzer_id):
         with open(template_path, 'r', encoding='utf-8') as f:
             template = f.read()
         
-        # Replace template variables, using lowercase for directory paths
+        # Replace template variables, using original case for directory paths
         content = template.replace('{{fuzzer_name}}', fuzzer_name)
-        content = content.replace('{{fuzzer_id}}', fuzzer_name.lower())
+        content = content.replace('{{fuzzer_id}}', fuzzer_name)  # Changed from lowercase to original case
         
         # Write the page
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -95,9 +102,9 @@ def generate_summary(dashboards, output_dir):
     """Generate summary data."""
     try:
         summary = {
-            'total_requests': sum(d['stats'].get('total_requests', 0) for d in dashboards),  # Changed from metadata to stats
-            'critical_issues': sum(d['stats'].get('critical_issues', 0) for d in dashboards),  # Changed from metadata to stats
-            'unique_endpoints': sum(d['stats'].get('unique_endpoints', 0) for d in dashboards),  # Changed from metadata to stats
+            'total_requests': sum(d['stats'].get('total_requests', 0) for d in dashboards),
+            'critical_issues': sum(d['stats'].get('critical_issues', 0) for d in dashboards),
+            'unique_endpoints': sum(d['stats'].get('unique_endpoints', 0) for d in dashboards),
             'success_rate': 0,
             'hits': 0,
             'misses': 0,
@@ -129,10 +136,10 @@ def generate_summary(dashboards, output_dir):
             
             fuzzer_data = {
                 'name': fuzzer_name,
-                'id': fuzzer_name.lower(),
-                'total_requests': dashboard['stats'].get('total_requests', 0),  # Changed from metadata to stats
-                'critical_issues': dashboard['stats'].get('critical_issues', 0),  # Changed from metadata to stats
-                'unique_endpoints': dashboard['stats'].get('unique_endpoints', 0),  # Changed from metadata to stats
+                'id': fuzzer_name,  # Changed from lowercase to original case
+                'total_requests': dashboard['stats'].get('total_requests', 0),
+                'critical_issues': dashboard['stats'].get('critical_issues', 0),
+                'unique_endpoints': dashboard['stats'].get('unique_endpoints', 0),
                 'duration': dashboard['metadata'].get('duration', '0s')
             }
             summary['fuzzers'].append(fuzzer_data)
@@ -233,7 +240,7 @@ def setup_directory_structure(base_dir):
 
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    output_dir = os.path.join(base_dir, 'output-fuzzers')  # Changed from 'test_data' to 'output-fuzzers'
+    output_dir = os.path.join(base_dir, 'output-fuzzers')
     data_dir = os.path.join(base_dir, 'dashboard', 'data')
     pages_dir = os.path.join(base_dir, 'dashboard', 'pages')
     fuzzer_template_path = os.path.join(base_dir, 'dashboard', 'templates', 'fuzzer.html')
@@ -271,8 +278,8 @@ def main():
         print(f"\nProcessing {name} results...")
         
         # Try ZIP file first
-        zip_path = os.path.join(output_dir, name, fuzzer['zip_name'])  # Changed from name.lower() to name
-        dir_path = os.path.join(output_dir, name, fuzzer['dir_name'])  # Changed from name.lower() to name
+        zip_path = os.path.join(output_dir, name, fuzzer['zip_name'])
+        dir_path = os.path.join(output_dir, name, fuzzer['dir_name'])
         
         input_path = None
         temp_dir = None

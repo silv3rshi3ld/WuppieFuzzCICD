@@ -1,4 +1,4 @@
-window.WuppieFuzzEndpointsMeta = {
+{
   "total_items": 14,
   "total_chunks": 1,
   "endpoints": [
@@ -101,4 +101,4 @@ window.WuppieFuzzEndpointsMeta = {
       "type": "miss"
     }
   ]
-};
+}

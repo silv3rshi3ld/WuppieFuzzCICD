@@ -1,5 +1,5 @@
-window.EvomasterEndpointsMeta = {
+{
   "total_items": 0,
   "total_chunks": 0,
   "endpoints": []
-};
+}

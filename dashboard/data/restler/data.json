@@ -1,4 +1,4 @@
-window.RestlerData = {
+{
   "stats": {
     "total_requests": 4383,
     "critical_issues": 17,
@@ -23,4 +23,4 @@ window.RestlerData = {
     ]
   },
   "crashes": []
-};
+}

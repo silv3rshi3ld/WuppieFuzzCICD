@@ -1,4 +1,4 @@
-window.RestlerEndpointsMeta = {
+{
   "total_items": 6,
   "total_chunks": 1,
   "endpoints": [
@@ -111,4 +111,4 @@ window.RestlerEndpointsMeta = {
       }
     }
   ]
-};
+}

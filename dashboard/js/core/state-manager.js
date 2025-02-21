@@ -42,6 +42,19 @@ class StateManager {
             this.notifySubscribers('crashes', data?.crashes || []);
             this.notifySubscribers('endpoints', endpointsMeta?.endpoints || []);
 
+            // Dispatch data loaded event
+            const eventData = {
+                coverage: coverage,
+                metadata: metadata,
+                stats: data?.stats || {},
+                crashes: data?.crashes || [],
+                issues: data?.issues || []
+            };
+            
+            window.dispatchEvent(new CustomEvent(`${this.fuzzerName.toLowerCase()}DataLoaded`, {
+                detail: eventData
+            }));
+
             // Update UI elements
             this.updateStats();
         } catch (error) {
@@ -88,14 +101,17 @@ class StateManager {
         // Update code coverage
         const codeCoverage = document.getElementById('codeCoverage');
         if (codeCoverage) {
-            const coverage = this.state.data?.stats?.code_coverage || 0;
-            codeCoverage.textContent = `${coverage.toFixed(1)}%`;
+            const coverage = this.state.coverage?.lines || {};
+            const covered = coverage.covered || 0;
+            const total = coverage.total || 1;
+            const percentage = (covered / total) * 100;
+            codeCoverage.textContent = `${percentage.toFixed(1)}%`;
         }
 
         // Update duration
         const duration = document.getElementById('duration');
         if (duration) {
-            duration.textContent = `Duration: ${this.state.data?.stats?.duration || '00:00:00'}`;
+            duration.textContent = `Duration: ${this.state.metadata?.duration || '00:00:00'}`;
         }
 
         // Update coverage metrics
@@ -106,12 +122,13 @@ class StateManager {
     }
 
     updateCoverageMetric(metric) {
-        const coverage = this.state.data?.coverage;
+        const coverage = this.state.coverage;
         if (!coverage) return;
 
-        const value = coverage[metric] || 0;
-        const total = coverage[`total_${metric}`] || 0;
-        const percentage = total > 0 ? (value / total * 100) : 0;
+        const metricData = coverage[metric] || {};
+        const covered = metricData.covered || 0;
+        const total = metricData.total || 1;
+        const percentage = (covered / total) * 100;
 
         const valueElement = document.getElementById(`${metric}Coverage`);
         const rawElement = document.getElementById(`${metric}CoverageRaw`);
@@ -121,7 +138,7 @@ class StateManager {
             valueElement.textContent = `${percentage.toFixed(1)}%`;
         }
         if (rawElement) {
-            rawElement.textContent = `${value} / ${total}`;
+            rawElement.textContent = `${covered} / ${total}`;
         }
         if (barElement) {
             barElement.style.width = `${percentage}%`;

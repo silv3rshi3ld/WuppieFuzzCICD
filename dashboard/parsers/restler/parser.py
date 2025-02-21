@@ -2,6 +2,7 @@
 
 import os
 import json
+import re
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
@@ -173,25 +174,53 @@ class RestlerParser(BaseParser):
                         bug_data = json.load(f)
                         
                         # Extract bug information
-                        request_data = bug_data.get('request_data', {})
-                        response_data = bug_data.get('response_data', {})
+                        request_sequence = bug_data.get('request_sequence', [{}])[0]
+                        request = request_sequence.get('replay_request', '')
+                        response = request_sequence.get('response', '')
                         
-                        # Get endpoint info
-                        path = request_data.get('path', '')
-                        method = request_data.get('method', '')
-                        status_code = str(response_data.get('status_code', 500))
+                        # Extract method and path from request
+                        method_match = re.match(r'(\w+)\s+([^\s]+)', request)
+                        if method_match:
+                            method = method_match.group(1)
+                            path = method_match.group(2).split('?')[0]  # Remove query params
+                        else:
+                            method = bug_data.get('verb', '')
+                            path = bug_data.get('endpoint', '')
+                        
+                        # Extract status code from response
+                        status_code = bug_data.get('status_code', '500')
+                        if isinstance(status_code, str) and status_code.isdigit():
+                            status_code = int(status_code)
+                        
+                        # Extract error details from response
+                        error_msg = ""
+                        has_stack_trace = False
+                        
+                        # Look for error message in response
+                        error_match = re.search(r'<p class="errormsg">(.*?)</p>', response, re.DOTALL)
+                        if error_match:
+                            error_msg = error_match.group(1).strip()
+                        
+                        # Look for stack trace
+                        if '<div class="traceback">' in response:
+                            has_stack_trace = True
+                            # Extract full stack trace
+                            trace_match = re.search(r'<div class="traceback">(.*?)</div>', response, re.DOTALL)
+                            if trace_match:
+                                error_msg += "\n\nStack Trace:\n" + trace_match.group(1).strip()
                         
                         # Update method counts
                         if method.upper() in self.method_counts:
                             self.method_counts[method.upper()] += 1
                         
                         # Update status code counts
-                        if status_code not in self.status_counts:
-                            self.status_counts[status_code] = 0
-                        self.status_counts[status_code] += 1
+                        str_status = str(status_code)
+                        if str_status not in self.status_counts:
+                            self.status_counts[str_status] = 0
+                        self.status_counts[str_status] += 1
                         
                         # Update hits/misses
-                        if 200 <= int(status_code) < 300:
+                        if 200 <= status_code < 300:
                             self.hits += 1
                         else:
                             self.misses += 1
@@ -218,31 +247,26 @@ class RestlerParser(BaseParser):
                         endpoint["total_requests"] += 1
                         
                         # Update status codes
-                        if status_code not in endpoint["status_codes"]:
-                            endpoint["status_codes"][status_code] = 0
-                        endpoint["status_codes"][status_code] += 1
+                        if str_status not in endpoint["status_codes"]:
+                            endpoint["status_codes"][str_status] = 0
+                        endpoint["status_codes"][str_status] += 1
                         
                         # Store response example
-                        if status_code not in endpoint["responses"]:
-                            endpoint["responses"][status_code] = json.dumps(response_data, indent=2)
+                        if str_status not in endpoint["responses"]:
+                            endpoint["responses"][str_status] = response
                         
                         # Update success requests
-                        if 200 <= int(status_code) < 300:
+                        if 200 <= status_code < 300:
                             endpoint["success_requests"] += 1
                         
                         # Determine severity
-                        error_msg = response_data.get('error', '')
-                        has_stack_trace = any(trace_indicator in str(error_msg).lower() for trace_indicator in [
-                            'stack trace', 'traceback', 'exception in', 'at line'
-                        ])
-                        
                         severity = "low"
-                        if int(status_code) >= 500:
+                        if status_code >= 500:
                             if has_stack_trace:
                                 severity = "critical"
                             else:
                                 severity = "high"
-                        elif int(status_code) >= 400:
+                        elif status_code >= 400:
                             severity = "medium"
                         
                         endpoint["severity_counts"][severity] += 1
@@ -252,12 +276,13 @@ class RestlerParser(BaseParser):
                             "timestamp": datetime.now().isoformat(),
                             "endpoint": path,
                             "method": method,
-                            "status_code": int(status_code),
+                            "status_code": status_code,
                             "type": "restler_bug",
-                            "request": json.dumps(request_data, indent=2),
-                            "response": json.dumps(response_data, indent=2),
-                            "error": bug_data.get('error_message', ''),
-                            "has_stack_trace": has_stack_trace
+                            "request": request,
+                            "response": response,
+                            "error": error_msg,
+                            "has_stack_trace": has_stack_trace,
+                            "severity": severity
                         }
                         
                         self.process_crash(crash_data)

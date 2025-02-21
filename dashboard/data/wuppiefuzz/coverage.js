@@ -1,19 +1,22 @@
 window.WuppieFuzzCoverage = {
-  "status_distribution": {
-    "hits": 790,
-    "misses": 0,
-    "unspecified": 0
+  "lines": {
+    "covered": 0,
+    "total": 1,
+    "percentage": 0.0
   },
-  "method_coverage": {
-    "GET": 133,
-    "POST": 421,
-    "PUT": 221,
-    "DELETE": 15
+  "functions": {
+    "covered": 23,
+    "total": 31,
+    "percentage": 74.19354838709677
   },
-  "status_codes": [
-    {
-      "status": "200",
-      "count": 790
-    }
-  ]
+  "branches": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
+  },
+  "statements": {
+    "covered": 0,
+    "total": 0,
+    "percentage": 0
+  }
 };

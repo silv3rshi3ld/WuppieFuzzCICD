@@ -1,19 +1,22 @@
 {
-  "status_distribution": {
-    "hits": 0,
-    "misses": 12,
-    "unspecified": 0
+  "lines": {
+    "covered": 11,
+    "total": 14,
+    "percentage": 78.57
   },
-  "method_coverage": {
-    "GET": 0,
-    "POST": 0,
-    "PUT": 0,
-    "DELETE": 0
+  "functions": {
+    "covered": 12,
+    "total": 14,
+    "percentage": 85.71
   },
-  "status_codes": [
-    {
-      "status": "500",
-      "count": 12
-    }
-  ]
+  "branches": {
+    "covered": 8,
+    "total": 14,
+    "percentage": 57.14
+  },
+  "statements": {
+    "covered": 11,
+    "total": 14,
+    "percentage": 78.57
+  }
 }

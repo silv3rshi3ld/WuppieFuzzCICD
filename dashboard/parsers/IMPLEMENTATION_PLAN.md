@@ -1,224 +1,107 @@
-# Dashboard Improvements Implementation Plan
+# WuppieFuzz Parser Implementation Plan
 
-## 1. Fix Endpoint Expansion
+## Current Issues
+- Code coverage data is not being extracted from endpointcoverage/index.html
+- Crashes and issues data is not being extracted from report.db
+- This data is not being included in the dashboard
 
-### Updates to endpoint-tree.js
-- Add click handler to entire endpoint card header
-- Implement smooth slide animation for expansion
-- Show request/response details in expanded view
-- Add syntax highlighting for JSON content
-- Add copy-to-clipboard functionality
+## Implementation Steps
 
-### Endpoint Details Display
-```html
-<div class="endpoint-details">
-    <div class="details-section">
-        <h4>Request Details</h4>
-        <pre><code>{request_data}</code></pre>
-    </div>
-    <div class="details-section">
-        <h4>Response Details</h4>
-        <pre><code>{response_data}</code></pre>
-    </div>
-    <div class="details-section">
-        <h4>Status Code Distribution</h4>
-        <div class="status-distribution"></div>
-    </div>
-</div>
+### 1. Create New Parser Structure
+Create a new WuppieFuzz parser package in `dashboard/parsers/wuppiefuzz/` with:
+- `__init__.py`
+- `parser.py` - Main parser logic
+- `coverage_parser.py` - Specific to parsing coverage data
+- `db_parser.py` - Specific to parsing SQLite data
+- `test_parser.py` - Unit tests
+
+### 2. Implement Coverage Parser
+In `coverage_parser.py`:
+```python
+def parse_coverage_data(index_path):
+    """Parse coverage data from index.html file."""
+    # Parse HTML file
+    # Extract coverage metrics:
+    # - Lines covered/total
+    # - Functions covered/total
+    # - Branches covered/total
+    # - Statements covered/total
+    return {
+        'lines': {'covered': X, 'total': Y},
+        'functions': {'covered': X, 'total': Y},
+        'branches': {'covered': X, 'total': Y},
+        'statements': {'covered': X, 'total': Y}
+    }
 ```
 
-## 2. Enhanced Styling
-
-### Stats Cards
-- Add gradient backgrounds
-- Implement hover effects with shadow and slight elevation
-- Add pulsing animation for critical errors
-- Include relevant icons for each metric
-
-### Color Scheme
-```css
-:root {
-    --color-success: #22c55e;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
-    --color-status-500: #dc2626;
-    --color-status-400: #f59e0b;
-    --color-status-200: #22c55e;
-}
+### 3. Implement DB Parser
+In `db_parser.py`:
+```python
+def parse_crashes_and_issues(db_path):
+    """Parse crashes and issues from SQLite database."""
+    # Connect to SQLite DB
+    # Extract:
+    # - Crashes with stack traces
+    # - Issues found
+    # - Severity levels
+    return {
+        'crashes': [...],
+        'issues': [...]
+    }
 ```
 
-### Animation Effects
-- Add smooth transitions for all hover states
-- Implement pulsing effect for critical errors
-- Add loading states and transitions
-
-## 3. Duration Display Fix
-
-### Parser Updates
-- Standardize timestamp parsing across all parsers
-- Implement duration calculation from start/end times
-- Add validation for duration format
-
-### Duration Format
-```typescript
-interface Duration {
-    hours: number;
-    minutes: number;
-    seconds: number;
-    formatted: string;  // "HH:MM:SS"
-}
+### 4. Update Main Parser
+Update parser to combine all data sources:
+```python
+def parse_wuppiefuzz_results(input_path):
+    """Parse all WuppieFuzz results."""
+    # Get coverage data
+    coverage_path = os.path.join(input_path, 'endpointcoverage', 'index.html')
+    coverage_data = parse_coverage_data(coverage_path)
+    
+    # Get crashes/issues
+    db_path = os.path.join(input_path, 'grafana', 'report.db')
+    crashes_data = parse_crashes_and_issues(db_path)
+    
+    # Combine into dashboard format
+    dashboard_data = {
+        'metadata': {...},
+        'stats': {...},
+        'coverage': coverage_data,
+        'crashes': crashes_data['crashes'],
+        'issues': crashes_data['issues'],
+        'endpoints': [...]
+    }
+    
+    return report, dashboard_data
 ```
 
-## 4. Result Normalization
+### 5. Update Dashboard Generation
+Modify `generate_dashboards.py` to:
+- Handle the new coverage data format
+- Include crashes and issues in summary statistics
+- Update templates to display the new data
 
-### Parser Standardization
-- Review and normalize request counting logic
-- Implement consistent status code categorization
-- Add validation for parsed data
+### 6. Testing Plan
+1. Create test data fixtures:
+   - Sample coverage HTML
+   - Sample SQLite DB
+   - Sample endpoint data
+2. Write unit tests for each parser component
+3. Write integration tests for combined parser
+4. Test dashboard generation with complete dataset
 
-### WuppyFuzz Finding Deduplication
-- Implement crash/finding deduplication logic:
-  ```python
-  def deduplicate_findings(crashes):
-      # Track unique findings by their key attributes
-      unique_findings = {}
-      for crash in crashes:
-          # Create unique key based on error characteristics
-          key = (
-              crash['endpoint'],
-              crash['method'],
-              crash['status_code'],
-              # Hash the error message/stack trace to group similar errors
-              hash(crash.get('error', '')),
-              # Consider request structure (ignoring dynamic values)
-              hash(normalize_request(crash.get('request', '')))
-          )
-          
-          if key not in unique_findings:
-              # Add new finding with occurrence count
-              crash['occurrences'] = 1
-              unique_findings[key] = crash
-          else:
-              # Update existing finding
-              existing = unique_findings[key]
-              existing['occurrences'] += 1
-              # Keep track of all timestamps
-              if not isinstance(existing['timestamp'], list):
-                  existing['timestamp'] = [existing['timestamp']]
-              existing['timestamp'].append(crash['timestamp'])
-              
-      return list(unique_findings.values())
+### 7. Implementation Order
+1. Create basic parser structure
+2. Implement coverage parsing
+3. Implement DB parsing
+4. Update main parser
+5. Write tests
+6. Update dashboard generation
+7. Manual testing and validation
 
-  def normalize_request(request_str):
-      """Normalize request by removing dynamic values."""
-      # Remove timestamps, UUIDs, random tokens etc.
-      normalized = re.sub(r'\b[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\b', 'UUID', request_str)
-      normalized = re.sub(r'\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*?\b', 'TIMESTAMP', normalized)
-      normalized = re.sub(r'\b[a-zA-Z0-9+/]{32,}\b', 'TOKEN', normalized)
-      return normalized
-  ```
-
-- Add finding grouping and categorization:
-  ```python
-  def categorize_findings(findings):
-      categories = {
-          'critical': [],  # 500 errors with clear stack traces
-          'high': [],      # 500 errors without clear cause
-          'medium': [],    # 400 errors with potential security implications
-          'low': []        # Other issues
-      }
-      
-      for finding in findings:
-          severity = determine_severity(finding)
-          categories[severity].append(finding)
-          
-      return categories
-
-  def determine_severity(finding):
-      """Determine finding severity based on various factors."""
-      if finding['status_code'] >= 500:
-          if 'stack_trace' in finding.get('error', '').lower():
-              return 'critical'
-          return 'high'
-      elif finding['status_code'] >= 400:
-          if any(term in finding.get('error', '').lower() 
-                for term in ['sql', 'injection', 'overflow', 'memory']):
-              return 'medium'
-      return 'low'
-  ```
-
-### Data Structure
-```typescript
-interface FuzzerResults {
-    metadata: {
-        name: string;
-        version: string;
-        timestamp: string;
-        duration: string;
-    };
-    stats: {
-        total_requests: number;
-        critical_issues: number;
-        unique_endpoints: number;
-        code_coverage: number;
-    };
-    coverage: {
-        lines: Coverage;
-        functions: Coverage;
-        branches: Coverage;
-        statements: Coverage;
-    };
-    endpoints: Array<{
-        path: string;
-        method: string;
-        total_requests: number;
-        success_requests: number;
-        success_rate: number;
-        status_codes: Record<string, number>;
-    }>;
-    crashes: Array<{
-        timestamp: string | string[];  // Single timestamp or array for duplicates
-        endpoint: string;
-        method: string;
-        status_code: number;
-        type: string;
-        request: string;
-        response: string;
-        error: string;
-        occurrences: number;  // Count of duplicates
-        severity: 'critical' | 'high' | 'medium' | 'low';
-    }>;
-}
-
-interface Coverage {
-    covered: number;
-    total: number;
-    percentage: number;
-}
-```
-
-## Implementation Order
-
-1. Finding Deduplication & Categorization
-   - Implement WuppyFuzz finding deduplication
-   - Add severity categorization
-   - Update crash display to show occurrence counts
-   - Add filtering by severity
-
-2. UI Components
-   - Update endpoint-tree.js with new expansion logic
-   - Enhance styling with new animations and effects
-   - Add proper error handling and loading states
-   - Add severity-based coloring and icons
-
-3. Data Display
-   - Implement proper duration formatting
-   - Add detailed endpoint information display
-   - Enhance error and status code visualization
-   - Add finding occurrence statistics
-
-4. Testing & Validation
-   - Add validation for parsed data
-   - Test with different result sizes
-   - Verify consistent behavior across fuzzers
-   - Test deduplication with various error patterns
+## Next Steps
+1. Create the new parser package structure
+2. Begin with coverage parser implementation as it's critical for dashboard display
+3. Follow with DB parser for crashes/issues
+4. Integrate into main dashboard generation

@@ -1,59 +1,125 @@
+"""Tests for WuppieFuzz parser."""
+
 import os
-import sys
+import unittest
+import sqlite3
+from tempfile import TemporaryDirectory
+from datetime import datetime
 
-# Add project root to Python path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-sys.path.insert(0, project_root)
+from .parser import parse_wuppiefuzz_results, extract_error_message
 
-from dashboard.parsers.wuppiefuzz.parser import parse_wuppiefuzz_results
+class TestWuppieFuzzParser(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        os.makedirs(os.path.join(self.temp_dir.name, 'grafana'))
+        self.db_path = os.path.join(self.temp_dir.name, 'grafana', 'report.db')
+        
+        # Create test database
+        self.conn = sqlite3.connect(self.db_path)
+        self.cursor = self.conn.cursor()
+        
+        # Create tables
+        self.cursor.executescript("""
+            CREATE TABLE coverage (
+                timestamp TEXT,
+                line_coverage INTEGER,
+                line_coverage_total INTEGER,
+                endpoint_coverage INTEGER,
+                endpoint_coverage_total INTEGER
+            );
+            
+            CREATE TABLE requests (
+                id INTEGER PRIMARY KEY,
+                timestamp TEXT,
+                type TEXT,
+                path TEXT,
+                data TEXT
+            );
+            
+            CREATE TABLE responses (
+                reqid INTEGER,
+                status INTEGER,
+                error TEXT,
+                data TEXT,
+                FOREIGN KEY(reqid) REFERENCES requests(id)
+            );
+            
+            CREATE TABLE runs (
+                timestamp TEXT
+            );
+        """)
+        
+        # Insert test data
+        self.cursor.execute(
+            "INSERT INTO coverage VALUES (?, ?, ?, ?, ?)",
+            ('2025-02-19T13:53:50.672Z', 50, 100, 10, 20)
+        )
+        
+        # Insert test request
+        self.cursor.execute(
+            "INSERT INTO requests VALUES (?, ?, ?, ?, ?)",
+            (1, '2025-02-19T13:53:50.672Z', 'GET', '/test', 'test request')
+        )
+        
+        # Insert test response
+        self.cursor.execute(
+            "INSERT INTO responses VALUES (?, ?, ?, ?)",
+            (1, 500, 'Test error', '<title>Test Error Message</title>')
+        )
+        
+        # Insert test run timestamps
+        self.cursor.execute(
+            "INSERT INTO runs VALUES (?)",
+            ('2025-02-19T13:53:50.672Z',)
+        )
+        
+        self.conn.commit()
 
-def test_wuppiefuzz_parser():
-    # Get the absolute path to the zip file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-    # Test with the test_data directory first
-    test_dir = os.path.join(project_root, 'test_data', 'wuppiefuzz', 'fuzzing-report')
-    output_path = os.path.join(current_dir, 'wuppiefuzz_report.json')
-    
-    # Test directory parsing first
-    try:
-        print("\nTesting directory parsing...")
-        raw_report, dashboard_data = parse_wuppiefuzz_results(test_dir)
-        
-        # If directory parsing works, test zip file
-        print("\nTesting zip file parsing...")
-        zip_path = os.path.join(project_root, 'output-fuzzers', 'Wuppiefuzz', 'fuzzing-report.zip')
-        raw_report_zip, dashboard_data_zip = parse_wuppiefuzz_results(zip_path)
-        print("\nWuppieFuzz Parser Test Results:")
-        print("===============================")
-        print(f"Metadata:")
-        print(f"- Duration: {dashboard_data['metadata']['duration']}")
-        print(f"- Total Requests: {dashboard_data['metadata']['total_requests']}")
-        print(f"- Critical Issues: {dashboard_data['metadata']['critical_issues']}")
-        
-        print("\nCoverage Statistics:")
-        coverage = dashboard_data['coverage']
-        print(f"- Overall Coverage: {coverage['percentages']['overall']}%")
-        print(f"- Line Coverage: {coverage['percentages']['lines']}%")
-        print(f"- Function Coverage: {coverage['percentages']['functions']}%")
-        
-        print("\nStatus Distribution:")
-        for status, percentage in coverage['status_distribution'].items():
-            print(f"- {status}: {percentage}%")
-        
-        print("\nEndpoints:", len(dashboard_data['endpoints']))
-        for endpoint in dashboard_data['endpoints']:
-            print(f"- {endpoint['method']} {endpoint['path']} -> Success Rate: {endpoint['success_rate']}%")
-        
-        print("\nBugs Found:", len(dashboard_data['crashes']))
-        for bug in dashboard_data['crashes']:
-            print(f"- {bug['method']} {bug['endpoint']} -> {bug['status_code']} ({bug['severity']})")
-        return True
-        
-    except Exception as e:
-        print(f"Error during testing: {e}")
-        return False
+    def tearDown(self):
+        self.conn.close()
+        self.temp_dir.cleanup()
 
-if __name__ == "__main__":
-    test_wuppiefuzz_parser()
+    def test_parse_results(self):
+        """Test parsing WuppieFuzz results."""
+        summary, data = parse_wuppiefuzz_results(self.temp_dir.name)
+        
+        # Check summary
+        self.assertEqual(summary['total_requests'], 1)
+        
+        # Check metadata
+        self.assertEqual(data['metadata']['fuzzer'], 'WuppieFuzz')
+        self.assertEqual(data['metadata']['total_requests'], 1)
+        
+        # Check coverage
+        self.assertEqual(data['coverage']['lines']['covered'], 50)
+        self.assertEqual(data['coverage']['lines']['total'], 100)
+        self.assertEqual(data['coverage']['functions']['covered'], 10)
+        self.assertEqual(data['coverage']['functions']['total'], 20)
+        
+        # Check bugs
+        self.assertEqual(len(data['bugs']), 1)
+        bug = data['bugs'][0]
+        self.assertEqual(bug['method'], 'GET')
+        self.assertEqual(bug['endpoint'], '/test')
+        self.assertEqual(bug['status_code'], 500)
+        self.assertEqual(bug['severity'], 'Critical')
+
+    def test_extract_error_message(self):
+        """Test error message extraction."""
+        html = '<title>Test Error // Some details</title>'
+        self.assertEqual(extract_error_message(html), 'Test Error')
+        
+        # Test empty input
+        self.assertEqual(
+            extract_error_message(''),
+            'No error details available'
+        )
+        
+        # Test invalid HTML
+        self.assertEqual(
+            extract_error_message('Invalid HTML'),
+            'No error details available'
+        )
+
+if __name__ == '__main__':
+    unittest.main()

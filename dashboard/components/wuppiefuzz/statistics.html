@@ -1,99 +1,168 @@
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <!-- Total Requests -->
-    <div class="stats-card">
-        <div class="stats-value" x-text="getFuzzerData().metadata.total_requests || 0"></div>
-        <div class="stats-label">Total Requests</div>
-    </div>
-
-    <!-- Critical Issues -->
-    <div class="stats-card" :class="{ 'has-critical-error': getFuzzerData().metadata.critical_issues > 0 }">
-        <div class="stats-value" :class="{ 'critical-error': getFuzzerData().metadata.critical_issues > 0 }" x-text="getFuzzerData().metadata.critical_issues || 0"></div>
-        <div class="stats-label">Critical Issues</div>
-    </div>
-
-    <!-- Duration -->
-    <div class="stats-card">
-        <div class="stats-value" x-text="getFuzzerData().metadata.duration || '0:00'"></div>
-        <div class="stats-label">Duration</div>
-    </div>
-
-    <!-- Success Rate -->
-    <div class="stats-card">
-        <div class="stats-value" x-text="(getFuzzerData().coverage?.status_distribution?.hits || 0) + '%'"></div>
-        <div class="stats-label">Success Rate</div>
-    </div>
-</div>
-
-<!-- Coverage Metrics -->
-<div class="bg-white rounded-lg shadow p-6 mb-8">
-    <h3 class="text-lg font-semibold mb-4">Code Coverage Details</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Lines Coverage -->
-        <div class="relative">
-            <div class="text-2xl font-bold mb-1" x-text="Math.round(getFuzzerData().coverage?.percentages?.lines || 0) + '%'"></div>
-            <div class="text-sm text-gray-600">Lines Covered</div>
-            <div class="absolute right-0 top-0 text-sm text-gray-500" x-text="getFuzzerData().coverage?.raw?.lines || 0"></div>
-            <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full transition-all duration-500 rounded-full"
-                     :class="{
-                         'bg-green-500': (getFuzzerData().coverage?.percentages?.lines || 0) >= 80,
-                         'bg-yellow-500': (getFuzzerData().coverage?.percentages?.lines || 0) >= 50 && (getFuzzerData().coverage?.percentages?.lines || 0) < 80,
-                         'bg-red-500': (getFuzzerData().coverage?.percentages?.lines || 0) < 50
-                     }"
-                     :style="'width: ' + (getFuzzerData().coverage?.percentages?.lines || 0) + '%'">
-                </div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <!-- Status Distribution -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="text-lg font-semibold mb-4">Status Distribution</h3>
+        <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Hits</span>
+                <span class="font-medium" id="wuppiefuzz-hits">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Misses</span>
+                <span class="font-medium" id="wuppiefuzz-misses">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Unspecified</span>
+                <span class="font-medium" id="wuppiefuzz-unspecified">0</span>
             </div>
         </div>
+    </div>
 
-        <!-- Functions Coverage -->
-        <div class="relative">
-            <div class="text-2xl font-bold mb-1" x-text="Math.round(getFuzzerData().coverage?.percentages?.functions || 0) + '%'"></div>
-            <div class="text-sm text-gray-600">Functions Covered</div>
-            <div class="absolute right-0 top-0 text-sm text-gray-500" x-text="getFuzzerData().coverage?.raw?.functions || 0"></div>
-            <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full transition-all duration-500 rounded-full"
-                     :class="{
-                         'bg-green-500': (getFuzzerData().coverage?.percentages?.functions || 0) >= 80,
-                         'bg-yellow-500': (getFuzzerData().coverage?.percentages?.functions || 0) >= 50 && (getFuzzerData().coverage?.percentages?.functions || 0) < 80,
-                         'bg-red-500': (getFuzzerData().coverage?.percentages?.functions || 0) < 50
-                     }"
-                     :style="'width: ' + (getFuzzerData().coverage?.percentages?.functions || 0) + '%'">
-                </div>
+    <!-- Method Coverage -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="text-lg font-semibold mb-4">Method Coverage</h3>
+        <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">GET</span>
+                <span class="font-medium" id="wuppiefuzz-get">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">POST</span>
+                <span class="font-medium" id="wuppiefuzz-post">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">PUT</span>
+                <span class="font-medium" id="wuppiefuzz-put">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">DELETE</span>
+                <span class="font-medium" id="wuppiefuzz-delete">0</span>
             </div>
         </div>
+    </div>
 
-        <!-- Branches Coverage -->
-        <div class="relative">
-            <div class="text-2xl font-bold mb-1" x-text="Math.round(getFuzzerData().coverage?.percentages?.branches || 0) + '%'"></div>
-            <div class="text-sm text-gray-600">Branches Covered</div>
-            <div class="absolute right-0 top-0 text-sm text-gray-500" x-text="getFuzzerData().coverage?.raw?.branches || 0"></div>
-            <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full transition-all duration-500 rounded-full"
-                     :class="{
-                         'bg-green-500': (getFuzzerData().coverage?.percentages?.branches || 0) >= 80,
-                         'bg-yellow-500': (getFuzzerData().coverage?.percentages?.branches || 0) >= 50 && (getFuzzerData().coverage?.percentages?.branches || 0) < 80,
-                         'bg-red-500': (getFuzzerData().coverage?.percentages?.branches || 0) < 50
-                     }"
-                     :style="'width: ' + (getFuzzerData().coverage?.percentages?.branches || 0) + '%'">
-                </div>
+    <!-- Code Coverage -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="text-lg font-semibold mb-4">Code Coverage</h3>
+        <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Lines Covered</span>
+                <span class="font-medium" id="wuppiefuzz-lines-coverage">0/0 (0%)</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Functions Covered</span>
+                <span class="font-medium" id="wuppiefuzz-functions-coverage">0/0 (0%)</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Branches Covered</span>
+                <span class="font-medium" id="wuppiefuzz-branches-coverage">0/0 (0%)</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Statements Covered</span>
+                <span class="font-medium" id="wuppiefuzz-statements-coverage">0/0 (0%)</span>
             </div>
         </div>
+    </div>
 
-        <!-- Statements Coverage -->
-        <div class="relative">
-            <div class="text-2xl font-bold mb-1" x-text="Math.round(getFuzzerData().coverage?.percentages?.statements || 0) + '%'"></div>
-            <div class="text-sm text-gray-600">Statements Covered</div>
-            <div class="absolute right-0 top-0 text-sm text-gray-500" x-text="getFuzzerData().coverage?.raw?.statements || 0"></div>
-            <div class="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div class="h-full transition-all duration-500 rounded-full"
-                     :class="{
-                         'bg-green-500': (getFuzzerData().coverage?.percentages?.statements || 0) >= 80,
-                         'bg-yellow-500': (getFuzzerData().coverage?.percentages?.statements || 0) >= 50 && (getFuzzerData().coverage?.percentages?.statements || 0) < 80,
-                         'bg-red-500': (getFuzzerData().coverage?.percentages?.statements || 0) < 50
-                     }"
-                     :style="'width: ' + (getFuzzerData().coverage?.percentages?.statements || 0) + '%'">
-                </div>
+    <!-- Issues Summary -->
+    <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="text-lg font-semibold mb-4">Issues Summary</h3>
+        <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Total Crashes</span>
+                <span class="font-medium" id="wuppiefuzz-total-crashes">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Total Issues</span>
+                <span class="font-medium" id="wuppiefuzz-total-issues">0</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600">Critical Issues</span>
+                <span class="font-medium text-red-600" id="wuppiefuzz-critical-issues">0</span>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Crashes and Issues List -->
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <h3 class="text-lg font-semibold mb-4">Crashes and Issues</h3>
+    <div class="space-y-4" id="wuppiefuzz-issues-list">
+        <!-- Issues will be populated here -->
+        <div class="text-gray-500 text-center py-4">No crashes or issues found</div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update coverage metrics
+    function updateCoverage(coverage) {
+        function formatCoverage(metric) {
+            const covered = metric.covered;
+            const total = metric.total;
+            const percentage = total > 0 ? Math.round((covered / total) * 100) : 0;
+            return `${covered}/${total} (${percentage}%)`;
+        }
+
+        document.getElementById('wuppiefuzz-lines-coverage').textContent = formatCoverage(coverage.lines);
+        document.getElementById('wuppiefuzz-functions-coverage').textContent = formatCoverage(coverage.functions);
+        document.getElementById('wuppiefuzz-branches-coverage').textContent = formatCoverage(coverage.branches);
+        document.getElementById('wuppiefuzz-statements-coverage').textContent = formatCoverage(coverage.statements);
+    }
+
+    // Update crashes and issues
+    function updateIssuesList(crashes, issues) {
+        const container = document.getElementById('wuppiefuzz-issues-list');
+        if (crashes.length === 0 && issues.length === 0) {
+            return;
+        }
+
+        container.innerHTML = '';
+        
+        // Sort by timestamp, most recent first
+        const allItems = [...crashes, ...issues].sort((a, b) => 
+            new Date(b.timestamp) - new Date(a.timestamp)
+        );
+
+        allItems.forEach(item => {
+            const severity = item.type === 'crash' ? 'high' : item.severity;
+            const severityColor = severity === 'critical' || item.type === 'crash' ? 'red' : 'yellow';
+            
+            const html = `
+                <div class="border-l-4 border-${severityColor}-500 bg-${severityColor}-50 p-4 rounded">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-semibold">${item.type === 'crash' ? 'Crash' : 'Issue'} - ${item.endpoint}</h4>
+                            <p class="text-sm text-gray-600 mt-1">
+                                ${item.type === 'crash' ? item.stack_trace : item.description}
+                            </p>
+                        </div>
+                        <span class="text-xs text-gray-500">
+                            ${new Date(item.timestamp).toLocaleString()}
+                        </span>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    // Update all statistics when data is loaded
+    window.addEventListener('wuppiefuzzDataLoaded', function(e) {
+        const data = e.detail;
+        
+        // Update coverage data
+        if (data.coverage) {
+            updateCoverage(data.coverage);
+        }
+
+        // Update crashes and issues
+        document.getElementById('wuppiefuzz-total-crashes').textContent = data.stats.total_crashes || 0;
+        document.getElementById('wuppiefuzz-total-issues').textContent = data.stats.total_issues || 0;
+        document.getElementById('wuppiefuzz-critical-issues').textContent = data.stats.critical_issues || 0;
+
+        // Update crashes and issues list
+        updateIssuesList(data.crashes || [], data.issues || []);
+    });
+});
+</script>

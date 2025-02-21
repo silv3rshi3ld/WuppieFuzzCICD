@@ -54,6 +54,7 @@ class BugListComponent {
     }
 
     getSeverityStyles(severity) {
+        severity = severity.toLowerCase();
         const styles = {
             critical: {
                 card: 'bg-red-50 border-red-200 shadow-red-100',
@@ -80,19 +81,15 @@ class BugListComponent {
         return styles[severity] || styles.low;
     }
 
-    formatTimestamps(timestamps) {
-        if (!Array.isArray(timestamps)) {
-            timestamps = [timestamps];
-        }
-        return timestamps
-            .map(ts => new Date(ts).toLocaleString())
-            .join('\n');
+    formatTimestamp(timestamp) {
+        if (!timestamp) return 'Unknown';
+        return new Date(timestamp).toLocaleString();
     }
 
     renderBugCard(bug, index) {
         const styles = this.getSeverityStyles(bug.severity);
         const detailsId = `bug-${index}`;
-        const occurrences = bug.occurrences || 1;
+        const occurrences = bug.occurrence_count || 1;
 
         return `
             <div class="bug-card ${styles.card} border rounded-lg p-4 ${styles.animation || ''}">
@@ -109,13 +106,16 @@ class BugListComponent {
                                     ${occurrences} occurrences
                                 </span>
                             ` : ''}
+                            <span class="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                ${bug.category}
+                            </span>
                         </div>
                         <div class="flex items-center gap-2 mb-1">
                             <span class="font-medium">${bug.method}</span>
                             <span class="text-gray-600">${bug.endpoint}</span>
                         </div>
                         <div class="text-sm text-gray-500">
-                            Status: ${bug.status_code} | First seen: ${new Date(Array.isArray(bug.timestamps) ? bug.timestamps[0] : bug.timestamp).toLocaleString()}
+                            Status: ${bug.status_code} | First seen: ${this.formatTimestamp(bug.first_seen)}
                         </div>
                     </div>
                     <button class="text-gray-400 hover:text-gray-600">
@@ -132,42 +132,46 @@ class BugListComponent {
     renderBugDetails(bug) {
         return `
             <div class="space-y-4 text-sm">
-                ${bug.occurrences > 1 ? `
+                ${bug.occurrence_count > 1 ? `
                     <div>
                         <span class="font-medium">Occurrences:</span>
-                        <span class="text-gray-600">${bug.occurrences}</span>
+                        <span class="text-gray-600">${bug.occurrence_count}</span>
                     </div>
                     <div>
-                        <span class="font-medium">Timestamps:</span>
-                        <pre class="mt-1 text-gray-600">${this.formatTimestamps(bug.timestamps)}</pre>
+                        <span class="font-medium">First Seen:</span>
+                        <pre class="mt-1 text-gray-600">${this.formatTimestamp(bug.first_seen)}</pre>
                     </div>
-                ` : ''}
-                ${bug.has_stack_trace ? `
-                    <div class="flex items-center gap-2 text-red-600">
-                        <i data-feather="alert-triangle" class="w-4 h-4"></i>
-                        <span class="font-medium">Stack Trace Present</span>
+                    <div>
+                        <span class="font-medium">Last Seen:</span>
+                        <pre class="mt-1 text-gray-600">${this.formatTimestamp(bug.last_seen)}</pre>
                     </div>
                 ` : ''}
                 <div>
                     <span class="font-medium">Error Message:</span>
-                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.error)}</pre>
+                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.evidence.error_message)}</pre>
+                </div>
+                ${bug.evidence.stack_trace ? `
+                    <div>
+                        <span class="font-medium">Stack Trace:</span>
+                        <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.evidence.stack_trace)}</pre>
+                    </div>
+                ` : ''}
+                <div>
+                    <span class="font-medium">Reproduction Steps:</span>
+                    <ol class="mt-1 list-decimal list-inside space-y-1">
+                        ${bug.reproduction.steps.map(step => `
+                            <li class="text-gray-600">${step}</li>
+                        `).join('')}
+                    </ol>
                 </div>
                 <div>
-                    <span class="font-medium">Request:</span>
-                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.request)}</pre>
-                </div>
-                <div>
-                    <span class="font-medium">Response:</span>
-                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto whitespace-pre-wrap">${this.escapeHtml(bug.response)}</pre>
+                    <span class="font-medium">cURL Command:</span>
+                    <pre class="mt-1 bg-gray-50 p-3 rounded text-gray-600 overflow-x-auto">${this.escapeHtml(bug.reproduction.curl_command)}</pre>
                 </div>
                 <div class="flex justify-end gap-2 mt-4">
-                    <button class="copy-button px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" data-copy="${this.escapeHtml(bug.request)}">
+                    <button class="copy-button px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" data-copy="${this.escapeHtml(bug.reproduction.curl_command)}">
                         <i data-feather="copy" class="w-4 h-4"></i>
-                        Copy Request
-                    </button>
-                    <button class="copy-button px-3 py-1 text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1" data-copy="${this.escapeHtml(bug.response)}">
-                        <i data-feather="copy" class="w-4 h-4"></i>
-                        Copy Response
+                        Copy cURL
                     </button>
                 </div>
             </div>

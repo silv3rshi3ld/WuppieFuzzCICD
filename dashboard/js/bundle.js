@@ -3,6 +3,10 @@
  */
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        // Initialize state manager
+        const stateManager = new StateManager(window.fuzzerName);
+        await stateManager.initialize();
+
         // Initialize dashboard
         const dashboard = new Dashboard();
         await dashboard.initialize();
@@ -55,6 +59,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
+
+        // Manually dispatch data loaded event
+        const eventData = {
+            coverage: window[`${window.fuzzerName}Coverage`],
+            metadata: window[`${window.fuzzerName}Metadata`],
+            stats: window[`${window.fuzzerName}Data`]?.stats || {},
+            crashes: window[`${window.fuzzerName}Data`]?.crashes || [],
+            issues: window[`${window.fuzzerName}Data`]?.issues || []
+        };
+        
+        window.dispatchEvent(new CustomEvent(`${window.fuzzerName.toLowerCase()}DataLoaded`, {
+            detail: eventData
+        }));
 
         // Handle errors
         window.onerror = function(msg, url, line, col, error) {
