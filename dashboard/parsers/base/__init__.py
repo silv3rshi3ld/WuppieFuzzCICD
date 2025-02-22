@@ -1,3 +1,1 @@
-from .parser import BaseParser
-
-__all__ = ['BaseParser']
+"""Base utilities for parsers."""

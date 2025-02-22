@@ -1,0 +1,83 @@
+[
+  {
+    "path": "/users/v1/{username}",
+    "method": "GET",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/createdb",
+    "method": "GET",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1/{username}/password",
+    "method": "PUT",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1/_debug",
+    "method": "GET",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1/login",
+    "method": "POST",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1",
+    "method": "GET",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1/{username}/email",
+    "method": "PUT",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "/users/v1/{username}",
+    "method": "DELETE",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  },
+  {
+    "path": "",
+    "method": "GET",
+    "statistics": {
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {}
+    }
+  }
+]

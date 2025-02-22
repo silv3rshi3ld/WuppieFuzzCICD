@@ -1,0 +1,98 @@
+[
+  {
+    "id": "test_7",
+    "name": "test_0",
+    "endpoint": "/books/v1/{book_title}",
+    "method": "GET",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  },
+  {
+    "id": "test_8",
+    "name": "test_1",
+    "endpoint": "/me",
+    "method": "GET",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  },
+  {
+    "id": "test_9",
+    "name": "test_2",
+    "endpoint": "/books/v1",
+    "method": "POST",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  },
+  {
+    "id": "test_10",
+    "name": "test_3",
+    "endpoint": "/users/v1/{username}/password",
+    "method": "PUT",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  },
+  {
+    "id": "test_11",
+    "name": "test_4",
+    "endpoint": "/users/v1/{username}/email",
+    "method": "PUT",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  },
+  {
+    "id": "test_12",
+    "name": "test_5",
+    "endpoint": "/users/v1/{username}",
+    "method": "DELETE",
+    "type": "fault",
+    "request": {
+      "headers": {},
+      "data": {}
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": {}
+    }
+  }
+]
