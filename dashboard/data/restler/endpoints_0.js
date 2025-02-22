@@ -1,16 +1,74 @@
 window.RestlerEndpoints0 = [
   {
-    "path": "/api/products",
+    "path": "/users/v1/{username}",
     "method": "GET",
-    "total_requests": 25,
-    "success_rate": 95,
-    "type": "hit"
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
   },
   {
-    "path": "/api/orders",
+    "path": "/createdb",
+    "method": "GET",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1/{username}/password",
+    "method": "PUT",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1/_debug",
+    "method": "GET",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1/login",
     "method": "POST",
-    "total_requests": 15,
-    "success_rate": 85,
-    "type": "hit"
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1",
+    "method": "GET",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1/{username}/email",
+    "method": "PUT",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "/users/v1/{username}",
+    "method": "DELETE",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
+  },
+  {
+    "path": "",
+    "method": "GET",
+    "total_requests": 0,
+    "success_rate": 0,
+    "type": "unspecified",
+    "status_codes": {}
   }
 ];

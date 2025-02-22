@@ -1,98 +1,110 @@
 [
   {
-    "id": "test_7",
-    "name": "test_0",
-    "endpoint": "/books/v1/{book_title}",
-    "method": "GET",
-    "type": "fault",
-    "request": {
-      "headers": {},
-      "data": {}
-    },
-    "response": {
-      "status_code": 401,
-      "headers": {},
-      "body": {}
-    }
-  },
-  {
     "id": "test_8",
-    "name": "test_1",
-    "endpoint": "/me",
-    "method": "GET",
+    "name": "test_0",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/books/v1/{book_title}",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 401,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "test_9",
-    "name": "test_2",
-    "endpoint": "/books/v1",
-    "method": "POST",
+    "name": "test_1",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/me",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 401,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "test_10",
-    "name": "test_3",
-    "endpoint": "/users/v1/{username}/password",
-    "method": "PUT",
+    "name": "test_2",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "POST",
+      "path": "/books/v1",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 401,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "test_11",
-    "name": "test_4",
-    "endpoint": "/users/v1/{username}/email",
-    "method": "PUT",
+    "name": "test_3",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "PUT",
+      "path": "/users/v1/{username}/password",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 401,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "test_12",
-    "name": "test_5",
-    "endpoint": "/users/v1/{username}",
-    "method": "DELETE",
+    "name": "test_4",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "PUT",
+      "path": "/users/v1/{username}/email",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 401,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
+    }
+  },
+  {
+    "id": "test_13",
+    "name": "test_5",
+    "type": "fault",
+    "timestamp": null,
+    "request": {
+      "method": "DELETE",
+      "path": "/users/v1/{username}",
+      "headers": {},
+      "body": ""
+    },
+    "response": {
+      "status_code": 401,
+      "headers": {},
+      "body": "",
+      "error_type": "fault"
     }
   }
 ]

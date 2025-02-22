@@ -1,30 +1,122 @@
 window.EvomasterEndpoints0 = [
   {
-    "path": "/api/users/register",
-    "method": "POST",
-    "status_code": 200,
-    "type": "hit",
-    "name": "test_0"
-  },
-  {
-    "path": "/api/products/1",
+    "path": "/users/v1/_debug",
     "method": "GET",
-    "status_code": 200,
+    "total_requests": 1,
+    "success_rate": 100.0,
     "type": "hit",
-    "name": "test_1"
+    "status_codes": {
+      "200": 1
+    }
   },
   {
-    "path": "/api/users/register",
-    "method": "POST",
-    "status_code": 400,
-    "type": "miss",
-    "name": "test_0"
-  },
-  {
-    "path": "/api/admin/users",
+    "path": "/users/v1",
     "method": "GET",
-    "status_code": 401,
+    "total_requests": 1,
+    "success_rate": 100.0,
+    "type": "hit",
+    "status_codes": {
+      "200": 1
+    }
+  },
+  {
+    "path": "/",
+    "method": "GET",
+    "total_requests": 1,
+    "success_rate": 100.0,
+    "type": "hit",
+    "status_codes": {
+      "200": 1
+    }
+  },
+  {
+    "path": "/createdb",
+    "method": "GET",
+    "total_requests": 1,
+    "success_rate": 100.0,
+    "type": "hit",
+    "status_codes": {
+      "200": 1
+    }
+  },
+  {
+    "path": "/users/v1/{username}",
+    "method": "GET",
+    "total_requests": 1,
+    "success_rate": 100.0,
+    "type": "hit",
+    "status_codes": {
+      "200": 1
+    }
+  },
+  {
+    "path": "/users/v1/login",
+    "method": "POST",
+    "total_requests": 1,
+    "success_rate": 100.0,
+    "type": "hit",
+    "status_codes": {
+      "200": 1
+    }
+  },
+  {
+    "path": "/books/v1/{book_title}",
+    "method": "GET",
+    "total_requests": 1,
+    "success_rate": 0.0,
     "type": "miss",
-    "name": "test_1"
+    "status_codes": {
+      "401": 1
+    }
+  },
+  {
+    "path": "/me",
+    "method": "GET",
+    "total_requests": 1,
+    "success_rate": 0.0,
+    "type": "miss",
+    "status_codes": {
+      "401": 1
+    }
+  },
+  {
+    "path": "/books/v1",
+    "method": "POST",
+    "total_requests": 1,
+    "success_rate": 0.0,
+    "type": "miss",
+    "status_codes": {
+      "401": 1
+    }
+  },
+  {
+    "path": "/users/v1/{username}/password",
+    "method": "PUT",
+    "total_requests": 1,
+    "success_rate": 0.0,
+    "type": "miss",
+    "status_codes": {
+      "401": 1
+    }
+  },
+  {
+    "path": "/users/v1/{username}/email",
+    "method": "PUT",
+    "total_requests": 1,
+    "success_rate": 0.0,
+    "type": "miss",
+    "status_codes": {
+      "401": 1
+    }
+  },
+  {
+    "path": "/users/v1/{username}",
+    "method": "DELETE",
+    "total_requests": 1,
+    "success_rate": 0.0,
+    "type": "miss",
+    "status_codes": {
+      "401": 1
+    }
   }
 ];

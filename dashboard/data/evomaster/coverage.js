@@ -1,27 +1,23 @@
 window.EvomasterCoverage = {
   "status_distribution": {
-    "hits": 2,
-    "misses": 2,
+    "hits": 12,
+    "misses": 0,
     "unspecified": 0
   },
   "method_coverage": {
-    "GET": 2,
+    "GET": 7,
     "POST": 2,
-    "PUT": 0,
-    "DELETE": 0
+    "PUT": 2,
+    "DELETE": 1
   },
   "status_codes": [
     {
       "status": "200",
-      "count": 2
+      "count": 6
     },
     {
       "status": "401",
-      "count": 1
-    },
-    {
-      "status": "400",
-      "count": 1
+      "count": 6
     }
   ]
 };

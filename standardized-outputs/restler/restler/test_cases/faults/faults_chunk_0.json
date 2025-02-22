@@ -1,178 +1,164 @@
 [
   {
-    "id": "bug_1",
-    "name": "bug_buckets",
-    "endpoint": "",
-    "method": "GET",
-    "type": "fault",
-    "request": {
-      "headers": {},
-      "data": {}
-    },
-    "response": {
-      "status_code": 500,
-      "headers": {},
-      "body": {}
-    }
-  },
-  {
     "id": "bug_2",
     "name": "InvalidValueChecker_500_1",
-    "endpoint": "/users/v1/{username}",
-    "method": "GET",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1/{username}",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_3",
     "name": "main_driver_500_1",
-    "endpoint": "/users/v1/_debug",
-    "method": "GET",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1/_debug",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_4",
     "name": "main_driver_500_2",
-    "endpoint": "/users/v1/{username}",
-    "method": "GET",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1/{username}",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_5",
     "name": "main_driver_500_3",
-    "endpoint": "/createdb",
-    "method": "GET",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/createdb",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
-    }
-  },
-  {
-    "id": "bug_6",
-    "name": "main_driver_500_4",
-    "endpoint": "",
-    "method": "GET",
-    "type": "fault",
-    "request": {
-      "headers": {},
-      "data": {}
-    },
-    "response": {
-      "status_code": 500,
-      "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_7",
     "name": "main_driver_500_5",
-    "endpoint": "/users/v1",
-    "method": "GET",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_8",
     "name": "main_driver_500_6",
-    "endpoint": "/users/v1/login",
-    "method": "POST",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "POST",
+      "path": "/users/v1/login",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_9",
     "name": "main_driver_500_7",
-    "endpoint": "/users/v1/{username}",
-    "method": "DELETE",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "DELETE",
+      "path": "/users/v1/{username}",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_10",
     "name": "main_driver_500_8",
-    "endpoint": "/users/v1/{username}/email",
-    "method": "PUT",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "PUT",
+      "path": "/users/v1/{username}/email",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   },
   {
     "id": "bug_11",
     "name": "main_driver_500_9",
-    "endpoint": "/users/v1/{username}/password",
-    "method": "PUT",
     "type": "fault",
+    "timestamp": null,
     "request": {
+      "method": "PUT",
+      "path": "/users/v1/{username}/password",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 500,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": "fault"
     }
   }
 ]

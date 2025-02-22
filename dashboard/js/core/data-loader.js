@@ -60,15 +60,29 @@ class DataLoader {
     }
 
     validateEndpoint(endpoint) {
-        return (
+        const valid = (
             endpoint &&
             typeof endpoint === 'object' &&
             typeof endpoint.path === 'string' &&
             typeof endpoint.method === 'string' &&
             typeof endpoint.total_requests === 'number' &&
             typeof endpoint.success_rate === 'number' &&
-            typeof endpoint.type === 'string'
+            typeof endpoint.type === 'string' &&
+            typeof endpoint.status_codes === 'object'
         );
+
+        if (!valid) {
+            console.error('Invalid endpoint structure:', endpoint);
+            return false;
+        }
+
+        // Validate type value
+        if (!['hit', 'miss', 'unspecified', 'partial'].includes(endpoint.type)) {
+            console.error('Invalid endpoint type:', endpoint.type);
+            return false;
+        }
+
+        return true;
     }
 }
 

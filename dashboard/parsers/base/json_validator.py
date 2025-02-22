@@ -1,25 +1,94 @@
 """JSON schema validation for fuzzer output data."""
 
-from typing import Any, Dict, List
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Type, Union, Tuple
 
 @dataclass
 class ValidationError:
-    """Represents a validation error."""
+    """Represents a validation error.
+    
+    Args:
+        path: Path to the field with error
+        message: Error message
+        value: Optional value that caused the error
+        severity: Error severity level
+    """
     path: str
     message: str
     value: Any = None
+    severity: str = 'error'
 
 class JsonValidator:
     """Validates JSON data against expected schemas."""
     
-    @staticmethod
-    def validate_metadata(data: Dict[str, Any]) -> List[ValidationError]:
+    def _validate_type(
+        self,
+        value: Any,
+        expected_type: Union[Type, Tuple[Type, ...]],
+        path: str
+    ) -> Optional[ValidationError]:
+        """Validate value type with better error messages.
+        
+        Args:
+            value: Value to validate
+            expected_type: Expected type or tuple of types
+            path: Field path for error reporting
+            
+        Returns:
+            ValidationError if validation fails, None otherwise
+        """
+        if not isinstance(value, expected_type):
+            type_name = expected_type.__name__ if isinstance(expected_type, type) else str(expected_type)
+            return ValidationError(
+                path=path,
+                message=f'Invalid type: expected {type_name}, got {type(value).__name__}',
+                value=value
+            )
+        return None
+
+    def _validate_dict_fields(
+        self,
+        data: Dict[str, Any],
+        required_fields: Dict[str, Type],
+        optional_fields: Dict[str, Type],
+        path: str
+    ) -> List[ValidationError]:
+        """Validate dictionary fields with support for optional fields.
+        
+        Args:
+            data: Dictionary to validate
+            required_fields: Required field names and types
+            optional_fields: Optional field names and types
+            path: Base path for error reporting
+            
+        Returns:
+            List of validation errors
+        """
+        errors = []
+        
+        # Check required fields
+        for field, field_type in required_fields.items():
+            if field not in data:
+                errors.append(ValidationError(
+                    path=f'{path}.{field}',
+                    message=f'Missing required field: {field}'
+                ))
+            elif error := self._validate_type(data[field], field_type, f'{path}.{field}'):
+                errors.append(error)
+                
+        # Check optional fields if present
+        for field, field_type in optional_fields.items():
+            if field in data and (error := self._validate_type(data[field], field_type, f'{path}.{field}')):
+                errors.append(error)
+                
+        return errors
+
+    def validate_metadata(self, data: Dict[str, Any]) -> List[ValidationError]:
         """Validate metadata structure.
         
         Args:
             data: Metadata dictionary to validate
-        
+            
         Returns:
             List of validation errors (empty if valid)
         """
@@ -33,22 +102,16 @@ class JsonValidator:
             required_fuzzer_fields = {
                 'name': str,
                 'timestamp': str,
-                'duration': str,
                 'total_requests': int,
-                'critical_issues': int
+                'success_count': int,
+                'failure_count': int
             }
-            for field, field_type in required_fuzzer_fields.items():
-                if field not in fuzzer:
-                    errors.append(ValidationError(
-                        f'metadata.fuzzer.{field}',
-                        f'Missing required field: {field}'
-                    ))
-                elif not isinstance(fuzzer[field], field_type):
-                    errors.append(ValidationError(
-                        f'metadata.fuzzer.{field}',
-                        f'Invalid type: expected {field_type.__name__}, got {type(fuzzer[field]).__name__}',
-                        fuzzer[field]
-                    ))
+            errors.extend(self._validate_dict_fields(
+                fuzzer,
+                required_fuzzer_fields,
+                {},  # No optional fields
+                'metadata.fuzzer'
+            ))
         
         # Check summary section
         if 'summary' not in data:
@@ -57,78 +120,45 @@ class JsonValidator:
             summary = data['summary']
             required_summary_fields = {
                 'endpoints_tested': int,
-                'success_rate': (int, float),
-                'coverage': dict
+                'success_rate': (int, float)
             }
-            for field, field_type in required_summary_fields.items():
-                if field not in summary:
-                    errors.append(ValidationError(
-                        f'metadata.summary.{field}',
-                        f'Missing required field: {field}'
-                    ))
-                elif not isinstance(summary[field], field_type):
-                    type_name = field_type.__name__ if isinstance(field_type, type) else str(field_type)
-                    errors.append(ValidationError(
-                        f'metadata.summary.{field}',
-                        f'Invalid type: expected {type_name}, got {type(summary[field]).__name__}',
-                        summary[field]
-                    ))
+            optional_summary_fields = {
+                'coverage': dict  # Some fuzzers might not provide coverage
+            }
+            errors.extend(self._validate_dict_fields(
+                summary,
+                required_summary_fields,
+                optional_summary_fields,
+                'metadata.summary'
+            ))
             
-            # Validate coverage if present
-            if 'coverage' in summary:
-                coverage = summary['coverage']
-                required_coverage_fields = {
-                    'lines': int,
-                    'functions': int,
-                    'branches': int,
-                    'statements': int
-                }
-                for field, field_type in required_coverage_fields.items():
-                    if field not in coverage:
-                        errors.append(ValidationError(
-                            f'metadata.summary.coverage.{field}',
-                            f'Missing required field: {field}'
-                        ))
-                    elif not isinstance(coverage[field], field_type):
-                        errors.append(ValidationError(
-                            f'metadata.summary.coverage.{field}',
-                            f'Invalid type: expected {field_type.__name__}, got {type(coverage[field]).__name__}',
-                            coverage[field]
-                        ))
-        
         return errors
-    
-    @staticmethod
-    def validate_endpoint(endpoint: Dict[str, Any]) -> List[ValidationError]:
+
+    def validate_endpoint(self, endpoint: Dict[str, Any]) -> List[ValidationError]:
         """Validate endpoint structure.
         
         Args:
             endpoint: Endpoint dictionary to validate
-        
+            
         Returns:
             List of validation errors (empty if valid)
         """
         errors = []
         
+        # Validate basic fields
         required_fields = {
             'path': str,
             'method': str,
             'statistics': dict
         }
+        errors.extend(self._validate_dict_fields(
+            endpoint,
+            required_fields,
+            {},  # No optional fields
+            'endpoint'
+        ))
         
-        for field, field_type in required_fields.items():
-            if field not in endpoint:
-                errors.append(ValidationError(
-                    f'endpoint.{field}',
-                    f'Missing required field: {field}'
-                ))
-            elif not isinstance(endpoint[field], field_type):
-                errors.append(ValidationError(
-                    f'endpoint.{field}',
-                    f'Invalid type: expected {field_type.__name__}, got {type(endpoint[field]).__name__}',
-                    endpoint[field]
-                ))
-        
+        # Validate statistics if present
         if 'statistics' in endpoint:
             stats = endpoint['statistics']
             required_stats = {
@@ -136,34 +166,44 @@ class JsonValidator:
                 'success_rate': (int, float),
                 'status_codes': dict
             }
-            for field, field_type in required_stats.items():
-                if field not in stats:
+            errors.extend(self._validate_dict_fields(
+                stats,
+                required_stats,
+                {},  # No optional fields
+                'endpoint.statistics'
+            ))
+            
+            # Validate status codes
+            if 'status_codes' in stats:
+                status_codes = stats['status_codes']
+                if not isinstance(status_codes, dict):
                     errors.append(ValidationError(
-                        f'endpoint.statistics.{field}',
-                        f'Missing required field: {field}'
+                        'endpoint.statistics.status_codes',
+                        'Status codes must be a dictionary'
                     ))
-                elif not isinstance(stats[field], field_type):
-                    type_name = field_type.__name__ if isinstance(field_type, type) else str(field_type)
-                    errors.append(ValidationError(
-                        f'endpoint.statistics.{field}',
-                        f'Invalid type: expected {type_name}, got {type(stats[field]).__name__}',
-                        stats[field]
-                    ))
+                else:
+                    for code, count in status_codes.items():
+                        if not isinstance(count, int):
+                            errors.append(ValidationError(
+                                f'endpoint.statistics.status_codes.{code}',
+                                'Status code count must be an integer',
+                                count
+                            ))
         
         return errors
-    
-    @staticmethod
-    def validate_test_case(test_case: Dict[str, Any]) -> List[ValidationError]:
+
+    def validate_test_case(self, test_case: Dict[str, Any]) -> List[ValidationError]:
         """Validate test case structure.
         
         Args:
             test_case: Test case dictionary to validate
-        
+            
         Returns:
             List of validation errors (empty if valid)
         """
         errors = []
         
+        # Validate basic fields
         required_fields = {
             'id': str,
             'name': str,
@@ -173,19 +213,12 @@ class JsonValidator:
             'request': dict,
             'response': dict
         }
-        
-        for field, field_type in required_fields.items():
-            if field not in test_case:
-                errors.append(ValidationError(
-                    f'test_case.{field}',
-                    f'Missing required field: {field}'
-                ))
-            elif not isinstance(test_case[field], field_type):
-                errors.append(ValidationError(
-                    f'test_case.{field}',
-                    f'Invalid type: expected {field_type.__name__}, got {type(test_case[field]).__name__}',
-                    test_case[field]
-                ))
+        errors.extend(self._validate_dict_fields(
+            test_case,
+            required_fields,
+            {},  # No optional fields
+            'test_case'
+        ))
         
         # Validate type value
         if 'type' in test_case and test_case['type'] not in ['success', 'fault']:
@@ -193,6 +226,38 @@ class JsonValidator:
                 'test_case.type',
                 "Type must be either 'success' or 'fault'",
                 test_case['type']
+            ))
+        
+        # Validate request if present
+        if 'request' in test_case:
+            request = test_case['request']
+            optional_request_fields = {
+                'headers': dict,
+                'body': str
+            }
+            errors.extend(self._validate_dict_fields(
+                request,
+                {},  # No required fields
+                optional_request_fields,
+                'test_case.request'
+            ))
+        
+        # Validate response if present
+        if 'response' in test_case:
+            response = test_case['response']
+            required_response_fields = {
+                'status_code': int
+            }
+            optional_response_fields = {
+                'headers': dict,
+                'body': str,
+                'error_type': str
+            }
+            errors.extend(self._validate_dict_fields(
+                response,
+                required_response_fields,
+                optional_response_fields,
+                'test_case.response'
             ))
         
         return errors

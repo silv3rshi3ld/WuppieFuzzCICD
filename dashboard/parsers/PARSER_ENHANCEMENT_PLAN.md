@@ -1,205 +1,174 @@
-# Parser Enhancement Plan - JSON Generation
+# Parser Enhancement Plan for Better Issue Categorization
 
-## Data Analysis
+## Current Limitations
 
-### Common Patterns Across Fuzzers
-1. All fuzzers track:
-   - Total requests
-   - Critical issues
-   - Duration/timing information
-   - Endpoint-specific statistics
-   - Status code distributions
-   - Test case results
+The standardized outputs currently lack critical information needed for proper issue categorization:
 
-2. Format Differences:
-   - WuppieFuzz: Structured JSON with detailed endpoint stats
-   - RESTler: Similar JSON structure with focus on API testing
-   - EvoMaster: Python test files with embedded metadata
+1. Response Details
+   - No response bodies
+   - Missing error messages and stack traces
+   - No SQL error information
+   - No memory corruption details
 
-## Standardized JSON Structure
+2. Server Health Metrics
+   - No CPU/memory usage data
+   - No server restart information
+   - No connection status details
 
-### 1. Core JSON Format
+3. Sanitizer Information
+   - No ASAN/UBSAN reports
+   - No memory corruption flags
+
+## Required Enhancements
+
+### 1. Parser Modifications
+
+Each fuzzer parser needs to be updated to capture:
+
+#### WuppieFuzz Parser
+```python
+class WuppieFuzzParser:
+    def parse_response(self, response):
+        return {
+            "status_code": response.status,
+            "body": response.body,  # Add full response body
+            "error_details": {
+                "stack_trace": extract_stack_trace(response.body),
+                "sql_errors": extract_sql_errors(response.body),
+                "memory_issues": extract_memory_issues(response.body)
+            },
+            "server_metrics": {
+                "cpu_usage": get_cpu_metrics(),
+                "memory_usage": get_memory_metrics(),
+                "restarts": detect_restarts()
+            }
+        }
+```
+
+#### RESTler Parser
+```python
+class RestlerParser:
+    def parse_bug_bucket(self, bucket):
+        return {
+            "status_code": bucket.status_code,
+            "response_body": bucket.response,  # Add full response
+            "sanitizer_output": parse_sanitizer_output(bucket.logs),
+            "server_health": extract_server_metrics(bucket.metadata)
+        }
+```
+
+#### EvoMaster Parser
+```python
+class EvoMasterParser:
+    def parse_test_result(self, result):
+        return {
+            "status_code": result.status,
+            "response": result.body,  # Add full response
+            "error_info": parse_error_info(result.logs),
+            "metrics": collect_execution_metrics(result)
+        }
+```
+
+### 2. Standardized Output Format Update
+
+Update the JSON schema to include new fields:
 
 ```json
 {
-  "metadata": {
-    "fuzzer": {
-      "name": "string",
-      "timestamp": "string",
-      "duration": "string",
-      "total_requests": "number",
-      "critical_issues": "number"
+  "test_case": {
+    "id": "string",
+    "name": "string",
+    "endpoint": "string",
+    "method": "string",
+    "type": "string",
+    "request": {
+      "headers": {},
+      "data": {}
     },
-    "summary": {
-      "endpoints_tested": "number",
-      "success_rate": "number",
-      "coverage": {
-        "lines": "number",
-        "functions": "number",
-        "branches": "number",
-        "statements": "number"
+    "response": {
+      "status_code": "number",
+      "headers": {},
+      "body": "string",  // Full response body
+      "error_details": {
+        "stack_trace": "string",
+        "sql_errors": ["string"],
+        "memory_issues": ["string"]
       }
+    },
+    "server_metrics": {
+      "cpu_usage": "number",
+      "memory_usage": "number",
+      "restarts": "number"
+    },
+    "sanitizer_output": {
+      "asan_reports": ["string"],
+      "ubsan_reports": ["string"]
     }
-  },
-  "endpoints": [
-    {
-      "path": "string",
-      "method": "string",
-      "statistics": {
-        "total_requests": "number",
-        "success_rate": "number",
-        "status_codes": {
-          "200": "number",
-          "404": "number",
-          "500": "number"
-          // etc
-        }
-      }
-    }
-  ],
-  "test_cases": [
-    {
-      "id": "string",
-      "name": "string",
-      "endpoint": "string",
-      "method": "string",
-      "type": "success|fault",
-      "request": {
-        "headers": "object?",
-        "data": "object?"
-      },
-      "response": {
-        "status_code": "number",
-        "body": "object?"
-      },
-      "assertions": [
-        {
-          "type": "string",
-          "expected": "any",
-          "actual": "any",
-          "passed": "boolean"
-        }
-      ]
-    }
-  ]
+  }
 }
 ```
 
-### 2. Chunking Strategy
+### 3. Categorization Logic
 
+Implement severity scoring based on enhanced data:
+
+```python
+def categorize_issue(test_case):
+    severity = "Low"
+    evidence = []
+    
+    # Critical Issues
+    if test_case.response.status_code >= 500:
+        if test_case.response.error_details.stack_trace:
+            severity = "Critical"
+            evidence.append("Stack trace found")
+        if test_case.sanitizer_output.asan_reports:
+            severity = "Critical"
+            evidence.append("Memory corruption detected")
+            
+    # Suspicious Behavior
+    elif test_case.response.status_code >= 400:
+        if "sql error" in test_case.response.body.lower():
+            severity = "High"
+            evidence.append("SQL error detected")
+        if test_case.server_metrics.restarts > 0:
+            severity = "High"
+            evidence.append("Server restart detected")
+            
+    return {
+        "severity": severity,
+        "evidence": evidence,
+        "reproducible": test_case.occurrences > 1
+    }
 ```
-output/
-├── {fuzzer_name}/
-│   ├── metadata.json              # Core fuzzer metadata
-│   ├── endpoints/
-│   │   ├── chunk_0.json          # 50 endpoints per file
-│   │   └── chunk_n.json
-│   └── test_cases/
-       ├── success/
-       │   ├── chunk_0.json       # 100 test cases per file
-       │   └── chunk_n.json
-       └── faults/
-           ├── chunk_0.json
-           └── chunk_n.json
-```
 
-## Parser Implementation Steps
+## Implementation Steps
 
-### 1. WuppieFuzz Parser
-- Input: report.json
-- Process:
-  1. Extract metadata and coverage info
-  2. Transform endpoint statistics
-  3. Convert test cases to standard format
-  4. Generate chunked output files
+1. Update Parser Classes
+   - Modify each fuzzer parser to collect additional data
+   - Add new parsing functions for error details
+   - Implement server metric collection
 
-### 2. RESTler Parser
-- Input: testing_summary.json
-- Process:
-  1. Parse summary data for metadata
-  2. Extract endpoint information
-  3. Transform test cases
-  4. Generate chunked files
+2. Update Output Format
+   - Extend JSON schema
+   - Update chunking logic for larger responses
+   - Add validation for new fields
 
-### 3. EvoMaster Parser
-- Input: EvoMaster_*_Test.py files
-- Process:
-  1. Parse test file comments for metadata
-  2. Extract test cases and assertions
-  3. Separate successes and faults
-  4. Generate standardized JSON output
+3. Enhance Dashboard
+   - Add severity visualization
+   - Create detailed error views
+   - Implement filtering by severity
 
-## Implementation Plan
+4. Testing
+   - Create test cases with various error types
+   - Validate parser enhancements
+   - Verify categorization logic
 
-### Phase 1: Base Infrastructure (Week 1)
-1. Create base chunking utility
-   - File size monitoring
-   - JSON chunk writer
-   - Directory structure creation
+## Timeline
 
-2. Implement common utilities
-   - JSON validators
-   - Data transformers
-   - File handlers
+1. Parser Updates: 2-3 days
+2. Output Format Changes: 1-2 days
+3. Dashboard Enhancements: 2-3 days
+4. Testing and Validation: 2-3 days
 
-### Phase 2: Parser Implementation (Week 2-3)
-1. WuppieFuzz Parser (3 days)
-   - Implement core parser
-   - Add chunking support
-   - Test with sample data
-
-2. RESTler Parser (3 days)
-   - Implement core parser
-   - Add chunking support
-   - Test with sample data
-
-3. EvoMaster Parser (4 days)
-   - Implement test file parser
-   - Extract metadata from comments
-   - Add chunking support
-   - Test with sample data
-
-### Phase 3: Testing & Validation (Week 4)
-1. Unit Tests
-   - Test each parser individually
-   - Validate output format
-   - Check chunking behavior
-
-2. Integration Tests
-   - Test all parsers together
-   - Verify consistent output
-   - Check file structure
-
-3. Performance Testing
-   - Test with large datasets
-   - Monitor memory usage
-   - Verify chunking efficiency
-
-## Success Criteria
-
-1. Data Completeness
-   - All important information extracted
-   - No data loss during conversion
-   - Consistent format across fuzzers
-
-2. File Management
-   - Proper chunking of large datasets
-   - Organized directory structure
-   - Efficient file handling
-
-3. Data Validation
-   - Valid JSON output
-   - Correct data types
-   - Required fields present
-
-4. Performance
-   - Efficient memory usage
-   - Reasonable processing time
-   - Proper handling of large files
-
-## Next Steps
-
-1. Review and approve JSON structure
-2. Implement base chunking utility
-3. Start with WuppieFuzz parser
-4. Create validation tools
+Total Estimated Time: 7-11 days

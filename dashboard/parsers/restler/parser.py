@@ -1,38 +1,130 @@
 """Parser for RESTler results."""
 
-import json
 import os
+import json
 import glob
 from datetime import datetime
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Any
 
-from ..base.json_chunker import JsonChunker
-from ..base.json_validator import JsonValidator
+from ..base.base_parser import BaseParser
+from ..base.standardized_types import (
+    StandardizedRequest,
+    StandardizedResponse,
+    TestMetadata,
+    StandardizedTestCase,
+    StandardizedEndpoint,
+    EndpointStatistics
+)
 
-class RestlerParser:
+class RestlerParser(BaseParser):
     """Parser for RESTler output data."""
     
     def __init__(self, input_path: str, output_dir: str):
-        """Initialize the parser.
+        """Initialize parser.
         
         Args:
             input_path: Path to RESTler output directory
             output_dir: Directory to save parsed results
         """
-        self.input_path = input_path
-        self.output_dir = output_dir
-        self.chunker = JsonChunker(output_dir, 'Restler')
-        self.validator = JsonValidator()
-        
-    def _find_experiment_dirs(self) -> List[str]:
-        """Find all experiment directories.
+        super().__init__(input_path, output_dir, 'Restler')
+
+    def _load_raw_data(self) -> Dict[str, Any]:
+        """Load raw data from RESTler output.
         
         Returns:
-            List[str]: List of experiment directory paths
+            Dict containing raw fuzzer output data
+            
+        Raises:
+            FileNotFoundError: If required files are missing
+            json.JSONDecodeError: If JSON parsing fails
+            ValueError: If data is invalid
         """
+        # Find experiment directories
         experiment_pattern = os.path.join(self.input_path, 'RestlerResults', 'experiment*')
-        return sorted(glob.glob(experiment_pattern))
+        experiment_dirs = sorted(glob.glob(experiment_pattern))
+        if not experiment_dirs:
+            raise FileNotFoundError("No experiment directories found")
+            
+        # Load response data
+        response_data = self._load_response_data()
+        if not response_data:
+            raise FileNotFoundError("No response data found")
+            
+        # Load bugs from all experiments
+        all_bugs = []
+        coverage_data = {}
+        for exp_dir in experiment_dirs:
+            bugs = self._load_bug_buckets(exp_dir)
+            all_bugs.extend(bugs)
+            
+            # Load coverage data from experiment
+            exp_coverage = self._load_experiment_coverage(exp_dir)
+            coverage_data.update(exp_coverage)
+            
+        return {
+            'response_data': response_data,
+            'bugs': all_bugs,
+            'coverage': coverage_data
+        }
+
+    def _load_experiment_coverage(self, experiment_dir: str) -> Dict[str, int]:
+        """Load coverage data from experiment directory.
         
+        Args:
+            experiment_dir: Path to experiment directory
+            
+        Returns:
+            Dictionary containing coverage data
+        """
+        coverage = {
+            'lines': 0,
+            'functions': 0,
+            'branches': 0,
+            'statements': 0
+        }
+        
+        # Try to load coverage from experiment logs
+        log_file = os.path.join(experiment_dir, 'EngineStdOut.txt')
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                log_content = f.read()
+                
+                # Extract coverage metrics from log
+                if 'Coverage:' in log_content:
+                    coverage_section = log_content.split('Coverage:')[1].split('\n')[0]
+                    try:
+                        # Parse coverage percentages
+                        coverage['lines'] = int(coverage_section.split('lines:')[1].split('%')[0].strip())
+                        coverage['functions'] = int(coverage_section.split('functions:')[1].split('%')[0].strip())
+                        coverage['branches'] = int(coverage_section.split('branches:')[1].split('%')[0].strip())
+                        coverage['statements'] = coverage['lines']  # Use line coverage as statement coverage
+                    except (IndexError, ValueError):
+                        pass
+                        
+        return coverage
+
+    def _load_response_data(self) -> Dict[str, Any]:
+        """Load response bucket data.
+        
+        Returns:
+            Dict containing summary and error buckets
+        """
+        response_data = {}
+        
+        # Load runSummary.json
+        summary_file = os.path.join(self.input_path, 'ResponseBuckets', 'runSummary.json')
+        if os.path.exists(summary_file):
+            with open(summary_file, 'r') as f:
+                response_data['summary'] = json.load(f)
+                
+        # Load errorBuckets.json
+        error_file = os.path.join(self.input_path, 'ResponseBuckets', 'errorBuckets.json')
+        if os.path.exists(error_file):
+            with open(error_file, 'r') as f:
+                response_data['errors'] = json.load(f)
+                
+        return response_data
+
     def _load_bug_buckets(self, experiment_dir: str) -> List[Dict[str, Any]]:
         """Load bug bucket data from an experiment directory.
         
@@ -40,7 +132,7 @@ class RestlerParser:
             experiment_dir: Path to experiment directory
             
         Returns:
-            List[Dict[str, Any]]: List of bug data
+            List of bug data dictionaries
         """
         bugs = []
         bug_buckets_dir = os.path.join(experiment_dir, 'bug_buckets')
@@ -48,290 +140,281 @@ class RestlerParser:
         # Load Bugs.json
         bugs_file = os.path.join(bug_buckets_dir, 'Bugs.json')
         if os.path.exists(bugs_file):
-            try:
-                with open(bugs_file, 'r') as f:
-                    bug_list = json.load(f)
-                    if isinstance(bug_list, list):
-                        for bug_data in bug_list:
-                            if isinstance(bug_data, dict):
-                                bugs.append(bug_data)
-                            else:
-                                print(f"Warning: Bug data in {bugs_file} is not a dictionary")
-                    else:
-                        print(f"Warning: {bugs_file} does not contain a list of bugs")
-            except json.JSONDecodeError:
-                print(f"Warning: Could not parse {bugs_file}")
+            with open(bugs_file, 'r') as f:
+                bug_list = json.load(f)
+                if isinstance(bug_list, list):
+                    bugs.extend(bug_list)
         
         # Load individual bug bucket files
         bucket_files = glob.glob(os.path.join(bug_buckets_dir, '*.json'))
         for file in bucket_files:
             if os.path.basename(file) != 'Bugs.json':
-                try:
-                    with open(file, 'r') as f:
-                        # Extract bug type from filename (e.g., "InvalidDynamicObjectChecker_500_1.json")
+                with open(file, 'r') as f:
+                    bug_data = json.load(f)
+                    if isinstance(bug_data, dict):
+                        # Extract bug type from filename
                         bug_type = os.path.splitext(os.path.basename(file))[0]
-                        bug_data = json.load(f)
-                        if isinstance(bug_data, dict):
-                            bug_data['bug_type'] = bug_type
-                            bugs.append(bug_data)
-                        else:
-                            print(f"Warning: Bug data in {file} is not a dictionary")
-                except json.JSONDecodeError:
-                    print(f"Warning: Could not parse {file}")
-                    
+                        bug_data['bug_type'] = bug_type
+                        bugs.append(bug_data)
+                        
         return bugs
-        
-    def _load_response_data(self) -> Dict[str, Any]:
-        """Load response bucket data.
-        
-        Returns:
-            Dict[str, Any]: Response data including summary and error buckets
-        """
-        response_data = {}
-        
-        # Load runSummary.json
-        summary_file = os.path.join(self.input_path, 'ResponseBuckets', 'runSummary.json')
-        if os.path.exists(summary_file):
-            try:
-                with open(summary_file, 'r') as f:
-                    response_data['summary'] = json.load(f)
-            except json.JSONDecodeError:
-                print(f"Warning: Could not parse {summary_file}")
-                
-        # Load errorBuckets.json
-        error_file = os.path.join(self.input_path, 'ResponseBuckets', 'errorBuckets.json')
-        if os.path.exists(error_file):
-            try:
-                with open(error_file, 'r') as f:
-                    response_data['errors'] = json.load(f)
-            except json.JSONDecodeError:
-                print(f"Warning: Could not parse {error_file}")
-                
-        return response_data
-        
-    def parse(self) -> bool:
-        """Parse RESTler results and generate standardized output.
-        
-        Returns:
-            bool: True if parsing was successful
-        """
-        try:
-            # Find all experiment directories
-            experiment_dirs = self._find_experiment_dirs()
-            if not experiment_dirs:
-                raise FileNotFoundError("No experiment directories found")
-            
-            # Load response data
-            response_data = self._load_response_data()
-            if not response_data:
-                raise FileNotFoundError("No response data found")
-            
-            # Collect bugs from all experiments
-            all_bugs = []
-            unique_endpoints = set()
-            for exp_dir in experiment_dirs:
-                bugs = self._load_bug_buckets(exp_dir)
-                all_bugs.extend(bugs)
-                # Track unique endpoints
-                for bug in bugs:
-                    if 'endpoint' in bug and 'verb' in bug:
-                        unique_endpoints.add(f"{bug['verb']} {bug['endpoint']}")
-            
-            # Transform and validate metadata
-            metadata = self._transform_metadata(response_data, len(unique_endpoints), len(all_bugs))
-            metadata_errors = self.validator.validate_metadata(metadata)
-            if metadata_errors:
-                for error in metadata_errors:
-                    print(f"Metadata validation error: {error.path} - {error.message}")
-                return False
-            
-            # Save metadata
-            self.chunker.save_metadata(metadata)
-            
-            # Transform and validate endpoints
-            endpoints = self._transform_endpoints(response_data, unique_endpoints)
-            for endpoint in endpoints:
-                endpoint_errors = self.validator.validate_endpoint(endpoint)
-                if endpoint_errors:
-                    for error in endpoint_errors:
-                        print(f"Endpoint validation error: {error.path} - {error.message}")
-                    return False
-            
-            # Save endpoints in chunks
-            self.chunker.chunk_endpoints(endpoints)
-            
-            # Transform and validate test cases
-            test_cases = self._transform_test_cases(all_bugs, response_data)
-            for test_case in test_cases:
-                test_case_errors = self.validator.validate_test_case(test_case)
-                if test_case_errors:
-                    for error in test_case_errors:
-                        print(f"Test case validation error: {error.path} - {error.message}")
-                    return False
-            
-            # Save test cases in chunks
-            self.chunker.chunk_test_cases(test_cases)
-            
-            return True
-            
-        except FileNotFoundError as e:
-            print(f"File not found error: {str(e)}")
-            return False
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {str(e)}")
-            return False
-        except (KeyError, ValueError) as e:
-            print(f"Data processing error: {str(e)}")
-            return False
-    
-    def _transform_metadata(self, response_data: Dict[str, Any], endpoint_count: int, bug_count: int) -> Dict[str, Any]:
-        """Transform RESTler metadata to standardized format.
+
+    def _transform_metadata(self, raw_data: Dict[str, Any]) -> TestMetadata:
+        """Transform RESTler metadata to standard format.
         
         Args:
-            response_data: Response bucket data
-            endpoint_count: Number of unique endpoints
-            bug_count: Number of unique bugs
-        
+            raw_data: Raw RESTler output data
+            
         Returns:
-            Standardized metadata dictionary
+            Standardized test metadata
         """
-        summary = response_data.get('summary', {})
+        summary = raw_data['response_data'].get('summary', {})
+        errors = raw_data['response_data'].get('errors', {})
+        coverage = raw_data.get('coverage', {})
         
-        return {
-            'fuzzer': {
+        # Count total requests and successes
+        total_requests = summary.get('total_requests', 0)
+        success_requests = summary.get('success_requests', 0)
+        
+        # Add requests from error buckets
+        for error_data in errors.values():
+            if isinstance(error_data, list):
+                for error in error_data:
+                    if isinstance(error, dict):
+                        total_requests += error.get('count', 1)
+            elif isinstance(error_data, dict):
+                total_requests += error_data.get('count', 1)
+        
+        # Calculate critical issues (500 errors)
+        critical_issues = 0
+        for error_type, error_data in errors.items():
+            if '_500_' in error_type:
+                if isinstance(error_data, list):
+                    critical_issues += sum(error.get('count', 1) for error in error_data)
+                else:
+                    critical_issues += error_data.get('count', 1)
+        
+        # Add critical issues from bug buckets
+        for bug in raw_data['bugs']:
+            if self._extract_status_code(bug) >= 500:
+                critical_issues += 1
+        
+        # Calculate unique endpoints
+        unique_endpoints = set()
+        for bug in raw_data['bugs']:
+            endpoint = bug.get('endpoint')
+            verb = bug.get('verb')
+            if endpoint and verb:
+                unique_endpoints.add((endpoint, verb))
+        
+        return TestMetadata(
+            timestamp=datetime.fromisoformat(summary.get('start_time', datetime.now().isoformat())),
+            total_requests=total_requests,
+            success_count=success_requests,
+            failure_count=total_requests - success_requests,
+            fuzzer_info={
                 'name': 'Restler',
-                'timestamp': summary.get('start_time', datetime.now().isoformat()),
-                'duration': summary.get('total_time', '0:00:00'),
-                'total_requests': summary.get('total_requests', 0),
-                'critical_issues': bug_count
+                'duration': summary.get('duration', '0'),
+                'critical_issues': critical_issues
             },
-            'summary': {
-                'endpoints_tested': endpoint_count,
-                'success_rate': self._calculate_success_rate(response_data),
+            summary={
+                'endpoints_tested': len(unique_endpoints),
+                'success_rate': (success_requests / total_requests * 100) if total_requests > 0 else 0,
                 'coverage': {
-                    'lines': summary.get('coverage', {}).get('lines', 0),
-                    'functions': summary.get('coverage', {}).get('functions', 0),
-                    'branches': summary.get('coverage', {}).get('branches', 0),
-                    'statements': summary.get('coverage', {}).get('statements', 0)
+                    'lines': coverage.get('lines', 0),
+                    'functions': coverage.get('functions', 0),
+                    'branches': coverage.get('branches', 0),
+                    'statements': coverage.get('statements', 0)
                 }
             }
-        }
-    
-    def _transform_endpoints(self, response_data: Dict[str, Any], unique_endpoints: Set[str]) -> List[Dict[str, Any]]:
-        """Transform endpoint data to standardized format.
+        )
+
+    def _transform_endpoints(self, raw_data: Dict[str, Any]) -> List[StandardizedEndpoint]:
+        """Transform endpoint data to standard format.
         
         Args:
-            response_data: Response bucket data
-            unique_endpoints: Set of unique endpoints found
-        
-        Returns:
-            List of standardized endpoint dictionaries
-        """
-        transformed = []
-        summary = response_data.get('summary', {})
-        endpoint_stats = summary.get('endpoint_stats', {})
-        
-        for endpoint in unique_endpoints:
-            # Extract method and path from endpoint string
-            if ' ' in endpoint:
-                method, path = endpoint.split(' ', 1)
-            else:
-                # If no method in endpoint string, try to find it in stats
-                path = endpoint
-                method = endpoint_stats.get(endpoint, {}).get('verb', 'GET')
+            raw_data: Raw RESTler output data
             
-            transformed.append({
-                'path': path,
-                'method': method.upper(),  # Ensure method is uppercase
-                'statistics': {
-                    'total_requests': endpoint_stats.get(endpoint, {}).get('requests', 0),
-                    'success_rate': endpoint_stats.get(endpoint, {}).get('success_rate', 0),
-                    'status_codes': endpoint_stats.get(endpoint, {}).get('status_codes', {})
-                }
-            })
+        Returns:
+            List of standardized endpoints
+        """
+        endpoints = {}  # Dict[Tuple[str, str], StandardizedEndpoint]
         
-        return transformed
-    
-    def _transform_test_cases(self, bugs: List[Dict[str, Any]], response_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Transform test cases to standardized format.
+        # Process error buckets to get status codes
+        errors = raw_data['response_data'].get('errors', {})
+        for error_type, error_data in errors.items():
+            if isinstance(error_data, list):
+                for error in error_data:
+                    if isinstance(error, dict):
+                        self._process_error_data(error, error_type, endpoints)
+            elif isinstance(error_data, dict):
+                self._process_error_data(error_data, error_type, endpoints)
+        
+        # Process bugs to get additional endpoints
+        for bug in raw_data['bugs']:
+            endpoint = bug.get('endpoint')
+            verb = bug.get('verb')
+            if endpoint and verb:
+                key = (endpoint, verb.upper())
+                if key not in endpoints:
+                    endpoints[key] = StandardizedEndpoint(
+                        path=endpoint,
+                        method=verb.upper(),
+                        statistics=EndpointStatistics()
+                    )
+                
+                # Update statistics
+                status_code = self._extract_status_code(bug)
+                endpoints[key].statistics.total_requests += 1
+                if 200 <= status_code < 300:
+                    endpoints[key].statistics.success_count += 1
+                else:
+                    endpoints[key].statistics.failure_count += 1
+                
+                # Update status code counts
+                status_str = str(status_code)
+                if status_str in endpoints[key].statistics.status_codes:
+                    endpoints[key].statistics.status_codes[status_str] += 1
+                else:
+                    endpoints[key].statistics.status_codes[status_str] = 1
+                    
+                # Calculate success rate
+                stats = endpoints[key].statistics
+                stats.success_rate = (stats.success_count / stats.total_requests * 100) if stats.total_requests > 0 else 0
+        
+        return list(endpoints.values())
+
+    def _transform_test_cases(self, raw_data: Dict[str, Any]) -> List[StandardizedTestCase]:
+        """Transform test cases to standard format.
         
         Args:
-            bugs: List of bug data
-            response_data: Response bucket data
-        
+            raw_data: Raw RESTler output data
+            
         Returns:
-            List of standardized test case dictionaries
+            List of standardized test cases
         """
-        transformed = []
+        test_cases = []
         
         # Transform bug cases
-        for i, bug in enumerate(bugs):
-            # Extract method from bug type (e.g., "InvalidDynamicObjectChecker_500_1" -> "GET")
-            bug_type = bug.get('bug_type', '')
-            method = 'GET'  # Default method
-            if 'verb' in bug:
-                method = bug['verb']
-            elif 'request' in bug:
-                method = bug['request'].get('method', 'GET')
-            elif '_' in bug_type:
-                # Try to extract method from bug type
-                for known_method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']:
-                    if known_method in bug_type:
-                        method = known_method
-                        break
+        for i, bug in enumerate(raw_data['bugs']):
+            endpoint = bug.get('endpoint')
+            verb = bug.get('verb')
+            if not endpoint or not verb:
+                continue
+            
+            # Extract basic info
+            method = verb.upper()
+            status_code = self._extract_status_code(bug)
+            
+            # Create request
+            request = StandardizedRequest(
+                method=method,
+                path=endpoint,
+                headers=bug.get('request_headers', {}) if 'request_headers' in bug else bug.get('request', {}).get('headers', {}),
+                body=bug.get('request_data', '') if 'request_data' in bug else bug.get('request', {}).get('body', '')
+            )
+            
+            # Create response
+            response = StandardizedResponse(
+                status_code=status_code,
+                headers=bug.get('response_headers', {}) if 'response_headers' in bug else bug.get('response', {}).get('headers', {}),
+                body=bug.get('response_body', '') if 'response_body' in bug else bug.get('response', {}).get('body', ''),
+                error_type='fault' if status_code >= 400 else None
+            )
+            
+            # Create test case
+            test_case = StandardizedTestCase(
+                id=f"bug_{i+1}",
+                name=bug.get('bug_type', 'Unknown Bug'),
+                request=request,
+                response=response,
+                type='fault'
+            )
+            
+            test_cases.append(test_case)
+        
+        return test_cases
 
-            transformed.append({
-                'id': f"bug_{i+1}",
-                'name': bug_type or 'Unknown Bug',
-                'endpoint': bug.get('endpoint', ''),
-                'method': method,
-                'type': 'fault',
-                'request': {
-                    'headers': bug.get('request_headers', {}) if 'request_headers' in bug else bug.get('request', {}).get('headers', {}),
-                    'data': bug.get('request_data', {}) if 'request_data' in bug else bug.get('request', {}).get('body', {})
-                },
-                'response': {
-                    'status_code': bug.get('response_code', 500) if 'response_code' in bug else bug.get('response', {}).get('status_code', 500),
-                    'headers': bug.get('response_headers', {}) if 'response_headers' in bug else bug.get('response', {}).get('headers', {}),
-                    'body': bug.get('response_body', {}) if 'response_body' in bug else bug.get('response', {}).get('body', {})
-                }
-            })
-        
-        # Transform success cases from response data
-        success_cases = response_data.get('summary', {}).get('success_cases', [])
-        for i, case in enumerate(success_cases):
-            transformed.append({
-                'id': f"success_{i+1}",
-                'name': case.get('name', f"Success Case {i+1}"),
-                'endpoint': case.get('endpoint', ''),
-                'method': case.get('verb', case.get('method', 'GET')).upper(),
-                'type': 'success',
-                'request': {
-                    'headers': case.get('request_headers', {}),
-                    'data': case.get('request_data', {})
-                },
-                'response': {
-                    'status_code': case.get('response_code', 200),
-                    'headers': case.get('response_headers', {}),
-                    'body': case.get('response_body', {})
-                }
-            })
-        
-        return transformed
-    
-    def _calculate_success_rate(self, response_data: Dict[str, Any]) -> float:
-        """Calculate overall success rate from response data.
+    def _process_error_data(
+        self,
+        error: Dict[str, Any],
+        error_type: str,
+        endpoints: Dict[tuple, StandardizedEndpoint]
+    ) -> None:
+        """Process error data to update endpoint statistics.
         
         Args:
-            response_data: Response bucket data
-        
-        Returns:
-            Float representing success rate percentage
+            error: Error data dictionary
+            error_type: Type of error
+            endpoints: Dictionary of endpoints to update
         """
-        summary = response_data.get('summary', {})
-        total_requests = summary.get('total_requests', 0)
-        if total_requests == 0:
-            return 0.0
+        path = error.get('endpoint')
+        method = error.get('verb')
+        if not path or not method:
+            return
             
-        success_requests = summary.get('success_requests', 0)
-        return round((success_requests / total_requests * 100), 2)
+        method = method.upper()
+        count = error.get('count', 1)
+        key = (path, method)
+        
+        # Create endpoint if not exists
+        if key not in endpoints:
+            endpoints[key] = StandardizedEndpoint(
+                path=path,
+                method=method,
+                statistics=EndpointStatistics()
+            )
+        
+        # Extract status code from error type
+        status_code = '500'  # Default
+        if '_' in error_type:
+            parts = error_type.split('_')
+            for part in parts:
+                if part.isdigit() and len(part) == 3:
+                    status_code = part
+                    break
+        
+        # Update statistics
+        endpoints[key].statistics.total_requests += count
+        if status_code.startswith('2'):
+            endpoints[key].statistics.success_count += count
+        else:
+            endpoints[key].statistics.failure_count += count
+            
+        # Update status code counts
+        if status_code in endpoints[key].statistics.status_codes:
+            endpoints[key].statistics.status_codes[status_code] += count
+        else:
+            endpoints[key].statistics.status_codes[status_code] = count
+            
+        # Calculate success rate
+        stats = endpoints[key].statistics
+        stats.success_rate = (stats.success_count / stats.total_requests * 100) if stats.total_requests > 0 else 0
+
+    def _extract_status_code(self, data: Dict[str, Any]) -> int:
+        """Extract status code from bug data.
+        
+        Args:
+            data: Bug data dictionary
+            
+        Returns:
+            HTTP status code
+        """
+        # Try direct response code
+        if 'response_code' in data:
+            return int(data['response_code'])
+            
+        # Try nested response status code
+        if 'response' in data and 'status_code' in data['response']:
+            return int(data['response']['status_code'])
+            
+        # Try to extract from bug type
+        bug_type = data.get('bug_type', '')
+        if '_' in bug_type:
+            parts = bug_type.split('_')
+            for part in parts:
+                if part.isdigit() and len(part) == 3:
+                    return int(part)
+        
+        # Default to 500 for unknown errors
+        return 500

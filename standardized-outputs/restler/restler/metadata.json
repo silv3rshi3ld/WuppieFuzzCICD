@@ -1,14 +1,16 @@
 {
-  "fuzzer": {
+  "timestamp": "2025-02-22T04:45:24.164962",
+  "total_requests": 0,
+  "success_count": 0,
+  "failure_count": 0,
+  "fuzzer_info": {
     "name": "Restler",
-    "timestamp": "2025-02-22T03:00:18.254555",
-    "duration": "0:00:00",
-    "total_requests": 0,
+    "duration": "0",
     "critical_issues": 11
   },
   "summary": {
-    "endpoints_tested": 9,
-    "success_rate": 0.0,
+    "endpoints_tested": 8,
+    "success_rate": 0,
     "coverage": {
       "lines": 0,
       "functions": 0,

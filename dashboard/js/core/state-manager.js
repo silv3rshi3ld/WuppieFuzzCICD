@@ -11,7 +11,8 @@ class StateManager {
         this.filters = {
             hit: true,
             miss: true,
-            unspecified: true
+            unspecified: true,
+            partial: true
         };
         this.selectedEndpoint = null;
         this.subscribers = new Map();
@@ -31,6 +32,48 @@ class StateManager {
             if (!this.validateData()) {
                 console.error('Data validation failed. Some features may not work correctly.');
             }
+            // Process endpoints for filtering
+            this.endpoints = this.endpoints.map(endpoint => {
+                const total = endpoint.total_requests || 0;
+                const success = Object.entries(endpoint.status_codes || {})
+                    .filter(([code]) => code.startsWith('2'))
+                    .reduce((sum, [_, count]) => sum + count, 0);
+                
+                return {
+                    ...endpoint,
+                    type: total === 0 ? 'unspecified' :
+                          success === total ? 'hit' :
+                          success === 0 ? 'miss' :
+                          'partial'
+                };
+            });
+            
+            // Initialize charts with actual data
+            const chartData = {
+                status_distribution: {
+                    hits: this.endpoints.filter(e => e.type === 'hit').length,
+                    misses: this.endpoints.filter(e => e.type === 'miss').length,
+                    unspecified: this.endpoints.filter(e => e.type === 'unspecified').length,
+                    partial: this.endpoints.filter(e => e.type === 'partial').length
+                },
+                method_coverage: this.endpoints.reduce((acc, e) => {
+                    if (e.total_requests > 0) {
+                        acc[e.method] = (acc[e.method] || 0) + e.total_requests;
+                    }
+                    return acc;
+                }, {}),
+                status_codes: Object.entries(
+                    this.endpoints.reduce((acc, e) => {
+                        Object.entries(e.status_codes || {}).forEach(([code, count]) => {
+                            acc[code] = (acc[code] || 0) + count;
+                        });
+                        return acc;
+                    }, {})
+                ).map(([status, count]) => ({ status, count }))
+            };
+            
+            // Update coverage data
+            this.coverage = chartData;
             
             // Notify subscribers
             this.notifySubscribers('metadata', this.metadata);
@@ -39,6 +82,7 @@ class StateManager {
             
             // Update UI elements
             this.updateUIElements();
+            this.notifySubscribers('coverage', chartData);
             
         } catch (error) {
             console.error('Error initializing state:', error);
@@ -79,16 +123,16 @@ class StateManager {
         try {
             // Update duration
             const durationElement = document.getElementById('duration');
-            if (durationElement && this.metadata.duration) {
-                durationElement.textContent = `Duration: ${this.metadata.duration}`;
+            if (durationElement && this.metadata.fuzzer.duration) {
+                durationElement.textContent = `Duration: ${this.metadata.fuzzer.duration}`;
             }
             
             // Calculate stats
             const stats = {
-                totalRequests: this.metadata.total_requests || 0,
-                criticalErrors: this.metadata.critical_issues || 0,
-                uniqueEndpoints: this.endpoints.length || 0,
-                successRate: this.coverage?.status_distribution?.hits || 0
+                totalRequests: this.metadata.fuzzer.total_requests || 0,
+                criticalErrors: this.metadata.fuzzer.critical_issues || 0,
+                uniqueEndpoints: this.metadata.total_endpoints || 0,
+                successRate: this.metadata.summary.success_rate || 0
             };
             
             // Update stats elements

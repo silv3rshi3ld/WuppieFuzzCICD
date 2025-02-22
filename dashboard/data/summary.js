@@ -1,42 +1,42 @@
 window.summaryData = {
-  "total_requests": 94,
-  "critical_issues": 3,
-  "unique_endpoints": 0,
-  "success_rate": 85,
-  "hits": 6,
-  "misses": 6,
+  "total_requests": 15,
+  "critical_issues": 11,
+  "unique_endpoints": 21,
+  "success_rate": 40,
+  "hits": 21,
+  "misses": 0,
   "unspecified": 0,
-  "get_hits": 4,
-  "post_hits": 4,
-  "put_hits": 0,
-  "delete_hits": 0,
-  "status_2xx": 80,
-  "status_4xx": 9,
-  "status_5xx": 5,
+  "get_hits": 7,
+  "post_hits": 2,
+  "put_hits": 2,
+  "delete_hits": 1,
+  "status_2xx": 6,
+  "status_4xx": 6,
+  "status_5xx": 0,
   "fuzzers": [
     {
       "name": "WuppieFuzz",
       "id": "wuppiefuzz",
-      "total_requests": 50,
-      "critical_issues": 2,
+      "total_requests": 0,
+      "critical_issues": 0,
       "unique_endpoints": 0,
-      "duration": "0:05:00"
+      "duration": "0:00:00"
     },
     {
       "name": "Restler",
       "id": "restler",
-      "total_requests": 40,
-      "critical_issues": 1,
-      "unique_endpoints": 0,
-      "duration": "0:03:00"
+      "total_requests": 0,
+      "critical_issues": 11,
+      "unique_endpoints": 9,
+      "duration": "0:00:00"
     },
     {
       "name": "Evomaster",
       "id": "evomaster",
-      "total_requests": 4,
+      "total_requests": 15,
       "critical_issues": 0,
-      "unique_endpoints": 0,
-      "duration": "0:10:00"
+      "unique_endpoints": 12,
+      "duration": "0:00:00"
     }
   ]
 };

@@ -1,98 +1,110 @@
 [
   {
-    "id": "test_0",
-    "name": "test_0",
-    "endpoint": "/users/v1/_debug",
-    "method": "GET",
-    "type": "success",
-    "request": {
-      "headers": {},
-      "data": {}
-    },
-    "response": {
-      "status_code": 200,
-      "headers": {},
-      "body": {}
-    }
-  },
-  {
     "id": "test_1",
-    "name": "test_1",
-    "endpoint": "/users/v1",
-    "method": "GET",
+    "name": "test_0",
     "type": "success",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1/_debug",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 200,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": null
     }
   },
   {
     "id": "test_2",
-    "name": "test_2",
-    "endpoint": "/",
-    "method": "GET",
+    "name": "test_1",
     "type": "success",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 200,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": null
     }
   },
   {
     "id": "test_3",
-    "name": "test_3",
-    "endpoint": "/createdb",
-    "method": "GET",
+    "name": "test_2",
     "type": "success",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 200,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": null
     }
   },
   {
     "id": "test_4",
-    "name": "test_4",
-    "endpoint": "/users/v1/{username}",
-    "method": "GET",
+    "name": "test_3",
     "type": "success",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/createdb",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 200,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": null
     }
   },
   {
     "id": "test_5",
-    "name": "test_5",
-    "endpoint": "/users/v1/login",
-    "method": "POST",
+    "name": "test_4",
     "type": "success",
+    "timestamp": null,
     "request": {
+      "method": "GET",
+      "path": "/users/v1/{username}",
       "headers": {},
-      "data": {}
+      "body": ""
     },
     "response": {
       "status_code": 200,
       "headers": {},
-      "body": {}
+      "body": "",
+      "error_type": null
+    }
+  },
+  {
+    "id": "test_6",
+    "name": "test_5",
+    "type": "success",
+    "timestamp": null,
+    "request": {
+      "method": "POST",
+      "path": "/users/v1/login",
+      "headers": {},
+      "body": ""
+    },
+    "response": {
+      "status_code": 200,
+      "headers": {},
+      "body": "",
+      "error_type": null
     }
   }
 ]

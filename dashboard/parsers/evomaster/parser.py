@@ -4,124 +4,109 @@ import os
 import re
 import ast
 from datetime import datetime
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Dict, List, Any, Tuple
 
-from ..base.json_chunker import JsonChunker
-from ..base.json_validator import JsonValidator
+from ..base.base_parser import BaseParser
+from ..base.standardized_types import (
+    StandardizedRequest,
+    StandardizedResponse,
+    TestMetadata,
+    StandardizedTestCase,
+    StandardizedEndpoint,
+    EndpointStatistics
+)
 
-class EvoMasterParser:
+class EvoMasterParser(BaseParser):
     """Parser for EvoMaster output data."""
     
     def __init__(self, input_path: str, output_dir: str):
-        """Initialize the parser.
+        """Initialize parser.
         
         Args:
             input_path: Path to EvoMaster output directory
             output_dir: Directory to save parsed results
         """
-        self.input_path = input_path
-        self.output_dir = output_dir
-        self.chunker = JsonChunker(output_dir, 'Evomaster')
-        self.validator = JsonValidator()
-        
-    def parse(self) -> bool:
-        """Parse EvoMaster results and generate standardized output.
+        super().__init__(input_path, output_dir, 'EvoMaster')
+
+    def _load_raw_data(self) -> Dict[str, Any]:
+        """Load raw data from EvoMaster output.
         
         Returns:
-            bool: True if parsing was successful
+            Dict containing raw fuzzer output data
+            
+        Raises:
+            FileNotFoundError: If required files are missing
+            ValueError: If data is invalid
         """
-        try:
-            # Check for test files
-            test_files = {
-                'success': os.path.join(self.input_path, 'EvoMaster_successes_Test.py'),
-                'fault': os.path.join(self.input_path, 'EvoMaster_faults_Test.py'),
-                'other': os.path.join(self.input_path, 'EvoMaster_others_Test.py')
-            }
+        test_files = {
+            'success': os.path.join(self.input_path, 'EvoMaster_successes_Test.py'),
+            'fault': os.path.join(self.input_path, 'EvoMaster_faults_Test.py'),
+            'other': os.path.join(self.input_path, 'EvoMaster_others_Test.py')
+        }
+        
+        # At minimum we need either successes or faults
+        if not os.path.exists(test_files['success']) and not os.path.exists(test_files['fault']):
+            raise FileNotFoundError("No test files found")
             
-            # At minimum we need either successes or faults
-            if not os.path.exists(test_files['success']) and not os.path.exists(test_files['fault']):
-                raise FileNotFoundError("No test files found")
-            
-            # Parse all available test files
-            all_test_cases = []
-            start_time = None
-            end_time = None
-            
-            for test_type, file_path in test_files.items():
-                if os.path.exists(file_path):
-                    cases, file_start, file_end = self._parse_test_file(file_path, test_type)
-                    all_test_cases.extend(cases)
+        # Parse all available test files
+        all_test_cases = []
+        start_time = None
+        end_time = None
+        coverage_data = {}
+        
+        for test_type, file_path in test_files.items():
+            if os.path.exists(file_path):
+                cases, file_start, file_end, file_coverage = self._parse_test_file(file_path, test_type)
+                all_test_cases.extend(cases)
+                
+                # Track execution timeframe
+                if file_start and (not start_time or file_start < start_time):
+                    start_time = file_start
+                if file_end and (not end_time or file_end > end_time):
+                    end_time = file_end
                     
-                    # Track execution timeframe
-                    if file_start and (not start_time or file_start < start_time):
-                        start_time = file_start
-                    if file_end and (not end_time or file_end > end_time):
-                        end_time = file_end
+                # Merge coverage data
+                for metric, value in file_coverage.items():
+                    coverage_data[metric] = max(coverage_data.get(metric, 0), value)
+        
+        if not all_test_cases:
+            raise ValueError("No test cases found in test files")
             
-            if not all_test_cases:
-                raise ValueError("No test cases found in test files")
-            
-            # Generate and validate metadata
-            metadata = self._generate_metadata(all_test_cases, start_time, end_time)
-            metadata_errors = self.validator.validate_metadata(metadata)
-            if metadata_errors:
-                for error in metadata_errors:
-                    print(f"Metadata validation error: {error.path} - {error.message}")
-                return False
-            
-            # Save metadata
-            self.chunker.save_metadata(metadata)
-            
-            # Transform and validate endpoints
-            endpoints = self._extract_endpoints(all_test_cases)
-            for endpoint in endpoints:
-                endpoint_errors = self.validator.validate_endpoint(endpoint)
-                if endpoint_errors:
-                    for error in endpoint_errors:
-                        print(f"Endpoint validation error: {error.path} - {error.message}")
-                    return False
-            
-            # Save endpoints in chunks
-            self.chunker.chunk_endpoints(endpoints)
-            
-            # Transform test cases to standard format
-            standardized_tests = self._transform_test_cases(all_test_cases)
-            for test_case in standardized_tests:
-                test_case_errors = self.validator.validate_test_case(test_case)
-                if test_case_errors:
-                    for error in test_case_errors:
-                        print(f"Test case validation error: {error.path} - {error.message}")
-                    return False
-            
-            # Save test cases in chunks
-            self.chunker.chunk_test_cases(standardized_tests)
-            
-            return True
-            
-        except FileNotFoundError as e:
-            print(f"File not found error: {str(e)}")
-            return False
-        except (ValueError, AttributeError) as e:
-            print(f"Data processing error: {str(e)}")
-            return False
-    
-    def _parse_test_file(self, file_path: str, test_type: str) -> Tuple[List[Dict[str, Any]], Optional[datetime], Optional[datetime]]:
+        return {
+            'test_cases': all_test_cases,
+            'start_time': start_time,
+            'end_time': end_time,
+            'coverage': coverage_data
+        }
+
+    def _parse_test_file(
+        self,
+        file_path: str,
+        test_type: str
+    ) -> Tuple[List[Dict[str, Any]], datetime, datetime, Dict[str, int]]:
         """Parse a Python test file and extract test information.
         
         Args:
             file_path: Path to the test file
             test_type: Type of tests ('success', 'fault', or 'other')
-        
+            
         Returns:
             Tuple containing:
             - List of test case dictionaries
-            - Start time of first test (or None)
-            - End time of last test (or None)
+            - Start time of first test
+            - End time of last test
+            - Coverage data dictionary
         """
         test_cases = []
         current_test = None
         start_time = None
         end_time = None
+        coverage = {
+            'lines': 0,
+            'functions': 0,
+            'branches': 0,
+            'statements': 0
+        }
         
         with open(file_path, 'r') as f:
             lines = f.readlines()
@@ -131,6 +116,14 @@ class EvoMasterParser:
             time_match = re.search(r'# Generated on: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})', line)
             if time_match and not start_time:
                 start_time = datetime.fromisoformat(time_match.group(1))
+            
+            # Look for coverage information
+            coverage_match = re.search(r'# Coverage: (\d+)% lines, (\d+)% functions, (\d+)% branches', line)
+            if coverage_match:
+                coverage['lines'] = int(coverage_match.group(1))
+                coverage['functions'] = int(coverage_match.group(2))
+                coverage['branches'] = int(coverage_match.group(3))
+                coverage['statements'] = coverage['lines']  # Use line coverage as statement coverage
             
             # Start of a test method
             if line.strip().startswith('def test_'):
@@ -170,7 +163,7 @@ class EvoMasterParser:
                         data_type, data_str = data_match.groups()
                         current_test['request_data'][data_type] = ast.literal_eval(data_str)
                     except (SyntaxError, ValueError):
-                        print(f"Warning: Could not parse request data in {test_name}")
+                        self.logger.warning(f"Could not parse request data in {test_name}")
             
             # Extract headers
             if '.headers=' in line:
@@ -180,7 +173,7 @@ class EvoMasterParser:
                         headers_str = headers_match.group(1)
                         current_test['request_data']['headers'] = ast.literal_eval(headers_str)
                     except (SyntaxError, ValueError):
-                        print(f"Warning: Could not parse headers in {test_name}")
+                        self.logger.warning(f"Could not parse headers in {test_name}")
             
             # Extract assertions
             if 'assert' in line:
@@ -198,154 +191,146 @@ class EvoMasterParser:
                         body_str = body_match.group(1)
                         current_test['response_data']['body'] = ast.literal_eval(body_str)
                     except (SyntaxError, ValueError):
-                        print(f"Warning: Could not parse response body in {test_name}")
+                        self.logger.warning(f"Could not parse response body in {test_name}")
         
         # Add the last test case
         if current_test:
             test_cases.append(current_test)
             end_time = datetime.now()  # Use current time as end time for last test
         
-        return test_cases, start_time, end_time
-    
-    def _generate_metadata(
-        self,
-        test_cases: List[Dict[str, Any]],
-        start_time: Optional[datetime],
-        end_time: Optional[datetime]
-    ) -> Dict[str, Any]:
-        """Generate metadata from test cases.
+        return test_cases, start_time, end_time, coverage
+
+    def _transform_metadata(self, raw_data: Dict[str, Any]) -> TestMetadata:
+        """Transform EvoMaster metadata to standard format.
         
         Args:
-            test_cases: List of test cases
-            start_time: Start time of test execution
-            end_time: End time of test execution
-        
+            raw_data: Raw EvoMaster output data
+            
         Returns:
-            Metadata dictionary
+            Standardized test metadata
         """
+        test_cases = raw_data['test_cases']
         success_cases = [tc for tc in test_cases if tc['type'] == 'success']
         fault_cases = [tc for tc in test_cases if tc['type'] == 'fault']
-        total_requests = len(test_cases)
-        critical_issues = sum(1 for tc in fault_cases if tc.get('status_code', 0) >= 500)
         
-        # Calculate duration if we have both timestamps
-        duration = '0:00:00'
-        if start_time and end_time:
-            duration = str(end_time - start_time)
+        # Calculate duration
+        start_time = raw_data['start_time'] or datetime.now()
+        end_time = raw_data['end_time'] or datetime.now()
+        duration = str(end_time - start_time)
         
-        return {
-            'fuzzer': {
-                'name': 'Evomaster',
-                'timestamp': start_time.isoformat() if start_time else datetime.now().isoformat(),
+        # Calculate critical issues (500 errors)
+        critical_issues = sum(
+            1 for tc in test_cases
+            if tc.get('status_code', 0) >= 500
+        )
+        
+        return TestMetadata(
+            timestamp=start_time,
+            total_requests=len(test_cases),
+            success_count=len(success_cases),
+            failure_count=len(fault_cases),
+            fuzzer_info={
+                'name': 'EvoMaster',
                 'duration': duration,
-                'total_requests': total_requests,
                 'critical_issues': critical_issues
             },
-            'summary': {
-                'endpoints_tested': len(self._get_unique_endpoints(test_cases)),
-                'success_rate': len(success_cases) / total_requests * 100 if total_requests > 0 else 0,
-                'coverage': {
-                    'lines': 0,      # EvoMaster doesn't provide these metrics
-                    'functions': 0,   # in the test files, but they might
-                    'branches': 0,    # be available in other output files
-                    'statements': 0   # that we could parse later
-                }
+            summary={
+                'endpoints_tested': len(set((tc['endpoint'], tc['method']) for tc in test_cases if tc.get('endpoint') and tc.get('method'))),
+                'success_rate': (len(success_cases) / len(test_cases) * 100) if test_cases else 0,
+                'coverage': raw_data.get('coverage', {
+                    'lines': 0,
+                    'functions': 0,
+                    'branches': 0,
+                    'statements': 0
+                })
             }
-        }
-    
-    def _get_unique_endpoints(self, test_cases: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
-        """Get unique endpoint-method combinations.
+        )
+
+    def _transform_endpoints(self, raw_data: Dict[str, Any]) -> List[StandardizedEndpoint]:
+        """Transform endpoint data to standard format.
         
         Args:
-            test_cases: List of test cases
-        
+            raw_data: Raw EvoMaster output data
+            
         Returns:
-            List of unique (endpoint, method) tuples
+            List of standardized endpoints
         """
-        unique = set()
-        for tc in test_cases:
-            if tc.get('endpoint') and tc.get('method'):
-                unique.add((tc['endpoint'], tc['method']))
-        return list(unique)
-    
-    def _extract_endpoints(self, test_cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Extract endpoint information from test cases.
+        endpoints = {}  # Dict[Tuple[str, str], StandardizedEndpoint]
         
-        Args:
-            test_cases: List of test cases
-        
-        Returns:
-            List of endpoint dictionaries
-        """
-        endpoints_dict = {}
-        
-        for test_case in test_cases:
+        # Process test cases to get endpoint information
+        for test_case in raw_data['test_cases']:
             if not test_case.get('endpoint') or not test_case.get('method'):
                 continue
                 
             key = (test_case['endpoint'], test_case['method'])
-            if key not in endpoints_dict:
-                endpoints_dict[key] = {
-                    'path': test_case['endpoint'],
-                    'method': test_case['method'],
-                    'statistics': {
-                        'total_requests': 0,
-                        'success_rate': 0,
-                        'status_codes': {}
-                    }
-                }
+            if key not in endpoints:
+                endpoints[key] = StandardizedEndpoint(
+                    path=test_case['endpoint'],
+                    method=test_case['method'],
+                    statistics=EndpointStatistics()
+                )
             
             # Update statistics
-            stats = endpoints_dict[key]['statistics']
-            stats['total_requests'] += 1
-            status = str(test_case.get('status_code', 0))
-            stats['status_codes'][status] = stats['status_codes'].get(status, 0) + 1
+            status_code = test_case.get('status_code', 0)
+            endpoints[key].statistics.total_requests += 1
+            if 200 <= status_code < 300:
+                endpoints[key].statistics.success_count += 1
+            else:
+                endpoints[key].statistics.failure_count += 1
+            
+            # Update status code counts
+            status_str = str(status_code)
+            if status_str in endpoints[key].statistics.status_codes:
+                endpoints[key].statistics.status_codes[status_str] += 1
+            else:
+                endpoints[key].statistics.status_codes[status_str] = 1
+                
+            # Calculate success rate
+            stats = endpoints[key].statistics
+            stats.success_rate = (stats.success_count / stats.total_requests * 100) if stats.total_requests > 0 else 0
         
-        # Calculate success rates
-        for endpoint in endpoints_dict.values():
-            stats = endpoint['statistics']
-            success_count = sum(
-                count for status, count in stats['status_codes'].items()
-                if status.startswith('2')
-            )
-            stats['success_rate'] = (
-                success_count / stats['total_requests'] * 100
-                if stats['total_requests'] > 0 else 0
-            )
-        
-        return list(endpoints_dict.values())
-    
-    def _transform_test_cases(self, test_cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Transform test cases to standardized format.
+        return list(endpoints.values())
+
+    def _transform_test_cases(self, raw_data: Dict[str, Any]) -> List[StandardizedTestCase]:
+        """Transform test cases to standard format.
         
         Args:
-            test_cases: List of raw test case data
-        
+            raw_data: Raw EvoMaster output data
+            
         Returns:
-            List of standardized test case dictionaries
+            List of standardized test cases
         """
-        transformed = []
-        for idx, test_case in enumerate(test_cases):
-            if not test_case.get('endpoint') or not test_case.get('method'):
+        test_cases = []
+        
+        for i, case in enumerate(raw_data['test_cases']):
+            if not case.get('endpoint') or not case.get('method'):
                 continue
-                
-            transformed.append({
-                'id': f"test_{idx}",
-                'name': test_case['name'],
-                'endpoint': test_case['endpoint'],
-                'method': test_case['method'],
-                'type': test_case['type'],
-                'request': {
-                    'headers': test_case.get('request_data', {}).get('headers', {}),
-                    'data': {
-                        k: v for k, v in test_case.get('request_data', {}).items()
-                        if k != 'headers'
-                    }
-                },
-                'response': {
-                    'status_code': test_case.get('status_code', 0),
-                    'headers': test_case.get('response_data', {}).get('headers', {}),
-                    'body': test_case.get('response_data', {}).get('body', {})
-                }
-            })
-        return transformed
+            
+            # Create request
+            request = StandardizedRequest(
+                method=case['method'],
+                path=case['endpoint'],
+                headers=case.get('request_data', {}).get('headers', {}),
+                body=str(case.get('request_data', {}).get('body', ''))
+            )
+            
+            # Create response
+            response = StandardizedResponse(
+                status_code=case.get('status_code', 0),
+                headers=case.get('response_data', {}).get('headers', {}),
+                body=str(case.get('response_data', {}).get('body', '')),
+                error_type='fault' if case['type'] == 'fault' else None
+            )
+            
+            # Create test case
+            test_case = StandardizedTestCase(
+                id=f"test_{i+1}",
+                name=case['name'],
+                request=request,
+                response=response,
+                type=case['type']
+            )
+            
+            test_cases.append(test_case)
+        
+        return test_cases

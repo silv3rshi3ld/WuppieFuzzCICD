@@ -45,15 +45,15 @@ def process_fuzzer_outputs(input_base: str, output_base: str) -> List[str]:
     
     # Process WuppieFuzz output
     print("\nProcessing WuppieFuzz output...")
-    wuppiefuzz_input = os.path.join(input_base, 'Wuppiefuzz', 'fuzzing-report')
-    if os.path.exists(wuppiefuzz_input):
-        parser = WuppieFuzzParser(wuppiefuzz_input, output_dirs['wuppiefuzz'])
+    wuppiefuzz_base = os.path.join(input_base, 'Wuppiefuzz', 'fuzzing-report')
+    if os.path.exists(wuppiefuzz_base):
+        parser = WuppieFuzzParser(wuppiefuzz_base, output_dirs['wuppiefuzz'])
         if not parser.parse():
             errors.append("Failed to process WuppieFuzz output")
         else:
             print("✓ WuppieFuzz output processed successfully")
     else:
-        errors.append(f"WuppieFuzz output directory not found at: {wuppiefuzz_input}")
+        errors.append(f"WuppieFuzz output directory not found at: {wuppiefuzz_base}")
     
     # Process RESTler output
     print("\nProcessing RESTler output...")
