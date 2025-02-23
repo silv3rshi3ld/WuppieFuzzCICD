@@ -1,42 +1,36 @@
 window.summaryData = {
-  "total_requests": 15,
-  "critical_issues": 11,
-  "unique_endpoints": 21,
-  "success_rate": 40,
-  "hits": 21,
-  "misses": 0,
-  "unspecified": 0,
-  "get_hits": 7,
-  "post_hits": 2,
-  "put_hits": 2,
-  "delete_hits": 1,
-  "status_2xx": 6,
-  "status_4xx": 6,
-  "status_5xx": 0,
-  "fuzzers": [
-    {
-      "name": "WuppieFuzz",
-      "id": "wuppiefuzz",
-      "total_requests": 0,
-      "critical_issues": 0,
-      "unique_endpoints": 0,
-      "duration": "0:00:00"
+  "total_requests": 0,
+  "critical_issues": 0,
+  "unique_endpoints": 14,
+  "success_rate": 0.0,
+  "coverage": {
+    "statusDistribution": {
+      "hits": 0,
+      "misses": 0,
+      "unspecified": 0
     },
-    {
-      "name": "Restler",
-      "id": "restler",
-      "total_requests": 0,
-      "critical_issues": 11,
-      "unique_endpoints": 9,
-      "duration": "0:00:00"
+    "methodCoverage": {
+      "GET": {
+        "hits": 0,
+        "misses": 0,
+        "unspecified": 0
+      },
+      "POST": {
+        "hits": 0,
+        "misses": 0,
+        "unspecified": 0
+      },
+      "PUT": {
+        "hits": 0,
+        "misses": 0,
+        "unspecified": 0
+      },
+      "DELETE": {
+        "hits": 0,
+        "misses": 0,
+        "unspecified": 0
+      }
     },
-    {
-      "name": "Evomaster",
-      "id": "evomaster",
-      "total_requests": 15,
-      "critical_issues": 0,
-      "unique_endpoints": 12,
-      "duration": "0:00:00"
-    }
-  ]
+    "statusCodes": []
+  }
 };

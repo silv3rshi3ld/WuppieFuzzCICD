@@ -12,6 +12,252 @@
     <!-- JavaScript Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        .endpoint-tree ul {
+            list-style: none;
+            padding-left: 1.5rem;
+        }
+        .endpoint-tree .path-segment {
+            cursor: pointer;
+            padding: 0.25rem 0;
+        }
+        .endpoint-tree .path-segment:hover {
+            background-color: #f3f4f6;
+        }
+        .endpoint-tree .methods {
+            margin-left: 1.5rem;
+            padding: 0.5rem;
+            background-color: #f9fafb;
+            border-radius: 0.375rem;
+        }
+        .severity-critical {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .severity-high {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .severity-medium {
+            background-color: #fef9c3;
+            color: #854d0e;
+        }
+        .severity-low {
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        .severity-info {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .collapsible {
+            cursor: pointer;
+        }
+        .collapsible::before {
+            content: '▼';
+            display: inline-block;
+            margin-right: 0.5rem;
+            transition: transform 0.2s;
+        }
+        .collapsible.collapsed::before {
+            transform: rotate(-90deg);
+        }
+        .response-details {
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e7eb;
+            margin-top: 0.5rem;
+        }
+    </style>
+
+    <!-- Embedded Data -->
+    <script>
+        // Data will be injected here by the generator
+        const fuzzerData = {
+  "metadata": {
+    "name": "Evomaster",
+    "total_requests": 0,
+    "critical_issues": 0,
+    "unique_endpoints": 12,
+    "success_rate": 0,
+    "duration": "Unknown"
+  },
+  "coverage": {
+    "statusDistribution": {
+      "hits": 7,
+      "misses": 5,
+      "unspecified": 0
+    },
+    "methodCoverage": {
+      "GET": {
+        "hits": 6,
+        "misses": 2,
+        "unspecified": 0
+      },
+      "POST": {
+        "hits": 1,
+        "misses": 1,
+        "unspecified": 0
+      },
+      "PUT": {
+        "hits": 0,
+        "misses": 2,
+        "unspecified": 0
+      },
+      "DELETE": {
+        "hits": 0,
+        "misses": 0
+      }
+    },
+    "statusCodes": [
+      {
+        "status": "200",
+        "count": 7
+      },
+      {
+        "status": "401",
+        "count": 5
+      },
+      {
+        "status": "404",
+        "count": 0
+      },
+      {
+        "status": "500",
+        "count": 0
+      },
+      {
+        "status": "204",
+        "count": 0
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "path": "/books/v1/{book_title}",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['type'] == 'about:blank'"
+    },
+    {
+      "path": "/me",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['type'] == 'about:blank'"
+    },
+    {
+      "path": "/books/v1",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['type'] == 'about:blank'"
+    },
+    {
+      "path": "/users/v1/{username}/password",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['type'] == 'about:blank'"
+    },
+    {
+      "path": "/users/v1/{username}/email",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['type'] == 'about:blank'"
+    },
+    {
+      "path": "/books/v1",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['Books'][2]['user'] == 'admin'"
+    },
+    {
+      "path": "/users/v1/_debug",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['users'][2]['username'] == 'admin'"
+    },
+    {
+      "path": "/users/v1",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['users'][2]['username'] == 'admin'"
+    },
+    {
+      "path": "/",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['vulnerable'] == 1.0"
+    },
+    {
+      "path": "/createdb",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['message'] == 'Database populated.'"
+    },
+    {
+      "path": "/users/v1/{username}",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['email'] == 'mail1@mail.com'"
+    },
+    {
+      "path": "/users/v1/login",
+      "method": "GET",
+      "total_requests": 0,
+      "success_rate": 0,
+      "status_codes": {},
+      "response_data": "assert res_0.json()['message'] == 'Username does not exist'"
+    }
+  ]
+};
+
+        // Status code severity classification
+        function getSeverity(code) {
+            code = parseInt(code);
+            if (code >= 500) return 'critical';
+            if (code === 401 || code === 403) return 'high';
+            if (code === 400) return 'medium';
+            if (code === 200) return 'medium';
+            if (code === 404) return 'low';
+            if (code >= 300 && code < 400) return 'info';
+            return 'low';
+        }
+
+        const severityDescriptions = {
+            critical: 'Critical: Stack traces, service crashes, memory corruption',
+            high: 'High: Access control bypass, authentication flaws',
+            medium: 'Medium: Input validation issues, verbose errors',
+            low: 'Low: Expected error responses',
+            info: 'Informational: Redirects, informational responses'
+        };
+    </script>
 </head>
 <body class="bg-gray-50">
     <div class="container mx-auto px-4 py-8">
@@ -25,24 +271,11 @@
                 <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
                 Evomaster Results
             </h1>
-            <div class="ml-auto text-gray-500" id="duration">Duration: -</div>
+            <div class="ml-auto text-gray-500" id="duration">Duration: Unknown</div>
         </div>
 
-        <!-- Loading State -->
-        <div id="loadingState" class="loading-state hidden">
-            <i data-feather="loader" class="h-12 w-12 text-gray-400"></i>
-            <p class="text-lg">Loading fuzzer data...</p>
-        </div>
-
-        <!-- Error State -->
-        <div id="errorState" class="error-state hidden">
-            <i data-feather="alert-triangle" class="h-12 w-12"></i>
-            <p class="text-lg font-medium mb-2">Error Loading Data</p>
-            <p id="errorMessage" class="text-gray-600">Unable to load fuzzer data. Please try refreshing the page.</p>
-        </div>
-
-        <!-- Content (hidden until data loads) -->
-        <div id="content" class="hidden">
+        <!-- Content -->
+        <div id="content">
             <!-- Overall Statistics -->
             <div class="mb-12">
                 <div class="section-header">
@@ -53,19 +286,19 @@
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div class="stats-card">
-                        <div class="stats-value" id="totalRequests">-</div>
+                        <div class="stats-value" id="totalRequests">0</div>
                         <div class="stats-label">Total Requests</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value critical-error" id="criticalErrors">-</div>
+                        <div class="stats-value critical-error" id="criticalErrors">0</div>
                         <div class="stats-label">Critical Errors (500+)</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value" id="uniqueEndpoints">-</div>
+                        <div class="stats-value" id="uniqueEndpoints">12</div>
                         <div class="stats-label">Unique Endpoints</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value" id="successRate">-</div>
+                        <div class="stats-value" id="successRate">0%</div>
                         <div class="stats-label">Success Rate</div>
                     </div>
                 </div>
@@ -115,6 +348,19 @@
                 </div>
             </div>
 
+            <!-- Error Classification -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="alert-triangle" class="h-6 w-6 text-gray-400"></i>
+                        Error Classification
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 gap-4" id="errorClassification">
+                    <!-- Error classification will be inserted here -->
+                </div>
+            </div>
+
             <!-- Endpoint Tree -->
             <div class="mb-12">
                 <div class="section-header">
@@ -122,85 +368,307 @@
                         <i data-feather="git-merge" class="h-6 w-6 text-gray-400"></i>
                         Endpoint Tree
                     </h2>
-                    <input 
-                        type="text" 
-                        placeholder="Search endpoints..."
-                        class="search-input"
-                        id="endpointSearch"
-                    >
+                    <div class="flex items-center gap-4">
+                        <input 
+                            type="text" 
+                            placeholder="Search endpoints..."
+                            class="search-input"
+                            id="endpointSearch"
+                        >
+                    </div>
                 </div>
-                <div id="endpointTree" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <!-- Endpoint tree will be loaded here -->
-                </div>
-            </div>
-
-            <!-- Issues Found -->
-            <div>
-                <div class="section-header">
-                    <h2 class="section-title">
-                        <i data-feather="alert-triangle" class="h-6 w-6 text-gray-400"></i>
-                        Issues Found
-                    </h2>
-                </div>
-                <div id="bugList" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <!-- Bug list will be loaded here -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div class="endpoint-tree" id="endpointTree">
+                        <!-- Endpoint tree will be inserted here -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Core Libraries -->
-    <script src="../js/utils.js"></script>
-    <script src="../js/core/data-loader.js"></script>
-    <script src="../js/core/state-manager.js"></script>
-    <script src="../js/components/endpoint-tree.js"></script>
-    <script src="../js/components/bug-list.js"></script>
-    <script src="../js/components/charts.js"></script>
-    
-    <!-- Data Files -->
-    <script src="../data/evomaster/metadata.js"></script>
-    <script src="../data/evomaster/coverage.js"></script>
-    <script src="../data/evomaster/endpoints_0.js"></script>
-    
-    <!-- Initialize Components -->
+    <!-- Initialize -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize icons
-            feather.replace();
-            
-            // Show loading state
-            document.getElementById('loadingState').classList.remove('hidden');
-            
-            try {
-                // Initialize state manager
-                const stateManager = new StateManager('Evomaster');
-                window.currentStateManager = stateManager;
-                
-                // Initialize components
-                new EndpointTree('endpointTree', stateManager);
-                new BugList('bugList', stateManager);
-                new Charts(stateManager);
-                
-                // Initialize state
-                stateManager.initialize();
-                
-                // Add search functionality
-                const searchInput = document.getElementById('endpointSearch');
-                searchInput.addEventListener('input', (e) => {
-                    stateManager.setSearchQuery(e.target.value);
+        // Initialize icons
+        feather.replace();
+
+        // Initialize charts
+        function initializeCharts() {
+            // Coverage Distribution Chart
+            new Chart(document.getElementById('coverageChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Hits', 'Misses', 'Unspecified'],
+                    datasets: [{
+                        data: [
+                            fuzzerData.coverage.statusDistribution.hits,
+                            fuzzerData.coverage.statusDistribution.misses,
+                            fuzzerData.coverage.statusDistribution.unspecified
+                        ],
+                        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Method Coverage Chart
+            const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+            new Chart(document.getElementById('methodChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: methods,
+                    datasets: [{
+                        label: 'Hits',
+                        data: methods.map(m => fuzzerData.coverage.methodCoverage[m]?.hits || 0),
+                        backgroundColor: '#22c55e'
+                    }, {
+                        label: 'Misses',
+                        data: methods.map(m => fuzzerData.coverage.methodCoverage[m]?.misses || 0),
+                        backgroundColor: '#ef4444'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Status Code Distribution Chart
+            new Chart(document.getElementById('statusChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: fuzzerData.coverage.statusCodes.map(s => s.status),
+                    datasets: [{
+                        data: fuzzerData.coverage.statusCodes.map(s => s.count),
+                        backgroundColor: fuzzerData.coverage.statusCodes.map(s => {
+                            const code = parseInt(s.status);
+                            if (code >= 500) return '#ef4444';
+                            if (code >= 400) return '#f59e0b';
+                            return '#22c55e';
+                        })
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Build endpoint tree
+        function buildEndpointTree() {
+            const tree = {};
+            fuzzerData.endpoints.forEach(endpoint => {
+                const parts = endpoint.path.split('/').filter(p => p);
+                let current = tree;
+                parts.forEach(part => {
+                    if (!current[part]) {
+                        current[part] = {
+                            methods: {},
+                            children: {}
+                        };
+                    }
+                    current = current[part].children;
                 });
-                
-                // Hide loading state and show content
-                document.getElementById('loadingState').classList.add('hidden');
-                document.getElementById('content').classList.remove('hidden');
-                
-            } catch (error) {
-                // Hide loading state and show error
-                document.getElementById('loadingState').classList.add('hidden');
-                document.getElementById('errorMessage').textContent = error.message;
-                document.getElementById('errorState').classList.remove('hidden');
-                console.error('Error initializing dashboard:', error);
+
+                // Add method to the last node
+                const lastNode = parts.reduce((acc, part) => acc[part].children, tree);
+                if (!lastNode._methods) lastNode._methods = [];
+                lastNode._methods.push(endpoint);
+            });
+
+            function renderTree(node, path = '') {
+                let html = '<ul>';
+                for (const [segment, data] of Object.entries(node)) {
+                    if (segment === '_methods') continue;
+                    const currentPath = path + '/' + segment;
+                    const methods = node[segment].methods;
+                    const hasChildren = Object.keys(data.children).length > 0;
+                    
+                    html += `
+                        <li>
+                            <div class="path-segment ${hasChildren ? 'collapsible' : ''}" data-path="${currentPath}">
+                                ${segment}
+                            </div>
+                    `;
+
+                    if (hasChildren) {
+                        html += renderTree(data.children, currentPath);
+                    }
+
+                    // Add methods if this is an endpoint
+                    const endpointMethods = data.children._methods;
+                    if (endpointMethods && endpointMethods.length > 0) {
+                        html += '<div class="methods">';
+                        endpointMethods.forEach(endpoint => {
+                            const severityClasses = Object.entries(endpoint.status_codes)
+                                .map(([code, count]) => `severity-${getSeverity(code)}`)
+                                .join(' ');
+                            
+                            html += `
+                                <div class="method-details mb-4">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium">
+                                            ${endpoint.method}
+                                        </span>
+                                        <span class="text-gray-600">${endpoint.total_requests} requests</span>
+                                        <span class="text-gray-600">${endpoint.success_rate}% success</span>
+                                    </div>
+                                    <div class="status-codes flex gap-2 flex-wrap">
+                                        ${Object.entries(endpoint.status_codes)
+                                            .map(([code, count]) => `
+                                                <span class="px-2 py-1 rounded-full text-sm font-medium severity-${getSeverity(code)}">
+                                                    ${code}: ${count}
+                                                </span>
+                                            `).join('')}
+                                    </div>
+                                    ${endpoint.response_data ? `
+                                        <div class="mt-2">
+                                            <button class="text-sm text-blue-600 hover:text-blue-800 collapsible collapsed" 
+                                                    onclick="toggleResponse(this)">
+                                                Show Response
+                                            </button>
+                                            <div class="response-details hidden">
+                                                ${endpoint.response_data}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+
+                    html += '</li>';
+                }
+                html += '</ul>';
+                return html;
             }
+
+            document.getElementById('endpointTree').innerHTML = renderTree(tree);
+
+            // Add click handlers for collapsible segments
+            document.querySelectorAll('.collapsible').forEach(el => {
+                el.addEventListener('click', function() {
+                    this.classList.toggle('collapsed');
+                    const content = this.nextElementSibling;
+                    if (content) {
+                        content.classList.toggle('hidden');
+                    }
+                });
+            });
+        }
+
+        // Initialize error classification
+        function initializeErrorClassification() {
+            const errorsByType = {};
+            fuzzerData.endpoints.forEach(endpoint => {
+                Object.entries(endpoint.status_codes).forEach(([code, count]) => {
+                    const severity = getSeverity(code);
+                    if (!errorsByType[severity]) {
+                        errorsByType[severity] = {
+                            count: 0,
+                            codes: {}
+                        };
+                    }
+                    errorsByType[severity].count += count;
+                    if (!errorsByType[severity].codes[code]) {
+                        errorsByType[severity].codes[code] = 0;
+                    }
+                    errorsByType[severity].codes[code] += count;
+                });
+            });
+
+            const container = document.getElementById('errorClassification');
+            Object.entries(errorsByType)
+                .sort((a, b) => {
+                    const order = ['critical', 'high', 'medium', 'low', 'info'];
+                    return order.indexOf(a[0]) - order.indexOf(b[0]);
+                })
+                .forEach(([severity, data]) => {
+                    container.innerHTML += `
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center gap-4 mb-4">
+                                <span class="px-3 py-1 rounded-full text-sm font-medium severity-${severity}">
+                                    ${severity.charAt(0).toUpperCase() + severity.slice(1)}
+                                </span>
+                                <span class="text-gray-600">${data.count} responses</span>
+                                <span class="text-sm text-gray-500">${severityDescriptions[severity]}</span>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                ${Object.entries(data.codes).map(([code, count]) => `
+                                    <div class="p-3 rounded-lg severity-${severity} bg-opacity-10">
+                                        <div class="text-lg font-semibold">${code}</div>
+                                        <div class="text-sm">${count} requests</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+        }
+
+        // Toggle response details
+        function toggleResponse(button) {
+            button.classList.toggle('collapsed');
+            const details = button.nextElementSibling;
+            details.classList.toggle('hidden');
+        }
+
+        // Initialize everything when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCharts();
+            buildEndpointTree();
+            initializeErrorClassification();
+
+            // Add search functionality
+            document.getElementById('endpointSearch').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                document.querySelectorAll('.endpoint-tree li').forEach(li => {
+                    const pathSegment = li.querySelector('.path-segment');
+                    const path = pathSegment.dataset.path.toLowerCase();
+                    const visible = path.includes(searchTerm);
+                    li.style.display = visible ? '' : 'none';
+                    if (visible) {
+                        let parent = li.parentElement;
+                        while (parent && !parent.classList.contains('endpoint-tree')) {
+                            parent.style.display = '';
+                            parent = parent.parentElement;
+                        }
+                    }
+                });
+            });
         });
     </script>
 </body>

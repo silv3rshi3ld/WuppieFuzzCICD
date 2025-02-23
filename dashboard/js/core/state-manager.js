@@ -1,5 +1,6 @@
 /**
- * State manager for handling UI state and data coordination
+ * Enhanced state manager for handling UI state and data coordination
+ * with support for progressive loading and error handling
  */
 class StateManager {
     constructor(fuzzerName) {
@@ -16,136 +17,141 @@ class StateManager {
         };
         this.selectedEndpoint = null;
         this.subscribers = new Map();
-        this.metadata = null;
-        this.coverage = null;
-        this.endpoints = [];
+        this.componentData = {
+            metadata: null,
+            coverage: null,
+            endpoints: [],
+            bugs: []
+        };
+        this.loadingState = {
+            components: new Set(),
+            errors: new Map()
+        };
     }
 
-    initialize() {
+    /**
+     * Load component data with error handling
+     */
+    async loadComponentData(component) {
+        if (this.loadingState.components.has(component)) {
+            return null; // Already loading
+        }
+
+        this.loadingState.components.add(component);
+        this.notifySubscribers('loadingState', this.getLoadingState());
+
         try {
-            // Load data using the data loader
-            this.metadata = this.dataLoader.loadMetadata();
-            this.coverage = this.dataLoader.loadCoverage();
-            this.endpoints = this.dataLoader.loadEndpointChunk(0);
-            
-            // Validate loaded data
-            if (!this.validateData()) {
-                console.error('Data validation failed. Some features may not work correctly.');
+            let data;
+            switch (component) {
+                case 'metadata':
+                    data = await this.dataLoader.loadMetadata();
+                    break;
+                case 'coverage':
+                    data = await this.dataLoader.loadCoverage();
+                    break;
+                case 'endpoints':
+                    data = await this.loadInitialEndpoints();
+                    break;
+                case 'bugs':
+                    data = this.extractBugsFromEndpoints();
+                    break;
+                default:
+                    throw new Error(`Unknown component: ${component}`);
             }
-            // Process endpoints for filtering
-            this.endpoints = this.endpoints.map(endpoint => {
-                const total = endpoint.total_requests || 0;
-                const success = Object.entries(endpoint.status_codes || {})
-                    .filter(([code]) => code.startsWith('2'))
-                    .reduce((sum, [_, count]) => sum + count, 0);
-                
-                return {
-                    ...endpoint,
-                    type: total === 0 ? 'unspecified' :
-                          success === total ? 'hit' :
-                          success === 0 ? 'miss' :
-                          'partial'
-                };
-            });
-            
-            // Initialize charts with actual data
-            const chartData = {
-                status_distribution: {
-                    hits: this.endpoints.filter(e => e.type === 'hit').length,
-                    misses: this.endpoints.filter(e => e.type === 'miss').length,
-                    unspecified: this.endpoints.filter(e => e.type === 'unspecified').length,
-                    partial: this.endpoints.filter(e => e.type === 'partial').length
-                },
-                method_coverage: this.endpoints.reduce((acc, e) => {
-                    if (e.total_requests > 0) {
-                        acc[e.method] = (acc[e.method] || 0) + e.total_requests;
-                    }
-                    return acc;
-                }, {}),
-                status_codes: Object.entries(
-                    this.endpoints.reduce((acc, e) => {
-                        Object.entries(e.status_codes || {}).forEach(([code, count]) => {
-                            acc[code] = (acc[code] || 0) + count;
-                        });
-                        return acc;
-                    }, {})
-                ).map(([status, count]) => ({ status, count }))
-            };
-            
-            // Update coverage data
-            this.coverage = chartData;
-            
-            // Notify subscribers
-            this.notifySubscribers('metadata', this.metadata);
-            this.notifySubscribers('coverage', this.coverage);
-            this.notifySubscribers('endpoints', this.getFilteredEndpoints());
-            
-            // Update UI elements
-            this.updateUIElements();
-            this.notifySubscribers('coverage', chartData);
-            
+
+            this.componentData[component] = data;
+            this.loadingState.errors.delete(component);
+            this.notifySubscribers(component, data);
+            return data;
+
         } catch (error) {
-            console.error('Error initializing state:', error);
+            this.loadingState.errors.set(component, error);
             throw error;
+
+        } finally {
+            this.loadingState.components.delete(component);
+            this.notifySubscribers('loadingState', this.getLoadingState());
         }
     }
 
-    validateData() {
-        // Validate metadata
-        if (!this.metadata || typeof this.metadata !== 'object') {
-            console.error('Invalid metadata:', this.metadata);
-            return false;
+    /**
+     * Load initial set of endpoints
+     */
+    async loadInitialEndpoints() {
+        const endpoints = await this.dataLoader.loadEndpointChunk(0);
+        if (!endpoints) {
+            throw new Error('Failed to load initial endpoints');
         }
-
-        // Validate coverage
-        if (!this.coverage || typeof this.coverage !== 'object') {
-            console.error('Invalid coverage data:', this.coverage);
-            return false;
-        }
-
-        // Validate endpoints
-        if (!Array.isArray(this.endpoints)) {
-            console.error('Invalid endpoints data:', this.endpoints);
-            return false;
-        }
-
-        // Validate each endpoint
-        const invalidEndpoints = this.endpoints.filter(endpoint => !this.dataLoader.validateEndpoint(endpoint));
-        if (invalidEndpoints.length > 0) {
-            console.error('Found invalid endpoints:', invalidEndpoints);
-            return false;
-        }
-
-        return true;
+        return endpoints;
     }
 
-    updateUIElements() {
+    /**
+     * Load next chunk of endpoints
+     */
+    async loadNextEndpointChunk() {
+        const loadingState = this.dataLoader.getLoadingState();
+        if (loadingState.loadingChunks.length > 0 || !loadingState.hasMore) {
+            return false;
+        }
+
         try {
-            // Update duration
-            const durationElement = document.getElementById('duration');
-            if (durationElement && this.metadata.fuzzer.duration) {
-                durationElement.textContent = `Duration: ${this.metadata.fuzzer.duration}`;
+            const newEndpoints = await this.dataLoader.loadEndpointChunk(loadingState.currentChunk);
+            if (newEndpoints && newEndpoints.length > 0) {
+                this.componentData.endpoints = [...this.componentData.endpoints, ...newEndpoints];
+                this.notifySubscribers('endpoints', this.getFilteredEndpoints());
+                return true;
             }
-            
-            // Calculate stats
-            const stats = {
-                totalRequests: this.metadata.fuzzer.total_requests || 0,
-                criticalErrors: this.metadata.fuzzer.critical_issues || 0,
-                uniqueEndpoints: this.metadata.total_endpoints || 0,
-                successRate: this.metadata.summary.success_rate || 0
-            };
-            
-            // Update stats elements
-            document.getElementById('totalRequests').textContent = stats.totalRequests;
-            document.getElementById('criticalErrors').textContent = stats.criticalErrors;
-            document.getElementById('uniqueEndpoints').textContent = stats.uniqueEndpoints;
-            document.getElementById('successRate').textContent = stats.successRate + '%';
-            
         } catch (error) {
-            console.error('Error updating UI elements:', error);
+            console.error('Error loading endpoint chunk:', error);
         }
+        return false;
     }
 
+    /**
+     * Extract bugs from endpoints data
+     */
+    extractBugsFromEndpoints() {
+        const bugs = [];
+        for (const endpoint of this.componentData.endpoints) {
+            const statusCodes = endpoint.status_codes || {};
+            for (const [code, count] of Object.entries(statusCodes)) {
+                if (parseInt(code) >= 500) {
+                    bugs.push({
+                        endpoint: endpoint.path,
+                        method: endpoint.method,
+                        status_code: code,
+                        count: count,
+                        response_data: endpoint.response_data
+                    });
+                }
+            }
+        }
+        return bugs;
+    }
+
+    /**
+     * Update specific component
+     */
+    async updateComponent(component) {
+        await this.loadComponentData(component);
+        this.updateUIElements();
+    }
+
+    /**
+     * Get current loading state
+     */
+    getLoadingState() {
+        return {
+            loading: this.loadingState.components.size > 0,
+            components: Array.from(this.loadingState.components),
+            errors: Object.fromEntries(this.loadingState.errors),
+            endpointState: this.dataLoader.getLoadingState()
+        };
+    }
+
+    /**
+     * Subscribe to state changes
+     */
     subscribe(key, callback) {
         if (!this.subscribers.has(key)) {
             this.subscribers.set(key, new Set());
@@ -153,12 +159,18 @@ class StateManager {
         this.subscribers.get(key).add(callback);
     }
 
+    /**
+     * Unsubscribe from state changes
+     */
     unsubscribe(key, callback) {
         if (this.subscribers.has(key)) {
             this.subscribers.get(key).delete(callback);
         }
     }
 
+    /**
+     * Notify subscribers of state changes
+     */
     notifySubscribers(key, data) {
         if (this.subscribers.has(key)) {
             this.subscribers.get(key).forEach(callback => {
@@ -171,43 +183,44 @@ class StateManager {
         }
     }
 
+    /**
+     * Set search query and update filtered endpoints
+     */
     setSearchQuery(query) {
         this.searchQuery = query;
         this.currentPage = 0;
         this.notifySubscribers('endpoints', this.getFilteredEndpoints());
     }
 
+    /**
+     * Set filter and update filtered endpoints
+     */
     setFilter(type, enabled) {
         this.filters[type] = enabled;
         this.currentPage = 0;
         this.notifySubscribers('endpoints', this.getFilteredEndpoints());
     }
 
+    /**
+     * Select endpoint and notify subscribers
+     */
     selectEndpoint(endpoint) {
-        if (!this.dataLoader.validateEndpoint(endpoint)) {
-            console.error('Invalid endpoint selected:', endpoint);
-            return;
-        }
         this.selectedEndpoint = endpoint;
         this.notifySubscribers('selectedEndpoint', endpoint);
     }
 
+    /**
+     * Get filtered and paginated endpoints
+     */
     getFilteredEndpoints() {
         try {
-            const filtered = this.endpoints.filter(endpoint => {
-                // Validate endpoint before filtering
-                if (!this.dataLoader.validateEndpoint(endpoint)) {
-                    console.error('Invalid endpoint found:', endpoint);
-                    return false;
-                }
-
-                // Check if the endpoint type is enabled in filters
+            const filtered = this.componentData.endpoints.filter(endpoint => {
+                // Apply type filter
                 if (!this.filters[endpoint.type]) {
-                    console.log(`Filtering out endpoint with type: ${endpoint.type}`);
                     return false;
                 }
-
-                // Apply search filter if query exists
+                
+                // Apply search filter
                 if (this.searchQuery) {
                     const searchLower = this.searchQuery.toLowerCase();
                     return endpoint.path.toLowerCase().includes(searchLower) ||
@@ -215,7 +228,7 @@ class StateManager {
                 }
                 return true;
             });
-
+            
             const start = this.currentPage * this.itemsPerPage;
             const end = start + this.itemsPerPage;
             
@@ -223,7 +236,8 @@ class StateManager {
                 items: filtered.slice(start, end),
                 total: filtered.length,
                 page: this.currentPage,
-                totalPages: Math.ceil(filtered.length / this.itemsPerPage)
+                totalPages: Math.ceil(filtered.length / this.itemsPerPage),
+                hasMore: this.dataLoader.hasMoreEndpoints()
             };
         } catch (error) {
             console.error('Error filtering endpoints:', error);
@@ -231,28 +245,70 @@ class StateManager {
                 items: [],
                 total: 0,
                 page: 0,
-                totalPages: 0
+                totalPages: 0,
+                hasMore: false
             };
         }
     }
 
+    /**
+     * Set current page
+     */
     setPage(pageNum) {
-        const totalPages = Math.ceil(this.endpoints.length / this.itemsPerPage);
+        const totalPages = Math.ceil(this.componentData.endpoints.length / this.itemsPerPage);
         if (pageNum >= 0 && pageNum < totalPages) {
             this.currentPage = pageNum;
             this.notifySubscribers('endpoints', this.getFilteredEndpoints());
         }
     }
 
+    /**
+     * Get complete state
+     */
     getState() {
         return {
-            metadata: this.metadata,
-            coverage: this.coverage,
+            metadata: this.componentData.metadata,
+            coverage: this.componentData.coverage,
             endpoints: this.getFilteredEndpoints(),
+            bugs: this.componentData.bugs,
             selectedEndpoint: this.selectedEndpoint,
             filters: this.filters,
-            searchQuery: this.searchQuery
+            searchQuery: this.searchQuery,
+            loadingState: this.getLoadingState()
         };
+    }
+
+    /**
+     * Update UI elements
+     */
+    updateUIElements() {
+        try {
+            const metadata = this.componentData.metadata;
+            if (metadata) {
+                // Update duration
+                const durationElement = document.getElementById('duration');
+                if (durationElement && metadata.fuzzer?.duration) {
+                    durationElement.textContent = `Duration: ${metadata.fuzzer.duration}`;
+                }
+                
+                // Update stats
+                const stats = {
+                    totalRequests: metadata.fuzzer?.total_requests || 0,
+                    criticalErrors: metadata.fuzzer?.critical_issues || 0,
+                    uniqueEndpoints: metadata.total_endpoints || 0,
+                    successRate: metadata.summary?.success_rate || 0
+                };
+                
+                Object.entries(stats).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = id === 'successRate' ? `${value}%` : value;
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error updating UI elements:', error);
+        }
     }
 }
 

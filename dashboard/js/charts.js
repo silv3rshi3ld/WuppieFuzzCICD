@@ -1,18 +1,24 @@
 // Chart initialization and configuration
-window.initializeCharts = function() {
+function initializeCharts() {
     const coverageChart = document.getElementById('coverageChart');
     const methodChart = document.getElementById('methodChart');
     const statusChart = document.getElementById('statusChart');
+    
+    const data = window.summaryData || {};
 
     // Coverage Distribution Chart (Pie)
     if (coverageChart) {
         new Chart(coverageChart, {
             type: 'pie',
             data: {
-                labels: window.fuzzerData.stats.statusDistribution.map(item => item.name),
+                labels: ['Hits', 'Misses', 'Unspecified'],
                 datasets: [{
-                    data: window.fuzzerData.stats.statusDistribution.map(item => item.value),
-                    backgroundColor: window.fuzzerData.stats.statusDistribution.map(item => item.color)
+                    data: [
+                        data.hits || 0,
+                        data.misses || 0,
+                        data.unspecified || 0
+                    ],
+                    backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
                 }]
             },
             options: {
@@ -29,38 +35,26 @@ window.initializeCharts = function() {
 
     // Method Coverage Chart (Bar)
     if (methodChart) {
-        const methodData = window.fuzzerData.stats.methodCoverage;
         new Chart(methodChart, {
             type: 'bar',
             data: {
-                labels: methodData.map(item => item.method),
-                datasets: [
-                    {
-                        label: 'Hits',
-                        data: methodData.map(item => item.hits),
-                        backgroundColor: '#22c55e'
-                    },
-                    {
-                        label: 'Misses',
-                        data: methodData.map(item => item.misses),
-                        backgroundColor: '#ef4444'
-                    },
-                    {
-                        label: 'Unspecified',
-                        data: methodData.map(item => item.unspecified),
-                        backgroundColor: '#f59e0b'
-                    }
-                ]
+                labels: ['GET', 'POST', 'PUT', 'DELETE'],
+                datasets: [{
+                    label: 'Hits',
+                    data: [
+                        data.get_hits || 0,
+                        data.post_hits || 0,
+                        data.put_hits || 0,
+                        data.delete_hits || 0
+                    ],
+                    backgroundColor: '#22c55e'
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: {
-                        stacked: true
-                    },
                     y: {
-                        stacked: true,
                         beginAtZero: true
                     }
                 },
@@ -75,21 +69,17 @@ window.initializeCharts = function() {
 
     // Status Code Distribution Chart (Bar)
     if (statusChart) {
-        const statusData = window.fuzzerData.stats.statusCodes;
         new Chart(statusChart, {
             type: 'bar',
             data: {
-                labels: statusData.map(item => item.status),
+                labels: ['2xx', '4xx', '5xx'],
                 datasets: [{
-                    label: 'Count',
-                    data: statusData.map(item => item.count),
-                    backgroundColor: statusData.map(item => {
-                        const code = parseInt(item.status);
-                        if (code >= 200 && code < 300) return '#22c55e';
-                        if (code >= 400 && code < 500) return '#f59e0b';
-                        if (code >= 500) return '#ef4444';
-                        return '#3b82f6';
-                    })
+                    data: [
+                        data.status_2xx || 0,
+                        data.status_4xx || 0,
+                        data.status_5xx || 0
+                    ],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#ef4444']
                 }]
             },
             options: {
@@ -108,4 +98,7 @@ window.initializeCharts = function() {
             }
         });
     }
-};
+}
+
+// Expose the function globally
+window.initializeCharts = initializeCharts;
