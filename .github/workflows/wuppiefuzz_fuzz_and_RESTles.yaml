@@ -1,10 +1,10 @@
-name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler, and Schemathesis
+name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler
 
 on:
   push:
-    branches: [main]
+    branches: [Data-parsing-dashboards]
   pull_request:
-    branches: [main]
+    branches: [Data-parsing-dashboards]
 
 jobs:
   evomaster:
