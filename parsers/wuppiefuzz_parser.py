@@ -213,15 +213,3 @@ class WuppieFuzzParser(BaseFuzzerParser):
             
         finally:
             self.cleanup()
-
-if __name__ == '__main__':
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    zip_path = os.path.abspath(os.path.join(script_dir, '..', 'output-fuzzers', 'Wuppiefuzz', 'fuzzing-report.zip'))
-    output_dir = os.path.abspath(os.path.join(script_dir, '..', 'dashboard'))
-    
-    try:
-        with WuppieFuzzParser(zip_path, output_dir) as parser:
-            parser.process_data()
-            print("WuppieFuzz data processed successfully")
-    except Exception as e:
-        print(f"Error parsing WuppieFuzz results: {e}")

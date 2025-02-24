@@ -1,80 +1,115 @@
-# Dashboard Simplification Plan
+# Dashboard Generation Workflow Plan
 
-## Current Issues
-- Complex data loading mechanism with multiple files
-- State management making things complicated
-- Data not showing up despite files being generated
-- Too many moving parts with progressive loading
+## Current Flow
+1. Fuzzers run and generate results
+2. Results are zipped and uploaded as artifacts:
+   - Evomaster: `evomaster-results.zip`
+   - Restler: `restler-fuzz-results.zip`
+   - Wuppiefuzz: `fuzzing-report.zip`
 
-## Simplified Approach
+## Proposed Workflow Changes
 
-### 1. Data Structure
-Keep one JSON file per fuzzer with all needed data:
-```json
-{
-  "metadata": {
-    "name": "WuppieFuzz",
-    "total_requests": 100,
-    "critical_issues": 5,
-    "duration": "1:30:00"
-  },
-  "coverage": {
-    "statusDistribution": {
-      "hits": 80,
-      "misses": 15,
-      "unspecified": 5
-    },
-    "methodCoverage": {
-      "GET": {"hits": 40, "misses": 5},
-      "POST": {"hits": 30, "misses": 8},
-      "PUT": {"hits": 10, "misses": 2},
-      "DELETE": {"hits": 0, "misses": 0}
-    },
-    "statusCodes": [
-      {"status": "200", "count": 80},
-      {"status": "404", "count": 15},
-      {"status": "500", "count": 5}
-    ]
-  },
-  "endpoints": [
-    {
-      "path": "/api/users",
-      "method": "GET",
-      "total_requests": 50,
-      "success_rate": 90,
-      "status_codes": {"200": 45, "404": 5}
-    }
-  ]
-}
+### 1. Download and Extract Artifacts
+- Add a new job that runs after all fuzzers complete
+- Download all fuzzer artifacts:
+  - Evomaster results
+  - Restler results
+  - Wuppiefuzz results
+- Extract the zip files to appropriate directories
+
+### 2. Parse Results
+- Run the parsers for each fuzzer:
+  - Use `parsers/evomaster_parser.py` for Evomaster results
+  - Use `parsers/restler_parser.py` for Restler results
+  - Use `parsers/wuppiefuzz_parser.py` for Wuppiefuzz results
+- Generate JSON reports for each fuzzer
+
+### 3. Generate Dashboard
+- Run `generate_dashboard.py` to create the dashboard
+- This will:
+  - Process all parser outputs
+  - Generate all necessary dashboard files
+  - Create a complete, self-contained dashboard
+
+### 4. Package and Upload Dashboard
+- Create a zip file containing the complete dashboard
+- Upload as a GitHub Actions artifact named "fuzzing-dashboard"
+- Make it available for download from the workflow run
+
+## GitHub Actions Implementation
+
+```yaml
+# After fuzzer jobs complete
+jobs:
+  generate-dashboard:
+    needs: [run-evomaster, run-restler, run-wuppiefuzz]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Evomaster Results
+        uses: actions/download-artifact@v3
+        with:
+          name: evomaster-results
+          path: output-fuzzers/Evomaster
+
+      - name: Download Restler Results
+        uses: actions/download-artifact@v3
+        with:
+          name: restler-results
+          path: output-fuzzers/Restler
+
+      - name: Download Wuppiefuzz Results
+        uses: actions/download-artifact@v3
+        with:
+          name: wuppiefuzz-results
+          path: output-fuzzers/Wuppiefuzz
+
+      - name: Extract Results
+        run: |
+          cd output-fuzzers/Evomaster && unzip evomaster-results.zip
+          cd ../Restler && unzip restler-fuzz-results.zip
+          cd ../Wuppiefuzz && unzip fuzzing-report.zip
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Parse Results and Generate Dashboard
+        run: |
+          python -m parsers
+          python generate_dashboard.py
+
+      - name: Package Dashboard
+        run: |
+          zip -r fuzzing-dashboard.zip dashboard/
+
+      - name: Upload Dashboard
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-dashboard
+          path: fuzzing-dashboard.zip
+          retention-days: 90
 ```
 
-### 2. Simplified HTML Structure
-- One self-contained HTML file per fuzzer
-- Data embedded directly in the HTML as a JavaScript object
-- Direct Chart.js initialization without state management
-- Simple DOM manipulation for showing data
+## Benefits
+1. Automated end-to-end workflow
+2. Single downloadable artifact containing complete dashboard
+3. Easy access to results for all stakeholders
+4. Consistent dashboard generation process
+5. Long retention period (90 days) for historical comparison
 
-### 3. Implementation Steps
-1. Update generate_dashboard.py to:
-   - Process fuzzer reports into simplified JSON structure
-   - Generate self-contained HTML files with embedded data
-   - Use direct Chart.js initialization
-   - Remove complex state management
+## Technical Considerations
+1. Ensure all required Python dependencies are installed
+2. Verify parsers can handle potential errors in fuzzer outputs
+3. Consider adding error handling and reporting
+4. Add logging for debugging workflow issues
+5. Consider caching dependencies to speed up workflow
 
-2. Create simple template with:
-   - Basic HTML structure
-   - Chart.js initialization
-   - Direct data access
-   - No progressive loading
-
-### 4. Benefits
-- Easier to debug (all data visible in page source)
-- No complex file loading
-- No state management needed
-- Direct Chart.js usage
-- Faster loading and rendering
-
-### Next Steps
-1. Update generate_dashboard.py to implement this simpler approach
-2. Create new simplified template
-3. Test with direct data embedding
+## Next Steps
+1. Implement the GitHub Actions workflow changes
+2. Test the workflow with sample fuzzer outputs
+3. Verify dashboard generation and artifact upload
+4. Add documentation for accessing and using the dashboard

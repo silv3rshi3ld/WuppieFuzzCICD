@@ -20,5 +20,19 @@ window.Evomastercoverage = {
       "misses": 2,
       "unspecified": 0
     }
-  }
+  },
+  "status_codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    401,
+    401,
+    401,
+    401,
+    401
+  ]
 };
