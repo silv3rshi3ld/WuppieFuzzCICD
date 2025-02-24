@@ -1,0 +1,11 @@
+--- simple_fuzzer.html
++++ simple_fuzzer.html
+@@ -87,7 +87,7 @@
+     <!-- Embedded Data -->
+     <script>
+         // Data will be injected here by the generator
+-        const fuzzerData = {{embedded_data}};
++        const fuzzerData = JSON.parse('{{embedded_data}}');
+ 
+         // Status code severity classification
+         function getSeverity(code) {

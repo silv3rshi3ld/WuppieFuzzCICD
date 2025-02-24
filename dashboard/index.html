@@ -10,7 +10,7 @@
     <link href="styles.css" rel="stylesheet">
     
     <!-- JavaScript Dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
 </head>
 <body class="bg-gray-50">
@@ -64,19 +64,19 @@
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div class="stats-card">
-                        <div class="stats-value" id="totalRequests">0</div>
+                        <div class="stats-value" id="totalRequests">7185</div>
                         <div class="stats-label">Total Requests</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value critical-error" id="criticalErrors">0</div>
+                        <div class="stats-value critical-error" id="criticalErrors">186</div>
                         <div class="stats-label">Critical Errors (500+)</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value" id="uniqueEndpoints">7185</div>
+                        <div class="stats-value" id="uniqueEndpoints">14</div>
                         <div class="stats-label">Unique Endpoints</div>
                     </div>
                     <div class="stats-card">
-                        <div class="stats-value" id="successRate">0.0%</div>
+                        <div class="stats-value" id="successRate">64.74%</div>
                         <div class="stats-label">Success Rate</div>
                     </div>
                 </div>
@@ -98,15 +98,15 @@
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Total Requests</span>
-                            <span class="font-medium">0</span>
+                            <span class="font-medium">7159</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Critical Issues</span>
-                            <span class="font-medium  text-gray-600">0</span>
+                            <span class="font-medium  text-red-600">176</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-600">Duration</span>
-                            <span class="font-medium">0:01:00</span>
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">64.88%</span>
                         </div>
                     </div>
                 </a>
@@ -116,15 +116,15 @@
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Total Requests</span>
-                            <span class="font-medium">0</span>
+                            <span class="font-medium">14</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Critical Issues</span>
-                            <span class="font-medium  text-gray-600">0</span>
+                            <span class="font-medium  text-red-600">10</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-600">Duration</span>
-                            <span class="font-medium">Unknown</span>
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">0%</span>
                         </div>
                     </div>
                 </a>
@@ -134,15 +134,15 @@
                     <div class="space-y-2">
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Total Requests</span>
-                            <span class="font-medium">0</span>
+                            <span class="font-medium">12</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-600">Critical Issues</span>
                             <span class="font-medium  text-gray-600">0</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-600">Duration</span>
-                            <span class="font-medium">Unknown</span>
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">58.33%</span>
                         </div>
                     </div>
                 </a>
@@ -264,9 +264,9 @@
                             labels: ['Hits', 'Misses', 'Unspecified'],
                             datasets: [{
                                 data: [
-                                    coverage.statusDistribution.hits || 0,
-                                    coverage.statusDistribution.misses || 0,
-                                    coverage.statusDistribution.unspecified || 0
+                                    coverage.status_distribution.hits || 0,
+                                    coverage.status_distribution.misses || 0,
+                                    coverage.status_distribution.unspecified || 0
                                 ],
                                 backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
                             }]
@@ -274,8 +274,10 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            legend: {
-                                position: 'bottom'
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
                             }
                         }
                     });
@@ -291,15 +293,15 @@
                             labels: methods,
                             datasets: [{
                                 label: 'Hits',
-                                data: methods.map(m => coverage.methodCoverage[m]?.hits || 0),
+                                data: methods.map(m => coverage.method_coverage[m]?.hits || 0),
                                 backgroundColor: '#22c55e'
                             }, {
                                 label: 'Misses',
-                                data: methods.map(m => coverage.methodCoverage[m]?.misses || 0),
+                                data: methods.map(m => coverage.method_coverage[m]?.misses || 0),
                                 backgroundColor: '#ef4444'
                             }, {
                                 label: 'Unspecified',
-                                data: methods.map(m => coverage.methodCoverage[m]?.unspecified || 0),
+                                data: methods.map(m => coverage.method_coverage[m]?.unspecified || 0),
                                 backgroundColor: '#f59e0b'
                             }]
                         },
@@ -307,18 +309,18 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             scales: {
-                                xAxes: [{
+                                x: {
                                     stacked: true
-                                }],
-                                yAxes: [{
+                                },
+                                y: {
                                     stacked: true,
-                                    ticks: {
-                                        beginAtZero: true
-                                    }
-                                }]
+                                    beginAtZero: true
+                                }
                             },
-                            legend: {
-                                position: 'bottom'
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
                             }
                         }
                     });
@@ -327,14 +329,23 @@
                 // Status Code Distribution Chart
                 const statusChart = document.getElementById('statusChart');
                 if (statusChart) {
+                    // Calculate status code distribution from endpoints
+                    const statusCodes = {};
+                    data.coverage.status_codes?.forEach(code => {
+                        statusCodes[code] = (statusCodes[code] || 0) + 1;
+                    });
+
+                    const labels = Object.keys(statusCodes).sort((a, b) => parseInt(a) - parseInt(b));
+                    const values = labels.map(code => statusCodes[code]);
+
                     new Chart(statusChart.getContext('2d'), {
                         type: 'bar',
                         data: {
-                            labels: coverage.statusCodes.map(s => s.status),
+                            labels: labels,
                             datasets: [{
-                                data: coverage.statusCodes.map(s => s.count),
-                                backgroundColor: coverage.statusCodes.map(s => {
-                                    const code = parseInt(s.status);
+                                data: values,
+                                backgroundColor: labels.map(code => {
+                                    code = parseInt(code);
                                     if (code >= 500) return '#ef4444';
                                     if (code >= 400) return '#f59e0b';
                                     return '#22c55e';
@@ -345,14 +356,14 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             scales: {
-                                yAxes: [{
-                                    ticks: {
-                                        beginAtZero: true
-                                    }
-                                }]
+                                y: {
+                                    beginAtZero: true
+                                }
                             },
-                            legend: {
-                                display: false
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
                             }
                         }
                     });

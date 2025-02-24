@@ -1,11 +1,6 @@
-window.WuppieFuzzMetadata = {
-  "fuzzer": {
-    "name": "wuppiefuzz",
-    "total_requests": 0,
-    "critical_issues": 0,
-    "duration": "0:01:00"
-  },
-  "summary": {
-    "success_rate": 0
-  }
+window.WuppieFuzzmetadata = {
+  "duration": "0:01:00",
+  "total_requests": 7159,
+  "unique_bugs": 176,
+  "critical_issues": 176
 };

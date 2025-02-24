@@ -74,12 +74,41 @@
             border: 1px solid #e5e7eb;
             margin-top: 0.5rem;
         }
+        .chart-error {
+            text-align: center;
+            padding: 2rem;
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 0.5rem;
+            color: #991b1b;
+        }
     </style>
 
-    <!-- Embedded Data -->
+    <!-- Global Functions -->
     <script>
-        // Data will be injected here by the generator
-        const fuzzerData = {{embedded_data}};
+        // Error handling helper
+        function handleChartError(containerId, error) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = `
+                    <div class="chart-error">
+                        <i data-feather="alert-triangle" class="h-6 w-6 mb-2"></i>
+                        <div class="font-medium">Failed to load chart</div>
+                        <div class="text-sm mt-1">${error}</div>
+                    </div>
+                `;
+                feather.replace();
+            }
+        }
+
+        // Data validation helper
+        function validateChartData(data, requiredFields) {
+            if (!data) return false;
+            return requiredFields.every(field => {
+                const value = field.split('.').reduce((obj, key) => obj && obj[key], data);
+                return value !== undefined && value !== null;
+            });
+        }
 
         // Status code severity classification
         function getSeverity(code) {
@@ -87,7 +116,7 @@
             if (code >= 500) return 'critical';
             if (code === 401 || code === 403) return 'high';
             if (code === 400) return 'medium';
-            if (code === 200) return 'medium';
+            if (code >= 200 && code < 300) return 'medium';
             if (code === 404) return 'low';
             if (code >= 300 && code < 400) return 'info';
             return 'low';
@@ -100,6 +129,11 @@
             low: 'Low: Expected error responses',
             info: 'Informational: Redirects, informational responses'
         };
+    </script>
+
+    <!-- Embedded Data -->
+    <script>
+        const fuzzerData = JSON.parse("{{embedded_data}}");
     </script>
 </head>
 <body class="bg-gray-50">
@@ -114,7 +148,6 @@
                 <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
                 {{fuzzer_name}} Results
             </h1>
-            <div class="ml-auto text-gray-500" id="duration">Duration: {{duration}}</div>
         </div>
 
         <!-- Content -->
@@ -162,7 +195,7 @@
                             <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
                             Coverage Distribution
                         </h3>
-                        <div class="chart-container">
+                        <div class="chart-container" id="coverageChartContainer">
                             <canvas id="coverageChart"></canvas>
                         </div>
                     </div>
@@ -173,7 +206,7 @@
                             <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
                             Method Coverage
                         </h3>
-                        <div class="chart-container">
+                        <div class="chart-container" id="methodChartContainer">
                             <canvas id="methodChart"></canvas>
                         </div>
                     </div>
@@ -184,7 +217,7 @@
                             <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
                             Status Code Distribution
                         </h3>
-                        <div class="chart-container">
+                        <div class="chart-container" id="statusChartContainer">
                             <canvas id="statusChart"></canvas>
                         </div>
                     </div>
@@ -236,250 +269,283 @@
 
         // Initialize charts
         function initializeCharts() {
-            // Coverage Distribution Chart
-            new Chart(document.getElementById('coverageChart').getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: ['Hits', 'Misses', 'Unspecified'],
-                    datasets: [{
-                        data: [
-                            fuzzerData.coverage.statusDistribution.hits,
-                            fuzzerData.coverage.statusDistribution.misses,
-                            fuzzerData.coverage.statusDistribution.unspecified
-                        ],
-                        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
+            try {
+                // Validate coverage data
+                if (!validateChartData(fuzzerData.coverage, ['status_distribution.hits', 'status_distribution.misses', 'status_distribution.unspecified'])) {
+                    throw new Error('Invalid coverage distribution data');
+                }
+
+                // Coverage Distribution Chart
+                new Chart(document.getElementById('coverageChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Hits', 'Misses', 'Unspecified'],
+                        datasets: [{
+                            data: [
+                                fuzzerData.coverage.status_distribution.hits,
+                                fuzzerData.coverage.status_distribution.misses,
+                                fuzzerData.coverage.status_distribution.unspecified
+                            ],
+                            backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            // Method Coverage Chart
-            const methods = ['GET', 'POST', 'PUT', 'DELETE'];
-            new Chart(document.getElementById('methodChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: methods,
-                    datasets: [{
-                        label: 'Hits',
-                        data: methods.map(m => fuzzerData.coverage.methodCoverage[m]?.hits || 0),
-                        backgroundColor: '#22c55e'
-                    }, {
-                        label: 'Misses',
-                        data: methods.map(m => fuzzerData.coverage.methodCoverage[m]?.misses || 0),
-                        backgroundColor: '#ef4444'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true
+                // Validate method coverage data
+                if (!validateChartData(fuzzerData.coverage, ['method_coverage'])) {
+                    throw new Error('Invalid method coverage data');
+                }
+
+                // Method Coverage Chart
+                const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+                new Chart(document.getElementById('methodChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: methods,
+                        datasets: [{
+                            label: 'Hits',
+                            data: methods.map(m => fuzzerData.coverage.method_coverage[m]?.hits || 0),
+                            backgroundColor: '#22c55e'
+                        }, {
+                            label: 'Misses',
+                            data: methods.map(m => fuzzerData.coverage.method_coverage[m]?.misses || 0),
+                            backgroundColor: '#ef4444'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                stacked: true
+                            },
+                            y: {
+                                stacked: true,
+                                beginAtZero: true
+                            }
                         },
-                        y: {
-                            stacked: true,
-                            beginAtZero: true
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            // Status Code Distribution Chart
-            new Chart(document.getElementById('statusChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: fuzzerData.coverage.statusCodes.map(s => s.status),
-                    datasets: [{
-                        data: fuzzerData.coverage.statusCodes.map(s => s.count),
-                        backgroundColor: fuzzerData.coverage.statusCodes.map(s => {
-                            const code = parseInt(s.status);
-                            if (code >= 500) return '#ef4444';
-                            if (code >= 400) return '#f59e0b';
-                            return '#22c55e';
-                        })
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
+                // Calculate status code distribution from endpoints
+                const statusCodes = {};
+                fuzzerData.endpoints.forEach(endpoint => {
+                    const code = endpoint.status_code;
+                    if (code) {
+                        statusCodes[code] = (statusCodes[code] || 0) + 1;
+                    }
+                });
+
+                // Status Code Distribution Chart
+                new Chart(document.getElementById('statusChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(statusCodes),
+                        datasets: [{
+                            data: Object.values(statusCodes),
+                            backgroundColor: Object.keys(statusCodes).map(code => {
+                                code = parseInt(code);
+                                if (code >= 500) return '#ef4444';
+                                if (code >= 400) return '#f59e0b';
+                                return '#22c55e';
+                            })
+                        }]
                     },
-                    plugins: {
-                        legend: {
-                            display: false
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error initializing charts:', error);
+                handleChartError('coverageChartContainer', 'Failed to initialize coverage chart');
+                handleChartError('methodChartContainer', 'Failed to initialize method coverage chart');
+                handleChartError('statusChartContainer', 'Failed to initialize status code chart');
+            }
         }
 
         // Build endpoint tree
         function buildEndpointTree() {
-            const tree = {};
-            fuzzerData.endpoints.forEach(endpoint => {
-                const parts = endpoint.path.split('/').filter(p => p);
-                let current = tree;
-                parts.forEach(part => {
-                    if (!current[part]) {
-                        current[part] = {
-                            methods: {},
-                            children: {}
-                        };
-                    }
-                    current = current[part].children;
-                });
-
-                // Add method to the last node
-                const lastNode = parts.reduce((acc, part) => acc[part].children, tree);
-                if (!lastNode._methods) lastNode._methods = [];
-                lastNode._methods.push(endpoint);
-            });
-
-            function renderTree(node, path = '') {
-                let html = '<ul>';
-                for (const [segment, data] of Object.entries(node)) {
-                    if (segment === '_methods') continue;
-                    const currentPath = path + '/' + segment;
-                    const methods = node[segment].methods;
-                    const hasChildren = Object.keys(data.children).length > 0;
-                    
-                    html += `
-                        <li>
-                            <div class="path-segment ${hasChildren ? 'collapsible' : ''}" data-path="${currentPath}">
-                                ${segment}
-                            </div>
-                    `;
-
-                    if (hasChildren) {
-                        html += renderTree(data.children, currentPath);
-                    }
-
-                    // Add methods if this is an endpoint
-                    const endpointMethods = data.children._methods;
-                    if (endpointMethods && endpointMethods.length > 0) {
-                        html += '<div class="methods">';
-                        endpointMethods.forEach(endpoint => {
-                            const severityClasses = Object.entries(endpoint.status_codes)
-                                .map(([code, count]) => `severity-${getSeverity(code)}`)
-                                .join(' ');
-                            
-                            html += `
-                                <div class="method-details mb-4">
-                                    <div class="flex items-center gap-2 mb-2">
-                                        <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium">
-                                            ${endpoint.method}
-                                        </span>
-                                        <span class="text-gray-600">${endpoint.total_requests} requests</span>
-                                        <span class="text-gray-600">${endpoint.success_rate}% success</span>
-                                    </div>
-                                    <div class="status-codes flex gap-2 flex-wrap">
-                                        ${Object.entries(endpoint.status_codes)
-                                            .map(([code, count]) => `
-                                                <span class="px-2 py-1 rounded-full text-sm font-medium severity-${getSeverity(code)}">
-                                                    ${code}: ${count}
-                                                </span>
-                                            `).join('')}
-                                    </div>
-                                    ${endpoint.response_data ? `
-                                        <div class="mt-2">
-                                            <button class="text-sm text-blue-600 hover:text-blue-800 collapsible collapsed" 
-                                                    onclick="toggleResponse(this)">
-                                                Show Response
-                                            </button>
-                                            <div class="response-details hidden">
-                                                ${endpoint.response_data}
-                                            </div>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        });
-                        html += '</div>';
-                    }
-
-                    html += '</li>';
+            try {
+                if (!fuzzerData.endpoints || !Array.isArray(fuzzerData.endpoints)) {
+                    throw new Error('Invalid endpoints data');
                 }
-                html += '</ul>';
-                return html;
-            }
 
-            document.getElementById('endpointTree').innerHTML = renderTree(tree);
+                const tree = {};
+                fuzzerData.endpoints.forEach(endpoint => {
+                    const parts = endpoint.path.split('/').filter(p => p);
+                    let current = tree;
+                    parts.forEach(part => {
+                        if (!current[part]) {
+                            current[part] = {
+                                methods: [],
+                                children: {}
+                            };
+                        }
+                        current = current[part].children;
+                    });
 
-            // Add click handlers for collapsible segments
-            document.querySelectorAll('.collapsible').forEach(el => {
-                el.addEventListener('click', function() {
-                    this.classList.toggle('collapsed');
-                    const content = this.nextElementSibling;
-                    if (content) {
-                        content.classList.toggle('hidden');
-                    }
+                    // Add method to the last node
+                    if (!current._methods) current._methods = [];
+                    current._methods.push(endpoint);
                 });
-            });
+
+                function renderTree(node, path = '') {
+                    let html = '<ul>';
+                    for (const [segment, data] of Object.entries(node)) {
+                        if (segment === '_methods') continue;
+                        const currentPath = path + '/' + segment;
+                        const hasChildren = Object.keys(data.children).length > 0;
+                        
+                        html += `
+                            <li>
+                                <div class="path-segment ${hasChildren ? 'collapsible' : ''}" data-path="${currentPath}">
+                                    ${segment}
+                                </div>
+                        `;
+
+                        if (hasChildren) {
+                            html += renderTree(data.children, currentPath);
+                        }
+
+                        // Add methods if this is an endpoint
+                        if (data._methods && data._methods.length > 0) {
+                            html += '<div class="methods">';
+                            data._methods.forEach(endpoint => {
+                                html += `
+                                    <div class="method-details mb-4">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium">
+                                                ${endpoint.http_method}
+                                            </span>
+                                            <span class="px-2 py-1 rounded-full text-sm font-medium severity-${getSeverity(endpoint.status_code)}">
+                                                ${endpoint.status_code}
+                                            </span>
+                                            <span class="text-gray-600">${endpoint.type}</span>
+                                        </div>
+                                        ${endpoint.response_data ? `
+                                            <div class="mt-2">
+                                                <button class="text-sm text-blue-600 hover:text-blue-800 collapsible collapsed" 
+                                                        onclick="toggleResponse(this)">
+                                                    Show Response
+                                                </button>
+                                                <div class="response-details hidden">
+                                                    ${endpoint.response_data}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            });
+                            html += '</div>';
+                        }
+
+                        html += '</li>';
+                    }
+                    html += '</ul>';
+                    return html;
+                }
+
+                document.getElementById('endpointTree').innerHTML = renderTree(tree);
+
+                // Add click handlers for collapsible segments
+                document.querySelectorAll('.collapsible').forEach(el => {
+                    el.addEventListener('click', function() {
+                        this.classList.toggle('collapsed');
+                        const content = this.nextElementSibling;
+                        if (content) {
+                            content.classList.toggle('hidden');
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error building endpoint tree:', error);
+                handleChartError('endpointTree', 'Failed to build endpoint tree');
+            }
         }
 
         // Initialize error classification
         function initializeErrorClassification() {
-            const errorsByType = {};
-            fuzzerData.endpoints.forEach(endpoint => {
-                Object.entries(endpoint.status_codes).forEach(([code, count]) => {
-                    const severity = getSeverity(code);
+            try {
+                if (!fuzzerData.endpoints || !Array.isArray(fuzzerData.endpoints)) {
+                    throw new Error('Invalid endpoints data');
+                }
+
+                const errorsByType = {};
+                fuzzerData.endpoints.forEach(endpoint => {
+                    if (!endpoint.status_code) return;
+                    
+                    const severity = getSeverity(endpoint.status_code);
                     if (!errorsByType[severity]) {
                         errorsByType[severity] = {
                             count: 0,
                             codes: {}
                         };
                     }
-                    errorsByType[severity].count += count;
+                    
+                    const code = endpoint.status_code.toString();
                     if (!errorsByType[severity].codes[code]) {
                         errorsByType[severity].codes[code] = 0;
                     }
-                    errorsByType[severity].codes[code] += count;
+                    errorsByType[severity].count += 1;
+                    errorsByType[severity].codes[code] += 1;
                 });
-            });
 
-            const container = document.getElementById('errorClassification');
-            Object.entries(errorsByType)
-                .sort((a, b) => {
-                    const order = ['critical', 'high', 'medium', 'low', 'info'];
-                    return order.indexOf(a[0]) - order.indexOf(b[0]);
-                })
-                .forEach(([severity, data]) => {
-                    container.innerHTML += `
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="px-3 py-1 rounded-full text-sm font-medium severity-${severity}">
-                                    ${severity.charAt(0).toUpperCase() + severity.slice(1)}
-                                </span>
-                                <span class="text-gray-600">${data.count} responses</span>
-                                <span class="text-sm text-gray-500">${severityDescriptions[severity]}</span>
+                const container = document.getElementById('errorClassification');
+                Object.entries(errorsByType)
+                    .sort((a, b) => {
+                        const order = ['critical', 'high', 'medium', 'low', 'info'];
+                        return order.indexOf(a[0]) - order.indexOf(b[0]);
+                    })
+                    .forEach(([severity, data]) => {
+                        container.innerHTML += `
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <span class="px-3 py-1 rounded-full text-sm font-medium severity-${severity}">
+                                        ${severity.charAt(0).toUpperCase() + severity.slice(1)}
+                                    </span>
+                                    <span class="text-gray-600">${data.count} responses</span>
+                                    <span class="text-sm text-gray-500">${severityDescriptions[severity]}</span>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    ${Object.entries(data.codes).map(([code, count]) => `
+                                        <div class="p-3 rounded-lg severity-${severity} bg-opacity-10">
+                                            <div class="text-lg font-semibold">${code}</div>
+                                            <div class="text-sm">${count} requests</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                ${Object.entries(data.codes).map(([code, count]) => `
-                                    <div class="p-3 rounded-lg severity-${severity} bg-opacity-10">
-                                        <div class="text-lg font-semibold">${code}</div>
-                                        <div class="text-sm">${count} requests</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+            } catch (error) {
+                console.error('Error initializing error classification:', error);
+                handleChartError('errorClassification', 'Failed to initialize error classification');
+            }
         }
 
         // Toggle response details
@@ -491,27 +557,34 @@
 
         // Initialize everything when the page loads
         document.addEventListener('DOMContentLoaded', () => {
-            initializeCharts();
-            buildEndpointTree();
-            initializeErrorClassification();
+            try {
+                initializeCharts();
+                buildEndpointTree();
+                initializeErrorClassification();
 
-            // Add search functionality
-            document.getElementById('endpointSearch').addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                document.querySelectorAll('.endpoint-tree li').forEach(li => {
-                    const pathSegment = li.querySelector('.path-segment');
-                    const path = pathSegment.dataset.path.toLowerCase();
-                    const visible = path.includes(searchTerm);
-                    li.style.display = visible ? '' : 'none';
-                    if (visible) {
-                        let parent = li.parentElement;
-                        while (parent && !parent.classList.contains('endpoint-tree')) {
-                            parent.style.display = '';
-                            parent = parent.parentElement;
+                // Add search functionality
+                document.getElementById('endpointSearch').addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    document.querySelectorAll('.endpoint-tree li').forEach(li => {
+                        const pathSegment = li.querySelector('.path-segment');
+                        if (!pathSegment) return;
+                        
+                        const path = pathSegment.dataset.path.toLowerCase();
+                        const visible = path.includes(searchTerm);
+                        li.style.display = visible ? '' : 'none';
+                        if (visible) {
+                            let parent = li.parentElement;
+                            while (parent && !parent.classList.contains('endpoint-tree')) {
+                                parent.style.display = '';
+                                parent = parent.parentElement;
+                            }
                         }
-                    }
+                    });
                 });
-            });
+            } catch (error) {
+                console.error('Error during initialization:', error);
+                handleChartError('content', 'Failed to initialize dashboard');
+            }
         });
     </script>
 </body>

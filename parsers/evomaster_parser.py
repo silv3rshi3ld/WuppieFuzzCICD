@@ -6,15 +6,19 @@ import re
 import zipfile
 import tempfile
 import shutil
+from .base_parser import BaseFuzzerParser
 
-class EvomasterParser:
-    def __init__(self, zip_path):
+class EvomasterParser(BaseFuzzerParser):
+    def __init__(self, zip_path, output_dir, chunk_size=100):
         """
         Initialize the Evomaster parser.
         
         Args:
             zip_path (str): Path to the zip file containing Evomaster results
+            output_dir (str): Directory where the chunked output will be written
+            chunk_size (int): Number of endpoints per chunk
         """
+        super().__init__(output_dir, "Evomaster", chunk_size)
         self.zip_path = zip_path
         self.temp_dir = None
         self.results_dir = None
@@ -41,7 +45,6 @@ class EvomasterParser:
 
     def _parse_python_file(self, file_path):
         """Parse a Python test file and extract test information."""
-        print(f"\nParsing file: {file_path}")
         with open(file_path, 'r') as f:
             content = f.read()
         
@@ -57,15 +60,13 @@ class EvomasterParser:
         
         # Extract metadata from file comments
         for node in ast.walk(tree):
-            if isinstance(node, ast.Str):
-                if 'Covered targets:' in node.s:
-                    metadata['covered_targets'] = int(node.s.split(': ')[1])
-                elif 'Used time:' in node.s:
-                    metadata['used_time'] = node.s.split(': ')[1].strip()
-                elif 'Needed budget:' in node.s:
-                    metadata['needed_budget'] = node.s.split(': ')[1].strip()
-        
-        print(f"Found metadata: {metadata}")
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if 'Covered targets:' in node.value:
+                    metadata['covered_targets'] = int(node.value.split(': ')[1])
+                elif 'Used time:' in node.value:
+                    metadata['used_time'] = node.value.split(': ')[1].strip()
+                elif 'Needed budget:' in node.value:
+                    metadata['needed_budget'] = node.value.split(': ')[1].strip()
         
         # Extract test cases
         for node in ast.walk(tree):
@@ -81,18 +82,7 @@ class EvomasterParser:
                 }
                 
                 # Get the source code including comments
-                source_lines = []
-                for child in ast.iter_child_nodes(node):
-                    if hasattr(child, 'lineno'):
-                        start_line = child.lineno
-                        break
-                else:
-                    start_line = node.lineno
-                
-                # Extract test information from comments
-                print(f"\nProcessing test: {node.name}")
-                comment_lines = content.split('\n')[node.lineno-5:start_line]
-                print(f"Comment lines: {comment_lines}")
+                comment_lines = content.split('\n')[node.lineno-5:node.lineno]
                 for line in comment_lines:
                     line = line.strip()
                     if line.startswith('# ('):
@@ -102,14 +92,12 @@ class EvomasterParser:
                             test_case['status_code'] = int(match.group(1))
                             test_case['method'] = match.group(2)
                             test_case['endpoint'] = match.group(3).strip()
-                            print(f"Found test info: {test_case['method']} {test_case['endpoint']} -> {test_case['status_code']}")
                 
                 # Extract request and response details
                 for child in ast.walk(node):
                     if isinstance(child, ast.Assert):
                         assertion_text = ast.unparse(child).strip()
                         test_case['assertions'].append(assertion_text)
-                        # Try to extract response data from assertions
                         if 'json()' in assertion_text:
                             test_case['response_data'] = assertion_text
                     elif isinstance(child, ast.Assign):
@@ -120,21 +108,31 @@ class EvomasterParser:
                                     test_case['request_data'] = ''
                                 test_case['request_data'] += ast.unparse(child.value).strip() + '\n'
                 
-                if test_case['status_code'] is not None:  # Only add test cases with valid status codes
+                if test_case['status_code'] is not None:
                     test_info.append(test_case)
-                    print(f"Added test case: {test_case}")
         
-        print(f"\nFound {len(test_info)} test cases")
         return metadata, test_info
 
-    def get_metadata_statistics(self):
-        """Get metadata statistics about the fuzzing session."""
-        if not self.test_data:
-            self._parse_all_files()
+    def _parse_all_files(self):
+        """Parse both faults and successes files."""
+        if self.test_data is None:
+            self.test_data = {
+                'faults': {'metadata': {}, 'tests': []},
+                'successes': {'metadata': {}, 'tests': []}
+            }
+            
+            if os.path.exists(self.faults_file):
+                self.test_data['faults']['metadata'], self.test_data['faults']['tests'] = self._parse_python_file(self.faults_file)
+            
+            if os.path.exists(self.successes_file):
+                self.test_data['successes']['metadata'], self.test_data['successes']['tests'] = self._parse_python_file(self.successes_file)
+
+    def process_metadata(self):
+        """Process and write metadata."""
+        self._parse_all_files()
         
         duration = "Unknown"
         try:
-            # Parse the used time string (e.g., "0h 1m 19s")
             time_str = self.test_data['faults']['metadata'].get('used_time')
             if time_str:
                 hours = minutes = seconds = 0
@@ -146,220 +144,95 @@ class EvomasterParser:
                         minutes = int(part[:-1])
                     elif part.endswith('s'):
                         seconds = int(part[:-1])
-                
-                duration = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+                duration = str(timedelta(hours=hours, minutes=minutes, seconds=seconds))
         except Exception as e:
             print(f"Warning: Error extracting duration: {e}")
         
-        # Count critical issues (500+ status codes)
-        critical_issues = 0
-        try:
-            for test in self.test_data['faults']['tests']:
-                if test['status_code'] and test['status_code'] >= 500:
-                    critical_issues += 1
-        except Exception as e:
-            print(f"Warning: Error counting critical issues: {e}")
+        # Count statistics
+        total_requests = len(self.test_data['faults']['tests']) + len(self.test_data['successes']['tests'])
+        critical_issues = sum(1 for test in self.test_data['faults']['tests']
+                            if test['status_code'] and test['status_code'] >= 500)
         
-        total_requests = 0
-        unique_bugs = 0
-        try:
-            total_requests = len(self.test_data['faults']['tests']) + len(self.test_data['successes']['tests'])
-            unique_bugs = len(self.test_data['faults']['tests'])  # All tests in faults file are bugs
-        except Exception as e:
-            print(f"Warning: Error getting total requests or unique bugs: {e}")
-        
-        return {
-            "duration": str(duration),
+        metadata = {
+            "duration": duration,
             "total_requests": total_requests,
-            "unique_bugs": unique_bugs,
+            "unique_bugs": len(self.test_data['faults']['tests']),
             "critical_issues": critical_issues
         }
-
-    def get_endpoint_information(self):
-        """Get detailed information about each endpoint."""
-        if not self.test_data:
-            self._parse_all_files()
         
-        endpoints = []
-        try:
-            for test_type in ['faults', 'successes']:
-                for test in self.test_data[test_type]['tests']:
-                    if test['endpoint'] and test['status_code']:
-                        endpoints.append({
-                            "path": test['endpoint'],
-                            "http_method": test['method'] if test['method'] else 'GET',
-                            "status_code": test['status_code'],
-                            "type": 'miss' if test_type == 'faults' else 'hit',
-                            "request_details": test['request_data'],
-                            "response_data": test['response_data']
-                        })
-        except Exception as e:
-            print(f"Warning: Error in get_endpoint_information: {e}")
-        return endpoints
+        self.write_chunked_data(metadata, 'metadata')
 
-    def get_coverage_statistics(self):
-        """Get coverage statistics."""
-        if not self.test_data:
-            self._parse_all_files()
+    def process_coverage(self):
+        """Process and write coverage data."""
+        self._parse_all_files()
         
         status_dist = {'hits': 0, 'misses': 0, 'unspecified': 0}
         method_coverage = {}
+        status_codes = []
         
-        try:
-            # Process successes
-            for test in self.test_data['successes']['tests']:
-                if test['status_code']:
-                    status_dist['hits'] += 1
-                    method = test['method'] if test['method'] else 'GET'
-                    if method not in method_coverage:
-                        method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
-                    method_coverage[method]['hits'] += 1
-            
-            # Process faults (all counted as misses)
-            for test in self.test_data['faults']['tests']:
-                if test['status_code']:
-                    status_dist['misses'] += 1
-                    method = test['method'] if test['method'] else 'GET'
-                    if method not in method_coverage:
-                        method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
-                    method_coverage[method]['misses'] += 1
-        except Exception as e:
-            print(f"Warning: Error in get_coverage_statistics: {e}")
+        # Process successes
+        for test in self.test_data['successes']['tests']:
+            if test['status_code']:
+                status_dist['hits'] += 1
+                status_codes.append(test['status_code'])
+                method = test['method'] if test['method'] else 'GET'
+                if method not in method_coverage:
+                    method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
+                method_coverage[method]['hits'] += 1
         
-        return {
+        # Process faults
+        for test in self.test_data['faults']['tests']:
+            if test['status_code']:
+                status_dist['misses'] += 1
+                status_codes.append(test['status_code'])
+                method = test['method'] if test['method'] else 'GET'
+                if method not in method_coverage:
+                    method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
+                method_coverage[method]['misses'] += 1
+        
+        coverage_data = {
             "status_distribution": status_dist,
-            "method_coverage": method_coverage
+            "method_coverage": method_coverage,
+            "status_codes": status_codes
         }
-
-    def get_bug_information(self):
-        """Get detailed information about bugs."""
-        if not self.test_data:
-            self._parse_all_files()
         
-        bugs = []
-        try:
-            for test in self.test_data['faults']['tests']:
-                if test['status_code']:
-                    bugs.append({
+        self.write_chunked_data(coverage_data, 'coverage')
+
+    def process_endpoints(self):
+        """Process and write endpoint data in chunks."""
+        self._parse_all_files()
+        
+        all_endpoints = []
+        
+        # Process both faults and successes
+        for test_type in ['faults', 'successes']:
+            for test in self.test_data[test_type]['tests']:
+                if test['endpoint'] and test['status_code']:
+                    endpoint_info = {
+                        "path": test['endpoint'],
+                        "http_method": test['method'] if test['method'] else 'GET',
                         "status_code": test['status_code'],
-                        "endpoint": test['endpoint'],
-                        "method": test['method'] if test['method'] else 'GET',
-                        "type": 'miss',
-                        "request": test['request_data'],
-                        "response": test['response_data']
-                    })
-        except Exception as e:
-            print(f"Warning: Error in get_bug_information: {e}")
-        return bugs
-
-    def _parse_all_files(self):
-        """Parse both faults and successes files."""
-        self.test_data = {
-            'faults': {'metadata': {}, 'tests': []},
-            'successes': {'metadata': {}, 'tests': []}
-        }
+                        "type": 'miss' if test_type == 'faults' else 'hit',
+                        "request_details": test['request_data'],
+                        "response_data": test['response_data']
+                    }
+                    all_endpoints.append(endpoint_info)
         
-        if os.path.exists(self.faults_file):
-            print("\nParsing faults file...")
-            try:
-                self.test_data['faults']['metadata'], self.test_data['faults']['tests'] = self._parse_python_file(self.faults_file)
-                print(f"Found {len(self.test_data['faults']['tests'])} fault tests")
-            except Exception as e:
-                print(f"Warning: Error parsing faults file: {e}")
-        
-        if os.path.exists(self.successes_file):
-            print("\nParsing successes file...")
-            try:
-                self.test_data['successes']['metadata'], self.test_data['successes']['tests'] = self._parse_python_file(self.successes_file)
-                print(f"Found {len(self.test_data['successes']['tests'])} success tests")
-            except Exception as e:
-                print(f"Warning: Error parsing successes file: {e}")
-
-    def get_status_code_distribution(self):
-        """Get distribution of HTTP status codes."""
-        if not self.test_data:
-            self._parse_all_files()
-        
-        distribution = {
-            "200": 0, "401": 0, "404": 0, "500": 0, "204": 0
-        }
-        
-        try:
-            for test in self.test_data['successes']['tests']:
-                if test['status_code']:
-                    status = str(test['status_code'])
-                    if status in distribution:
-                        distribution[status] += 1
-            for test in self.test_data['faults']['tests']:
-                if test['status_code']:
-                    status = str(test['status_code'])
-                    if status in distribution:
-                        distribution[status] += 1
-        except Exception as e:
-            print(f"Warning: Error in get_status_code_distribution: {e}")
-        
-        return distribution
-
-    def get_kpi(self):
-        """Get Key Performance Indicators."""
-        if not self.test_data:
-            self._parse_all_files()
-        
-        total_requests = 0
-        success_count = 0
-        unique_endpoints = set()
-        critical_errors = 0
-
-        try:
-            total_requests = len(self.test_data['faults']['tests']) + len(self.test_data['successes']['tests'])
-            success_count = sum(1 for test in self.test_data['successes']['tests'] 
-                              if test['status_code'] and 200 <= test['status_code'] < 300)
-            critical_errors = sum(1 for test in self.test_data['faults']['tests'] 
-                                 if test['status_code'] and test['status_code'] >= 500)
-            for test_type in ['faults', 'successes']:
-                for test in self.test_data[test_type]['tests']:
-                    if test['endpoint']:
-                        unique_endpoints.add(test['endpoint'])
-        except Exception as e:
-            print(f"Warning: Error in get_kpi: {e}")
-        
-        return {
-            "total_requests": total_requests,
-            "critical_errors": critical_errors,
-            "unique_endpoints": len(unique_endpoints),
-            "success_rate": round((success_count / total_requests * 100), 2) if total_requests > 0 else 0.0
-        }
+        # Write endpoints in chunks
+        for i in range(0, len(all_endpoints), self.chunk_size):
+            chunk = all_endpoints[i:i + self.chunk_size]
+            self.write_chunked_data(chunk, f'endpoints/chunk_{i//self.chunk_size}')
 
     def process_data(self):
-        """Process all data and generate the final report."""
+        """Process all data in chunks."""
         try:
             self.extract_zip()
             
-            if not self.test_data:
-                self._parse_all_files()
+            # Process each data type
+            self.process_metadata()
+            self.process_coverage()
+            self.process_endpoints()
             
-            return {
-                "metadata": self.get_metadata_statistics(),
-                "endpoints": self.get_endpoint_information(),
-                "coverage": self.get_coverage_statistics(),
-                "status_codes": self.get_status_code_distribution(),
-                "kpi": self.get_kpi(),
-                "bugs": self.get_bug_information()
-            }
         finally:
             if self.temp_dir and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
-
-if __name__ == '__main__':
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    zip_path = os.path.abspath(os.path.join(script_dir, '..', 'output-fuzzers', 'Evomaster', 'evomaster-results.zip'))
-    try:
-        with EvomasterParser(zip_path) as parser:
-            report = parser.process_data()
-            # Save JSON report in the same folder as the zip file
-            output_path = os.path.join(os.path.dirname(zip_path), 'evomaster_report.json')
-            with open(output_path, 'w') as f:
-                json.dump(report, f, indent=2)
-            print(f"Evomaster report saved to {output_path}")
-    except Exception as e:
-        print(f"Error parsing Evomaster results: {e}")

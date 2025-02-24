@@ -1,10 +1,15 @@
-window.WuppieFuzzCoverage = {
-  "statusDistribution": {
+window.WuppieFuzzcoverage = {
+  "status_distribution": {
     "hits": 4645,
     "misses": 2514,
     "unspecified": 0
   },
-  "methodCoverage": {
+  "method_coverage": {
+    "DELETE": {
+      "hits": 0,
+      "misses": 314,
+      "unspecified": 0
+    },
     "GET": {
       "hits": 4320,
       "misses": 1147,
@@ -19,33 +24,6 @@ window.WuppieFuzzCoverage = {
       "hits": 0,
       "misses": 473,
       "unspecified": 0
-    },
-    "DELETE": {
-      "hits": 0,
-      "misses": 314,
-      "unspecified": 0
     }
-  },
-  "statusCodes": [
-    {
-      "status": "200",
-      "count": 4645
-    },
-    {
-      "status": "401",
-      "count": 1496
-    },
-    {
-      "status": "404",
-      "count": 495
-    },
-    {
-      "status": "500",
-      "count": 176
-    },
-    {
-      "status": "204",
-      "count": 0
-    }
-  ]
+  }
 };
