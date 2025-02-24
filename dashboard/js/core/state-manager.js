@@ -1,9 +1,15 @@
 /**
+<<<<<<< Updated upstream
  * State manager class for handling fuzzing results state and updates
+=======
+ * Enhanced state manager for handling data loading and component updates
+ * with proper error handling and state management
+>>>>>>> Stashed changes
  */
 class StateManager {
     constructor(fuzzerName) {
         this.fuzzerName = fuzzerName;
+<<<<<<< Updated upstream
         this.dataLoader = new DataLoader(fuzzerName);
         this.subscribers = {
             coverage: [],
@@ -17,10 +23,22 @@ class StateManager {
             data: null,
             endpointsMeta: null,
             endpoints: []
+=======
+        this.subscribers = new Map();
+        this.searchQuery = '';
+        this.dataLoader = null;
+        this.state = {
+            loading: false,
+            initialized: false,
+            components: new Set(),
+            errors: new Map(),
+            data: new Map()
+>>>>>>> Stashed changes
         };
     }
 
     async initialize() {
+<<<<<<< Updated upstream
         try {
             // Load initial data
             const [coverage, metadata, data, endpointsMeta] = await Promise.all([
@@ -59,10 +77,189 @@ class StateManager {
             this.updateStats();
         } catch (error) {
             console.error('Error initializing state:', error);
+=======
+        if (this.state.initialized) return;
+
+        try {
+            this.setLoading(true);
+            
+            // Create and initialize data loader
+            this.dataLoader = new DataLoader(this.fuzzerName);
+            await this.dataLoader.initialize();
+            
+            // Load initial data
+            const metadata = await this.loadComponentData('metadata');
+            if (!metadata) {
+                throw new Error('Failed to load initial metadata');
+            }
+
+            this.state.initialized = true;
+            this.setLoading(false);
+        } catch (error) {
+            this.handleError('initialization', error);
             throw error;
         }
     }
 
+    updateStatistics(metadata) {
+        if (!metadata || !metadata.summary) return;
+
+        const summary = metadata.summary;
+        
+        // Update total requests
+        const totalRequestsEl = document.querySelector('.total-requests');
+        if (totalRequestsEl) {
+            totalRequestsEl.textContent = summary.total_requests || 0;
+        }
+
+        // Update critical errors
+        const criticalErrorsEl = document.getElementById('criticalErrors');
+        if (criticalErrorsEl) {
+            criticalErrorsEl.textContent = summary.error_count || 0;
+        }
+
+        // Update unique endpoints
+        const uniqueEndpointsEl = document.getElementById('uniqueEndpoints');
+        if (uniqueEndpointsEl) {
+            uniqueEndpointsEl.textContent = summary.unique_endpoints || 0;
+        }
+
+        // Update success rate
+        const successRateEl = document.querySelector('.success-rate');
+        if (successRateEl) {
+            successRateEl.textContent = `${(summary.success_rate || 0).toFixed(2)}%`;
+        }
+    }
+
+    setLoading(loading, component = null) {
+        if (component) {
+            if (loading) {
+                this.state.components.add(component);
+            } else {
+                this.state.components.delete(component);
+            }
+        }
+        this.state.loading = loading || this.state.components.size > 0;
+        this.notifySubscribers('loading', this.state.loading);
+    }
+
+    handleError(component, error) {
+        console.error(`Error in ${component}:`, error);
+        this.state.errors.set(component, {
+            message: error.message,
+            timestamp: Date.now()
+        });
+        this.notifySubscribers('error', {
+            component,
+            error: error.message
+        });
+    }
+
+    subscribe(component, callback) {
+        if (!this.subscribers.has(component)) {
+            this.subscribers.set(component, new Set());
+        }
+        this.subscribers.get(component).add(callback);
+
+        // Push initial data if available
+        const data = this.state.data.get(component);
+        if (data) {
+            callback(data);
+        }
+    }
+
+    unsubscribe(component, callback) {
+        if (this.subscribers.has(component)) {
+            this.subscribers.get(component).delete(callback);
+        }
+    }
+
+    notifySubscribers(component, data) {
+        if (this.subscribers.has(component)) {
+            this.subscribers.get(component).forEach(callback => {
+                try {
+                    callback(data);
+                } catch (error) {
+                    console.error(`Error in ${component} subscriber:`, error);
+                }
+            });
+        }
+    }
+
+    setSearchQuery(query) {
+        this.searchQuery = query.toLowerCase();
+        this.updateEndpointTree();
+    }
+
+    async updateEndpointTree() {
+        try {
+            const data = await this.loadComponentData('endpoints');
+            if (!data || !data.items) return;
+
+            const filteredEndpoints = this.filterEndpoints(data.items);
+            
+            this.notifySubscribers('endpoints', {
+                items: filteredEndpoints,
+                hasMore: data.hasMore,
+                stats: data.stats
+            });
+        } catch (error) {
+            this.handleError('endpoints', error);
+        }
+    }
+
+    filterEndpoints(endpoints) {
+        return endpoints.filter(endpoint => {
+            const path = endpoint.path?.toLowerCase() || '';
+            const method = endpoint.http_method?.toLowerCase() || '';
+            return !this.searchQuery || 
+                path.includes(this.searchQuery) || 
+                method.includes(this.searchQuery);
+        });
+    }
+
+    async loadComponentData(component) {
+        if (!this.dataLoader) {
+            throw new Error('Data loader not initialized');
+        }
+
+        this.setLoading(true, component);
+
+        try {
+            let data;
+            switch (component) {
+                case 'metadata':
+                    data = await this.dataLoader.loadMetadata();
+                    this.updateStatistics(data);
+                    break;
+                case 'coverage':
+                    data = await this.dataLoader.loadCoverage();
+                    break;
+                case 'endpoints':
+                    data = await this.dataLoader.loadEndpoints();
+                    break;
+                case 'bugs':
+                    data = await this.dataLoader.loadBugs();
+                    break;
+                default:
+                    throw new Error(`Unknown component: ${component}`);
+            }
+
+            this.state.data.set(component, data);
+            this.state.errors.delete(component);
+            this.setLoading(false, component);
+            this.notifySubscribers(component, data);
+
+            return data;
+        } catch (error) {
+            this.handleError(component, error);
+            this.setLoading(false, component);
+>>>>>>> Stashed changes
+            throw error;
+        }
+    }
+
+<<<<<<< Updated upstream
     subscribe(type, callback) {
         if (this.subscribers[type]) {
             this.subscribers[type].push(callback);
@@ -143,6 +340,42 @@ class StateManager {
         if (barElement) {
             barElement.style.width = `${percentage}%`;
         }
+=======
+    async refreshData(component = null) {
+        try {
+            if (component) {
+                // Refresh specific component
+                this.state.data.delete(component);
+                await this.loadComponentData(component);
+            } else {
+                // Refresh all components
+                this.state.data.clear();
+                await Promise.all([
+                    this.loadComponentData('metadata'),
+                    this.loadComponentData('coverage'),
+                    this.loadComponentData('endpoints'),
+                    this.loadComponentData('bugs')
+                ]);
+            }
+        } catch (error) {
+            this.handleError(component || 'refresh', error);
+        }
+    }
+
+    getLoadingState() {
+        return {
+            loading: this.state.loading,
+            components: Array.from(this.state.components)
+        };
+    }
+
+    getErrors() {
+        return Array.from(this.state.errors.entries()).map(([component, error]) => ({
+            component,
+            message: error.message,
+            timestamp: error.timestamp
+        }));
+>>>>>>> Stashed changes
     }
 }
 

@@ -1,5 +1,10 @@
 /**
+<<<<<<< Updated upstream
  * Endpoint tree component for displaying API endpoints and their coverage
+=======
+ * Enhanced endpoint tree component for displaying API endpoints
+ * with improved error handling, loading states, and details display
+>>>>>>> Stashed changes
  */
 class EndpointTreeComponent {
     constructor() {
@@ -32,6 +37,7 @@ class EndpointTreeComponent {
             if (window.feather) feather.replace();
             return;
         }
+<<<<<<< Updated upstream
 
         // Filter endpoints based on current filters
         const filteredEndpoints = this.endpoints.filter(endpoint => {
@@ -81,6 +87,122 @@ class EndpointTreeComponent {
         // Add pagination if needed
         if (filteredEndpoints.length > this.endpointsPerPage) {
             html += this.renderPagination(filteredEndpoints.length);
+=======
+        
+        this.stateManager = stateManager;
+        this.loadingState = false;
+        this.searchDebounceTimeout = null;
+        
+        // Create wrapper for loading state
+        this.createWrapper();
+        
+        // Subscribe to data updates
+        this.stateManager.subscribe('endpoints', data => this.render(data));
+        this.stateManager.subscribe('loading', loading => this.setLoading(loading));
+        this.stateManager.subscribe('error', error => this.handleError(error));
+    }
+
+    createWrapper() {
+        // Create wrapper for loading overlay
+        this.wrapper = document.createElement('div');
+        this.wrapper.className = 'endpoint-tree-wrapper relative';
+        this.element.parentNode.insertBefore(this.wrapper, this.element);
+        this.wrapper.appendChild(this.element);
+
+        // Create loading overlay
+        this.loadingOverlay = document.createElement('div');
+        this.loadingOverlay.className = 'loading-overlay hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center';
+        this.loadingOverlay.innerHTML = `
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        `;
+        this.wrapper.appendChild(this.loadingOverlay);
+
+        // Create search input
+        this.createSearchInput();
+    }
+
+    createSearchInput() {
+        const searchContainer = document.createElement('div');
+        searchContainer.className = 'mb-4';
+        searchContainer.innerHTML = `
+            <div class="relative">
+                <input type="text" 
+                       class="search-input w-full px-4 py-2 border rounded-lg"
+                       placeholder="Search endpoints..."
+                >
+                <i data-feather="search" 
+                   class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                </i>
+            </div>
+        `;
+
+        this.element.parentNode.insertBefore(searchContainer, this.element);
+        
+        // Initialize search functionality
+        const searchInput = searchContainer.querySelector('.search-input');
+        searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+        
+        // Initialize icons
+        feather.replace();
+    }
+
+    handleSearch(query) {
+        clearTimeout(this.searchDebounceTimeout);
+        this.searchDebounceTimeout = setTimeout(() => {
+            this.stateManager.setSearchQuery(query);
+        }, 300);
+    }
+
+    setLoading(loading) {
+        this.loadingState = loading;
+        if (this.loadingOverlay) {
+            this.loadingOverlay.classList.toggle('hidden', !loading);
+        }
+    }
+
+    handleError(error) {
+        if (error.component === 'endpoints') {
+            this.showError(error.message);
+        }
+    }
+
+    render(data) {
+        try {
+            if (!data || !data.items || !Array.isArray(data.items)) {
+                this.showError('Invalid endpoint data received');
+                return;
+            }
+
+            if (data.items.length === 0) {
+                this.showEmptyState();
+                return;
+            }
+
+            // Group endpoints by path
+            const groupedEndpoints = this.groupEndpoints(data.items);
+            
+            // Generate HTTP methods legend
+            const legendHtml = this.generateLegend();
+            
+            // Generate endpoint tree HTML
+            const endpointsHtml = this.generateEndpointTree(groupedEndpoints);
+
+            // Update the element content
+            this.element.innerHTML = `
+                ${legendHtml}
+                <div class="space-y-4">
+                    ${endpointsHtml}
+                </div>
+            `;
+
+            // Initialize icons and add event listeners
+            feather.replace();
+            this.addEventListeners();
+            
+        } catch (error) {
+            console.error('Error rendering endpoint tree:', error);
+            this.showError('Error rendering endpoint tree');
+>>>>>>> Stashed changes
         }
 
         this.container.innerHTML = html;
@@ -92,6 +214,7 @@ class EndpointTreeComponent {
         this.addEventListeners();
     }
 
+<<<<<<< Updated upstream
     renderEndpointCard(endpoint) {
         const successRate = endpoint.success_rate;
         const successClass = successRate >= 80 ? 'bg-green-50 border-green-200' :
@@ -126,6 +249,47 @@ class EndpointTreeComponent {
                     <button class="text-gray-400 hover:text-gray-600">
                         <i data-feather="chevron-down"></i>
                     </button>
+=======
+    generateLegend() {
+        return `
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">HTTP Methods</h3>
+                <div class="flex flex-wrap gap-2">
+                    <span class="method-badge get">GET</span>
+                    <span class="method-badge post">POST</span>
+                    <span class="method-badge put">PUT</span>
+                    <span class="method-badge delete">DELETE</span>
+                    <span class="method-badge patch">PATCH</span>
+                </div>
+            </div>
+        `;
+    }
+
+    generateEndpointTree(groupedEndpoints) {
+        return Object.entries(groupedEndpoints).map(([path, endpoints]) => {
+            const totalMethods = endpoints.length;
+            const successRate = this.calculateSuccessRate(endpoints);
+            
+            return `
+                <div class="endpoint-group mb-4">
+                    <div class="card">
+                        <div class="endpoint-header p-4 bg-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-100">
+                            <div class="flex items-center gap-3">
+                                <i data-feather="chevron-right" class="h-4 w-4 transform transition-transform"></i>
+                                <div>
+                                    <div class="font-mono text-sm">${this.escapeHtml(path)}</div>
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        ${totalMethods} method${totalMethods !== 1 ? 's' : ''} | 
+                                        Success Rate: ${successRate}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="endpoint-methods hidden divide-y divide-gray-200">
+                            ${endpoints.map(endpoint => this.generateMethodHtml(endpoint)).join('')}
+                        </div>
+                    </div>
+>>>>>>> Stashed changes
                 </div>
                 <div class="endpoint-details hidden mt-4" id="${detailsId}">
                     ${this.renderEndpointDetails(endpoint)}
@@ -134,6 +298,7 @@ class EndpointTreeComponent {
         `;
     }
 
+<<<<<<< Updated upstream
     renderEndpointDetails(endpoint) {
         return `
             <div class="space-y-4">
@@ -187,12 +352,41 @@ class EndpointTreeComponent {
                                 <span class="font-medium">${count}</span>
                             </div>
                         `).join('')}
+=======
+    calculateSuccessRate(endpoints) {
+        const successful = endpoints.filter(e => (e.status_code || 0) < 400).length;
+        return ((successful / endpoints.length) * 100).toFixed(1);
+    }
+
+    generateMethodHtml(endpoint) {
+        const method = endpoint.http_method || 'GET';
+        const statusCode = endpoint.status_code || 200;
+        const severity = this.getSeverityInfo(statusCode);
+        
+        return `
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <span class="method-badge ${method.toLowerCase()}">${method}</span>
+                        <span class="text-sm text-gray-600">Status: ${statusCode}</span>
+                        <span class="bg-${severity.color}-100 text-${severity.color}-800 text-xs px-2 py-1 rounded-full">
+                            ${severity.level}
+                        </span>
+>>>>>>> Stashed changes
                     </div>
+                    <button class="button button-secondary text-sm show-details">
+                        <span>Show Details</span>
+                        <i data-feather="chevron-down" class="h-4 w-4 ml-1"></i>
+                    </button>
+                </div>
+                <div class="method-details hidden space-y-4">
+                    ${this.generateDetailsSection(endpoint)}
                 </div>
             </div>
         `;
     }
 
+<<<<<<< Updated upstream
     renderPagination(totalEndpoints) {
         const totalPages = Math.ceil(totalEndpoints / this.endpointsPerPage);
         return `
@@ -214,11 +408,42 @@ class EndpointTreeComponent {
                     >
                         Next
                     </button>
+=======
+    generateDetailsSection(endpoint) {
+        const sections = [];
+
+        if (endpoint.request_details) {
+            sections.push(this.generateDataSection('Request Details', endpoint.request_details));
+        }
+
+        if (endpoint.response_data) {
+            sections.push(this.generateDataSection('Response Details', endpoint.response_data));
+        }
+
+        // Add performance metrics if available
+        if (endpoint.average_response_time) {
+            sections.push(`
+                <div class="metrics-container">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-3 rounded">
+                            <div class="text-xs text-gray-500">Avg Response Time</div>
+                            <div class="text-sm font-medium">${endpoint.average_response_time}ms</div>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded">
+                            <div class="text-xs text-gray-500">Success Rate</div>
+                            <div class="text-sm font-medium">${endpoint.success_rate || 0}%</div>
+                        </div>
+                    </div>
+>>>>>>> Stashed changes
                 </div>
-            </div>
-        `;
+            `);
+        }
+
+        return sections.join('');
     }
 
+<<<<<<< Updated upstream
     addEventListeners() {
         // Add filter listeners
         const filterInputs = this.container.querySelectorAll('[data-filter]');
@@ -301,6 +526,180 @@ class EndpointTreeComponent {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
         }
+=======
+    generateDataSection(title, data) {
+        try {
+            const formattedData = typeof data === 'string' ? 
+                data : JSON.stringify(data, null, 2);
+            
+            return `
+                <div class="data-container">
+                    <div class="data-header flex justify-between items-center mb-2">
+                        <h4 class="text-sm font-medium text-gray-700">${title}</h4>
+                        <button class="copy-button p-1 hover:bg-gray-100 rounded" data-clipboard-text="${this.escapeHtml(formattedData)}">
+                            <i data-feather="copy" class="h-4 w-4"></i>
+                        </button>
+                    </div>
+                    <div class="data-content">
+                        <pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto"><code class="json">${this.formatJson(formattedData)}</code></pre>
+                    </div>
+                </div>
+            `;
+        } catch (error) {
+            console.error(`Error formatting ${title.toLowerCase()}:`, error);
+            return '';
+        }
+    }
+
+    getSeverityInfo(statusCode) {
+        const code = parseInt(statusCode);
+        
+        // Order matters: check specific codes first, then ranges
+        if (code === 404) {
+            return { level: 'Not Found', color: 'blue' };
+        }
+        if (code >= 500) {
+            return { level: 'Critical', color: 'red' };
+        }
+        if (code === 401 || code === 403) {
+            return { level: 'Auth Error', color: 'orange' };
+        }
+        if (code >= 400) {
+            return { level: 'Client Error', color: 'yellow' };
+        }
+        if (code >= 300) {
+            return { level: 'Redirect', color: 'gray' };
+        }
+        return { level: 'Success', color: 'green' };
+    }
+
+    showError(message) {
+        this.element.innerHTML = `
+            <div class="text-center py-8">
+                <div class="card p-6">
+                    <i data-feather="alert-triangle" class="h-12 w-12 text-red-500 mx-auto mb-4"></i>
+                    <p class="text-lg font-medium text-gray-900">${message}</p>
+                </div>
+            </div>
+        `;
+        feather.replace();
+    }
+
+    showEmptyState() {
+        this.element.innerHTML = `
+            <div class="text-center py-8">
+                <div class="card p-6">
+                    <i data-feather="inbox" class="h-12 w-12 text-gray-400 mx-auto mb-4"></i>
+                    <p class="text-lg font-medium text-gray-900">No endpoints found</p>
+                    <p class="text-sm text-gray-600 mt-2">Try adjusting your search criteria</p>
+                </div>
+            </div>
+        `;
+        feather.replace();
+    }
+
+    groupEndpoints(endpoints) {
+        return endpoints.reduce((groups, endpoint) => {
+            const path = endpoint.path || '';
+            if (!groups[path]) {
+                groups[path] = [];
+            }
+            groups[path].push(endpoint);
+            return groups;
+        }, {});
+    }
+
+    formatJson(json) {
+        try {
+            const obj = typeof json === 'string' ? JSON.parse(json) : json;
+            return this.syntaxHighlight(JSON.stringify(obj, null, 2));
+        } catch (e) {
+            return this.escapeHtml(json);
+        }
+    }
+
+    syntaxHighlight(json) {
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, 
+            match => {
+                let cls = 'json-number';
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'json-key';
+                    } else {
+                        cls = 'json-string';
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'json-boolean';
+                } else if (/null/.test(match)) {
+                    cls = 'json-null';
+                }
+                return `<span class="${cls}">${this.escapeHtml(match)}</span>`;
+            }
+        );
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    addEventListeners() {
+        // Endpoint group expansion
+        this.element.querySelectorAll('.endpoint-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const group = header.closest('.endpoint-group');
+                const methods = group.querySelector('.endpoint-methods');
+                const icon = header.querySelector('i[data-feather]');
+                
+                methods.classList.toggle('hidden');
+                if (icon) {
+                    icon.classList.toggle('rotate-90');
+                    feather.replace();
+                }
+            });
+        });
+
+        // Method details expansion
+        this.element.querySelectorAll('.show-details').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const methodContainer = button.closest('div').parentElement;
+                const details = methodContainer.querySelector('.method-details');
+                const icon = button.querySelector('i[data-feather]');
+                const text = button.querySelector('span');
+                
+                if (details && icon && text) {
+                    details.classList.toggle('hidden');
+                    icon.classList.toggle('rotate-180');
+                    text.textContent = details.classList.contains('hidden') ? 'Show Details' : 'Hide Details';
+                    feather.replace();
+                }
+            });
+        });
+
+        // Copy buttons
+        this.element.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const text = button.dataset.clipboardText;
+                if (text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        const icon = button.querySelector('i');
+                        if (icon) {
+                            icon.setAttribute('data-feather', 'check');
+                            feather.replace();
+                            setTimeout(() => {
+                                icon.setAttribute('data-feather', 'copy');
+                                feather.replace();
+                            }, 2000);
+                        }
+                    });
+                }
+            });
+        });
+>>>>>>> Stashed changes
     }
 }
 

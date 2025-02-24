@@ -19,6 +19,7 @@
     <!-- External Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
+<<<<<<< Updated upstream
     
     <!-- Core Modules -->
     <script src="../js/utils.js"></script>
@@ -36,10 +37,13 @@
     </script>
     <script src="../js/dashboard.js"></script>
     <script src="../js/bundle.js"></script>
+=======
+>>>>>>> Stashed changes
 </head>
 <body class="bg-gray-50 font-sans">
     <div class="container mx-auto px-4 py-6">
         <!-- Header -->
+<<<<<<< Updated upstream
         <div class="flex justify-between items-center mb-8">
             <div class="flex items-center gap-4">
                 <a href="../index.html" class="text-gray-600 hover:text-gray-800 flex items-center gap-2">
@@ -54,10 +58,29 @@
             <div class="duration" id="duration">
                 <i data-feather="clock"></i>
                 Duration: 00:00:00
+=======
+        <div class="card mb-8 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="../index.html" class="text-gray-500 hover:text-gray-700 flex items-center gap-2">
+                        <i data-feather="arrow-left" class="h-5 w-5"></i>
+                        <span>Back to Overview</span>
+                    </a>
+                    <h1 class="text-2xl font-bold flex items-center">
+                        <i data-feather="activity" class="h-8 w-8 text-primary mr-3"></i>
+                        WuppieFuzz Results
+                    </h1>
+                </div>
+                <div class="text-gray-600 flex items-center">
+                    <i data-feather="clock" class="h-5 w-5 mr-2"></i>
+                    <span id="duration">Duration: -</span>
+                </div>
+>>>>>>> Stashed changes
             </div>
         </div>
 
         <!-- Overall Statistics -->
+<<<<<<< Updated upstream
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Total Requests -->
             <div class="stats-card">
@@ -140,11 +163,80 @@
                     <div class="coverage-metric-raw" id="statementsCoverageRaw">0 / 0</div>
                     <div class="coverage-bar">
                         <div class="coverage-progress" id="statementsCoverageBar"></div>
+=======
+        <div class="mb-8">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="bar-chart-2" class="h-6 w-6"></i>
+                    Overall Statistics
+                </h2>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="stats-card">
+                    <div class="stats-value text-primary total-requests">0</div>
+                    <div class="stats-label">Total Requests</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value status-error" id="criticalErrors">0</div>
+                    <div class="stats-label">Critical Errors (500+)</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value text-primary" id="uniqueEndpoints">0</div>
+                    <div class="stats-label">Unique Endpoints</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value text-primary success-rate">0%</div>
+                    <div class="stats-label">Success Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Analysis -->
+        <div class="mb-8">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="pie-chart" class="h-6 w-6"></i>
+                    Response Analysis
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Coverage Distribution -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="pie-chart" class="h-5 w-5"></i>
+                        Coverage Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="coverageChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Method Coverage -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="bar-chart" class="h-5 w-5"></i>
+                        Method Coverage
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="methodChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Status Codes -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="activity" class="h-5 w-5"></i>
+                        Status Code Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+>>>>>>> Stashed changes
                     </div>
                 </div>
             </div>
         </div>
 
+<<<<<<< Updated upstream
         <!-- Response Analysis -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <!-- Coverage Distribution -->
@@ -178,6 +270,42 @@
                 <div class="h-64">
                     <canvas id="statusChart"></canvas>
                 </div>
+=======
+        <!-- Endpoint Tree -->
+        <div class="mb-8">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="git-merge" class="h-6 w-6"></i>
+                    Endpoint Tree
+                </h2>
+                <div class="flex items-center gap-4">
+                    <div class="relative">
+                        <i data-feather="search" class="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"></i>
+                        <input 
+                            type="text" 
+                            placeholder="Search endpoints..."
+                            class="search-input pl-10"
+                            id="endpointSearch"
+                        >
+                    </div>
+                </div>
+            </div>
+            <div id="endpointTree" class="card p-6">
+                <!-- Endpoint tree will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Issues Found -->
+        <div>
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="alert-triangle" class="h-6 w-6"></i>
+                    Issues Found
+                </h2>
+            </div>
+            <div id="bugList" class="card p-6">
+                <!-- Bug list will be loaded here -->
+>>>>>>> Stashed changes
             </div>
         </div>
 
@@ -200,10 +328,75 @@
         </div>
     </div>
 
+<<<<<<< Updated upstream
     <!-- Initialize Feather Icons -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             feather.replace();
+=======
+    <!-- Core Libraries -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/core/data-loader.js"></script>
+    <script src="../js/core/state-manager.js"></script>
+    <script src="../js/components/endpoint-tree.js"></script>
+    <script src="../js/components/bug-list.js"></script>
+    <script src="../js/charts.js"></script>
+
+    <!-- Data Files -->
+    <script>
+        // Initialize fuzzer data
+        window.fuzzerName = 'WuppieFuzz';
+        window[`${fuzzerName.toLowerCase()}Data`] = {
+            endpoints: [],
+            coverage: {},
+            metadata: {}
+        };
+    </script>
+    <script src="../data/{{fuzzer_name.lower()}}_dashboard.json"></script>
+    <script src="../data/{{fuzzer_name.lower()}}_report.json"></script>
+
+    <!-- Initialize Components -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize icons
+            feather.replace();
+            
+            try {
+                // Initialize state manager
+                window.stateManager = new StateManager(window.fuzzerName);
+                await window.stateManager.initialize();
+
+                // Initialize components
+                new EndpointTree('endpointTree', window.stateManager);
+                new BugList('bugList', window.stateManager);
+                new DashboardCharts(window.stateManager);
+
+                // Add search functionality
+                const searchInput = document.getElementById('endpointSearch');
+                searchInput.addEventListener('input', (e) => {
+                    window.stateManager.setSearchQuery(e.target.value);
+                });
+
+                // Load initial data
+                await window.stateManager.loadComponentData('metadata');
+                await window.stateManager.loadComponentData('coverage');
+                await window.stateManager.loadComponentData('endpoints');
+                await window.stateManager.loadComponentData('bugs');
+                
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                document.body.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="card p-6 max-w-lg mx-auto">
+                            <i data-feather="alert-triangle" class="h-12 w-12 text-red-500 mx-auto mb-4"></i>
+                            <p class="text-lg font-medium text-gray-900 mb-2">Error loading dashboard</p>
+                            <p class="text-sm text-gray-600">${error.message}</p>
+                        </div>
+                    </div>
+                `;
+                feather.replace();
+            }
+>>>>>>> Stashed changes
         });
     </script>
 </body>

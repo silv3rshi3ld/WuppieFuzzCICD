@@ -16,23 +16,32 @@
 <body class="bg-gray-50">
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
-        <div class="flex items-center mb-12">
-            <h1 class="text-2xl font-bold flex items-center">
-                <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+        <div class="card mb-8 p-6">
+            <h1 class="text-2xl font-bold flex items-center mb-2">
+                <i data-feather="activity" class="h-8 w-8 text-primary mr-3"></i>
                 Fuzzing Results Dashboard
             </h1>
+            <p class="text-gray-600">Comprehensive analysis of fuzzing results across multiple fuzzers</p>
         </div>
 
         <!-- Overall Summary -->
+<<<<<<< Updated upstream
         <div class="mb-12">
             <div class="section-header">
                 <h2 class="section-title">
                     <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+=======
+        <div class="mb-8">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="bar-chart-2" class="h-6 w-6"></i>
+>>>>>>> Stashed changes
                     Overall Summary
                 </h2>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div class="stats-card">
+<<<<<<< Updated upstream
                     <div class="stats-value" id="totalRequests">{{total_requests}}</div>
                     <div class="stats-label">Total Requests</div>
                 </div>
@@ -46,11 +55,27 @@
                 </div>
                 <div class="stats-card">
                     <div class="stats-value" id="successRate">{{success_rate}}%</div>
+=======
+                    <div class="stats-value text-primary">{{total_requests}}</div>
+                    <div class="stats-label">Total Requests</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value status-error">{{critical_issues}}</div>
+                    <div class="stats-label">Critical Errors (500+)</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value text-primary">{{unique_endpoints}}</div>
+                    <div class="stats-label">Unique Endpoints</div>
+                </div>
+                <div class="stats-card">
+                    <div class="stats-value text-primary">{{success_rate}}%</div>
+>>>>>>> Stashed changes
                     <div class="stats-label">Success Rate</div>
                 </div>
             </div>
         </div>
 
+<<<<<<< Updated upstream
         <!-- Fuzzer Results -->
         <div class="mb-12">
             <div class="section-header">
@@ -106,6 +131,63 @@
                         <canvas id="statusChart"></canvas>
                     </div>
                 </div>
+=======
+        <!-- Response Analysis -->
+        <div class="mb-8">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="pie-chart" class="h-6 w-6"></i>
+                    Response Analysis
+                </h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Coverage Distribution -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="pie-chart" class="h-5 w-5"></i>
+                        Coverage Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="coverageChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Method Coverage -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="bar-chart" class="h-5 w-5"></i>
+                        Method Coverage
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="methodChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Status Codes -->
+                <div class="chart-card">
+                    <h3 class="chart-title">
+                        <i data-feather="activity" class="h-5 w-5"></i>
+                        Status Code Distribution
+                    </h3>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fuzzer Results -->
+        <div>
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i data-feather="zap" class="h-6 w-6"></i>
+                    Fuzzer Results
+                </h2>
+                <span class="text-sm text-gray-500">(Click for details)</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {{fuzzer_cards}}
+>>>>>>> Stashed changes
             </div>
         </div>
     </div>
@@ -113,14 +195,25 @@
     <!-- Data Files -->
     <script src="data/summary.js"></script>
     
-    <!-- Initialize -->
+    <!-- Initialize Components -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize icons
             feather.replace();
             
+<<<<<<< Updated upstream
             // Initialize charts
             initializeCharts();
+=======
+            try {
+                // Initialize charts with summary data
+                if (window.summaryData) {
+                    new Charts(window.summaryData);
+                }
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+            }
+>>>>>>> Stashed changes
         });
 
         function initializeCharts() {

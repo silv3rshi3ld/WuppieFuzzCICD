@@ -1,4 +1,5 @@
 window.summaryData = {
+<<<<<<< Updated upstream
   "total_requests": 11542,
   "critical_issues": 19,
   "unique_endpoints": 28,
@@ -37,6 +38,35 @@ window.summaryData = {
       "critical_issues": 0,
       "unique_endpoints": 0,
       "duration": "00:00:00"
+=======
+  "total_requests": 0,
+  "critical_issues": 186,
+  "unique_endpoints": 14,
+  "success_rate": 0,
+  "coverage": {
+    "status_distribution": {
+      "client_errors": 2343,
+      "success": 4656,
+      "errors": 186
+    },
+    "method_coverage": {
+      "POST": {
+        "hits": 328,
+        "misses": 581
+      },
+      "GET": {
+        "hits": 4328,
+        "misses": 1159
+      },
+      "PUT": {
+        "hits": 0,
+        "misses": 475
+      },
+      "DELETE": {
+        "hits": 0,
+        "misses": 314
+      }
+>>>>>>> Stashed changes
     }
   ]
 };
