@@ -9,7 +9,8 @@ This project generates a comprehensive dashboard for visualizing and analyzing A
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
-  - [Running the Dashboard Generator](#running-the-dashboard-generator)
+  - [Running the Fuzzers](#running-the-fuzzers)
+  - [Generating the Dashboard](#generating-the-dashboard)
   - [Viewing the Dashboard](#viewing-the-dashboard)
 - [CI/CD Integration](#cicd-integration)
 - [Fuzzer Integration](#fuzzer-integration)
@@ -74,59 +75,70 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
    pip install -r requirements.txt
    ```
 
-### Running the Dashboard Generator
+### Running the Fuzzers
 
-The dashboard generation process involves two main steps:
+The first step in the process is to run the fuzzers against the target API to generate fuzzing results:
+
+1. **Run the fuzzers**: Each fuzzer (WuppieFuzz, RESTler, and EvoMaster) can be run against the VAmPI API to generate fuzzing results. The results will be stored in the `output-fuzzers/` directory.
+
+   ```bash
+   # Example: Run WuppieFuzz against VAmPI
+   cd services/wuppiefuzz
+   docker-compose -f docker-compose.wuppie.yml up
+   ```
+
+   Similar commands can be used for RESTler and EvoMaster. Alternatively, you can use the GitHub Actions workflow to run all fuzzers automatically.
+
+2. **Verify fuzzing results**: After running the fuzzers, verify that the results are available in the appropriate directories:
+   - WuppieFuzz results: `output-fuzzers/Wuppiefuzz/fuzzing-report.zip`
+   - RESTler results: `output-fuzzers/Restler/restler-fuzz-results.zip`
+   - EvoMaster results: `output-fuzzers/Evomaster/evomaster-results.zip`
+
+### Generating the Dashboard
+
+Once you have the fuzzing results, you can generate the dashboard:
 
 1. **Parse the fuzzing results**: This step processes the raw fuzzing output files and converts them into a structured format that the dashboard can use.
-2. **Generate the dashboard**: This step creates the HTML, CSS, and JavaScript files for the dashboard based on the parsed data.
 
-#### Step 1: Run the Parsers
+   ```bash
+   # Run all parsers at once (this will process all available fuzzer results)
+   python -m parsers
+   ```
 
-First, ensure you have fuzzing results in the appropriate directories:
-- WuppieFuzz results: `output-fuzzers/Wuppiefuzz/fuzzing-report.zip`
-- RESTler results: `output-fuzzers/Restler/restler-fuzz-results.zip`
-- EvoMaster results: `output-fuzzers/Evomaster/evomaster-results.zip`
+   This will parse the fuzzing results and generate processed data files in the `dashboard/data/` directory.
 
-Then run the parsers to process the fuzzing results:
+2. **Generate the dashboard**: After parsing the fuzzing results, generate the dashboard:
 
-```bash
-# Run all parsers at once (this will process all available fuzzer results)
-python -m parsers
+   ```bash
+   python generate_dashboard.py
+   ```
 
-# Or run individual parsers if needed
-python -m parsers.wuppiefuzz_parser
-python -m parsers.restler_parser
-python -m parsers.evomaster_parser
-```
-
-This will parse the fuzzing results and generate processed data files in the `dashboard/data/` directory.
-
-#### Step 2: Generate the Dashboard
-
-After parsing the fuzzing results, generate the dashboard:
-
-```bash
-python generate_dashboard.py
-```
-
-This script:
-1. Reads the processed data from `dashboard/data/`
-2. Generates summary statistics
-3. Creates individual pages for each fuzzer
-4. Updates the main dashboard index.html
+   This script:
+   1. Reads the processed data from `dashboard/data/`
+   2. Generates summary statistics
+   3. Creates individual pages for each fuzzer
+   4. Updates the main dashboard index.html
 
 ### Viewing the Dashboard
 
-To view the dashboard locally, you can use the included server script:
+To view the generated dashboard, you can open the `dashboard/index.html` file directly in your browser:
+
+```bash
+# On Windows
+start dashboard/index.html
+
+# On macOS
+open dashboard/index.html
+
+# On Linux
+xdg-open dashboard/index.html
+```
+
+Alternatively, you can use the included server script for testing:
 
 ```bash
 python serve_dashboard.py
 ```
-
-This will start a local web server and open the dashboard in your default browser.
-
-Alternatively, you can open the `dashboard/index.html` file directly in your browser.
 
 ## CI/CD Integration
 
@@ -138,11 +150,14 @@ The project includes GitHub Actions workflows for automating fuzzing and dashboa
    - Uploads the fuzzing results as artifacts
 
 2. **Dashboard Generation** (`dashboard-generation.yml`):
-   - Triggered after the fuzzing workflow completes
+   - Automatically triggered after the fuzzing workflow completes
    - Downloads the fuzzing results artifacts
+   - Extracts the artifacts to the appropriate directories
    - Processes the results using the parsers
    - Generates the dashboard
    - Packages and uploads the dashboard as an artifact
+
+This automated pipeline ensures that whenever fuzzing is performed, the dashboard is automatically generated with the latest results, requiring no manual intervention.
 
 ## Fuzzer Integration
 
