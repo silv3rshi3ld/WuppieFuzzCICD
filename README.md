@@ -16,6 +16,10 @@ This project generates a comprehensive dashboard for visualizing and analyzing A
   - [WuppieFuzz](#wuppiefuzz)
   - [RESTler](#restler)
   - [EvoMaster](#evomaster)
+- [Configuring Fuzzer Timebudgets](#configuring-fuzzer-timebudgets)
+  - [RESTler Timebudget](#restler-timebudget)
+  - [WuppieFuzz Timebudget](#wuppiefuzz-timebudget)
+  - [EvoMaster Timebudget](#evomaster-timebudget)
 - [Dashboard Features](#dashboard-features)
 - [Running Individual Parsers](#running-individual-parsers)
 - [Contributing](#contributing)
@@ -153,6 +157,81 @@ The dashboard integrates with [WuppieFuzz](https://github.com/TNO-S3/WuppieFuzz)
 ### EvoMaster
 
 [EvoMaster](https://github.com/EMResearch/EvoMaster) is an evolutionary-based test generation tool for REST APIs. The dashboard integrates EvoMaster's test results and coverage information.
+
+## Configuring Fuzzer Timebudgets
+
+By default, the fuzzers are configured with very short timebudgets (around 1 minute each) to allow for quick testing. For more thorough fuzzing, you can increase these timebudgets as described below.
+
+### RESTler Timebudget
+
+RESTler's timebudget is configured in the `services/restler/config/run-restler.sh` script. The timebudget is specified in hours.
+
+1. Open the script:
+   ```bash
+   nano services/restler/config/run-restler.sh
+   ```
+
+2. Locate the following lines:
+   ```bash
+   # Line 23
+   /service/config/entrypoint.sh fuzz-lean --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=0.017
+   
+   # Line 30
+   /service/config/entrypoint.sh fuzz --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=0.017
+   ```
+
+3. Change the `--time_budget=0.017` value to your desired duration in hours. For example:
+   - `--time_budget=0.5` for 30 minutes
+   - `--time_budget=1` for 1 hour
+   - `--time_budget=24` for 24 hours
+
+### WuppieFuzz Timebudget
+
+WuppieFuzz's timeout is configured in the GitHub workflow file or directly in your command when running locally.
+
+1. For GitHub Actions, edit `.github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml`:
+   ```bash
+   nano .github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml
+   ```
+
+2. Locate the following line (around line 90):
+   ```yaml
+   --timeout 60
+   ```
+
+3. Change the value to your desired duration in seconds. For example:
+   - `--timeout 1800` for 30 minutes
+   - `--timeout 3600` for 1 hour
+   - `--timeout 86400` for 24 hours
+
+4. For local execution, modify the timeout parameter in your WuppieFuzz command:
+   ```bash
+   ./wuppiefuzz fuzz --timeout 3600 [other parameters]
+   ```
+
+### EvoMaster Timebudget
+
+EvoMaster's timebudget is configured in the GitHub workflow file or directly in your command when running locally.
+
+1. For GitHub Actions, edit `.github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml`:
+   ```bash
+   nano .github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml
+   ```
+
+2. Locate the following line (around line 40):
+   ```yaml
+   --maxTime 60s
+   ```
+
+3. Change the value to your desired duration. EvoMaster accepts various time formats:
+   - `--maxTime 1800s` for 30 minutes
+   - `--maxTime 3600s` or `--maxTime 1h` for 1 hour
+   - `--maxTime 24h` for 24 hours
+
+4. For local execution, modify the maxTime parameter in your EvoMaster command:
+   ```bash
+   java -jar evomaster.jar --maxTime 1h [other parameters]
+   ```
 
 ## Dashboard Features
 
