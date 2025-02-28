@@ -236,3 +236,24 @@ class EvomasterParser(BaseFuzzerParser):
         finally:
             if self.temp_dir and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
+
+# Add this main block to handle direct execution
+if __name__ == "__main__":
+    import os
+    import sys
+    
+    # Get the base directory (project root)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(base_dir, 'dashboard', 'data')
+    
+    # Set up the parser with the correct paths
+    zip_path = os.path.join(base_dir, 'output-fuzzers', 'Evomaster', 'evomaster-results.zip')
+    parser = EvomasterParser(zip_path, os.path.join(output_dir, 'evomaster'))
+    
+    try:
+        # Process the data
+        parser.process_data()
+        print("Evomaster data processed successfully")
+    except Exception as e:
+        print(f"Error processing Evomaster data: {e}")
+        sys.exit(1)

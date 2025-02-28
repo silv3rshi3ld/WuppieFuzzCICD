@@ -1,6 +1,6 @@
-# CI/CD Pipeline with WuppieFuzz and Vulnerable REST API
+# Fuzzing Dashboard Generator
 
-Welcome to my CI/CD project, which integrates **WuppieFuzz** for automated API fuzz testing against a **Vulnerable REST API**. This repository demonstrates how to set up a continuous integration and deployment (CI/CD) pipeline that builds a vulnerable API, runs security tests using WuppieFuzz, and generates reports for analysis—all without manual setup!
+This project generates a comprehensive dashboard for visualizing and analyzing API fuzzing results from multiple fuzzers: **WuppieFuzz**, **RESTler**, and **EvoMaster**. The dashboard provides insights into API endpoint coverage, status codes, and potential vulnerabilities discovered during fuzzing.
 
 ## Table of Contents
 
@@ -8,194 +8,200 @@ Welcome to my CI/CD project, which integrates **WuppieFuzz** for automated API f
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
-  - [Setting Up a Self-Hosted Runner](#setting-up-a-self-hosted-runner)
-  - [Workflow Overview](#workflow-overview)
-- [CI/CD Pipeline Details](#cicd-pipeline-details)
-  - [Workflow Steps](#workflow-steps)
-- [WuppieFuzz Integration](#wuppiefuzz-integration)
-- [Vulnerable REST API](#vulnerable-rest-api)
-  - [Including Vulnerable API Source Code](#including-vulnerable-api-source-code)
-  - [Security Considerations](#security-considerations)
-- [Visualizing Fuzzing Results](#visualizing-fuzzing-results)
+  - [Installation](#installation)
+  - [Running the Dashboard Generator](#running-the-dashboard-generator)
+  - [Viewing the Dashboard](#viewing-the-dashboard)
+- [CI/CD Integration](#cicd-integration)
+- [Fuzzer Integration](#fuzzer-integration)
+  - [WuppieFuzz](#wuppiefuzz)
+  - [RESTler](#restler)
+  - [EvoMaster](#evomaster)
+- [Dashboard Features](#dashboard-features)
+- [Running Individual Parsers](#running-individual-parsers)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Introduction
 
-This project sets up a CI/CD pipeline using **GitHub Actions** to automate the process of building a **Vulnerable RESTful API**, performing security fuzz testing using **WuppieFuzz**, and generating reports. The goal is to demonstrate how fuzz testing can be seamlessly integrated into the development lifecycle to identify and address potential vulnerabilities.
+This project automates the process of generating a visual dashboard from API fuzzing results. It parses output from three different fuzzers (WuppieFuzz, RESTler, and EvoMaster) and creates an interactive HTML dashboard that helps analyze API security testing results, endpoint coverage, and potential vulnerabilities.
+
+The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a purposefully vulnerable API designed for testing and educational purposes.
 
 ## Project Structure
 
-- **.github/workflows/**: Contains the GitHub Actions workflow file.
-- **docker-compose.yml**: Docker Compose configuration to build and run the API and its dependencies.
-- **openapi.yaml**: The OpenAPI specification for the API.
-- **reports/**: Directory where WuppieFuzz outputs reports.
-- **WuppieFuzz/**: Directory containing WuppieFuzz source code.
-- **vulnerable-rest-api/**: Directory containing the source code of the Vulnerable REST API.
-- **README.md**: Project documentation.
+- **parsers/**: Contains parsers for each fuzzer's output format
+  - `wuppiefuzz_parser.py`: Parser for WuppieFuzz results
+  - `restler_parser.py`: Parser for RESTler results
+  - `evomaster_parser.py`: Parser for EvoMaster results
+- **dashboard/**: Contains the dashboard templates and generated output
+  - `templates/`: HTML templates for the dashboard
+  - `js/`: JavaScript files for dashboard functionality
+  - `components/`: Reusable dashboard components
+- **generate_dashboard.py**: Main script to generate the dashboard
+- **serve_dashboard.py**: Simple HTTP server for testing the dashboard locally
+- **.github/workflows/**: GitHub Actions workflow files
+  - `wuppiefuzz_fuzz_and_RESTles.yaml`: Workflow for running the fuzzers
+  - `dashboard-generation.yml`: Workflow for generating the dashboard
+- **services/**: Contains service configurations for the fuzzers and target API
+  - `vampi/`: The vulnerable API used as the fuzzing target
+  - `wuppiefuzz/`: Configuration for WuppieFuzz
+  - `restler/`: Configuration for RESTler
+  - `evomaster/`: Configuration for EvoMaster
+- **output-fuzzers/**: Directory where fuzzing results are stored
 
 ## Prerequisites
 
-- **Docker** and **Docker Compose** installed on the machine that will host the **self-hosted GitHub Actions runner**.
-- **GitHub Actions** enabled if running the CI/CD pipeline on GitHub.
+- Python 3.10 or higher
+- Dependencies listed in `requirements.txt`
+- Docker and Docker Compose (for running the fuzzing workflows)
 
 ## Getting Started
 
-### Setting Up a Self-Hosted Runner
+### Installation
 
-To run this CI/CD pipeline, you need to set up a **self-hosted runner** on the machine where Docker is installed. This runner will handle all steps in the CI/CD pipeline.
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/yourusername/fuzzing-dashboard.git
+   cd fuzzing-dashboard
+   ```
 
-#### Step 1: Create a Self-Hosted Runner on GitHub
+2. Install the required dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1. Navigate to your repository on GitHub.
-2. Click on **Settings**.
-3. In the left sidebar, click on **Actions**.
-4. Click on **Runners** and then click **Add runner**.
-5. Follow the instructions to download the runner package, configure it, and start the runner.
+### Running the Dashboard Generator
 
-#### Step 2: Configure the Self-Hosted Runner
+The dashboard generation process involves two main steps:
 
-After setting up the runner on GitHub, follow the steps provided to configure the runner:
+1. **Parse the fuzzing results**: This step processes the raw fuzzing output files and converts them into a structured format that the dashboard can use.
+2. **Generate the dashboard**: This step creates the HTML, CSS, and JavaScript files for the dashboard based on the parsed data.
+
+#### Step 1: Run the Parsers
+
+First, ensure you have fuzzing results in the appropriate directories:
+- WuppieFuzz results: `output-fuzzers/Wuppiefuzz/fuzzing-report.zip`
+- RESTler results: `output-fuzzers/Restler/restler-fuzz-results.zip`
+- EvoMaster results: `output-fuzzers/Evomaster/evomaster-results.zip`
+
+Then run the parsers to process the fuzzing results:
 
 ```bash
-./config.sh --url https://github.com/your-username/your-repository --token <your_runner_token>
+# Run all parsers at once (this will process all available fuzzer results)
+python -m parsers
+
+# Or run individual parsers if needed
+python -m parsers.wuppiefuzz_parser
+python -m parsers.restler_parser
+python -m parsers.evomaster_parser
 ```
 
-This command will link the runner to your repository.
+This will parse the fuzzing results and generate processed data files in the `dashboard/data/` directory.
 
-#### Step 3: Start the Runner
+#### Step 2: Generate the Dashboard
 
-Run the following command to start the runner:
+After parsing the fuzzing results, generate the dashboard:
 
 ```bash
-./run.sh
+python generate_dashboard.py
 ```
 
-Your self-hosted runner should now be active and ready to execute the CI/CD pipeline.
+This script:
+1. Reads the processed data from `dashboard/data/`
+2. Generates summary statistics
+3. Creates individual pages for each fuzzer
+4. Updates the main dashboard index.html
 
-### Workflow Overview
+### Viewing the Dashboard
 
-Once the runner is set up and active, pushing code to the `main` branch or creating a pull request will automatically trigger the CI/CD pipeline. The pipeline will handle all the setup, build, and testing steps, ensuring a fully automated process.
+To view the dashboard locally, you can use the included server script:
 
-## CI/CD Pipeline Details
-
-The CI/CD pipeline is defined using GitHub Actions in `.github/workflows/ci.yml`. The pipeline performs the following tasks:
-
-1. **Checkout Code**: Retrieves the latest code from the repository.
-2. **Set Up Dependencies**: Installs Docker Compose.
-3. **Build and Run Services**: Uses Docker Compose to build and run the Vulnerable REST API.
-4. **Wait for Services**: Ensures the API is up and running before testing.
-5. **Test API Connectivity**: Verifies that the API is accessible.
-6. **Clone and Build WuppieFuzz**: Clones the WuppieFuzz repository and builds it.
-7. **Generate Initial Corpus**: Creates an initial set of inputs for fuzzing.
-8. **Run WuppieFuzz Fuzzing**: Executes the fuzzing process against the Vulnerable REST API.
-9. **Upload Fuzzing Reports**: Uploads the generated reports for analysis.
-10. **Cleanup**: Stops and removes Docker containers.
-
-### Workflow Steps
-
-Here's a simplified version of the workflow:
-
-```yaml
-name: WuppieFuzz CI Pipeline
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  build_and_fuzz:
-    runs-on: self-hosted
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Docker Compose
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-          docker-compose --version
-
-      - name: Build and run services with Docker Compose
-        env:
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-        run: |
-          docker-compose up -d --build
-
-      - name: Wait for services to start
-        run: sleep 15
-
-      - name: Test API Connectivity
-        run: |
-          curl -I http://localhost:3001
-
-      - name: Clone WuppieFuzz repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
-
-      - name: Build WuppieFuzz
-        run: |
-          cd WuppieFuzz
-          cargo build --release
-          cd ..
-
-      - name: Add WuppieFuzz to PATH
-        run: |
-          echo "${{ github.workspace }}/WuppieFuzz/target/release" >> $GITHUB_PATH
-
-      - name: Generate initial corpus
-        run: wuppiefuzz output-corpus --openapi-spec openapi.yaml corpus_directory
-
-      - name: Run WuppieFuzz
-        env:
-          RUST_BACKTRACE: 1
-        run: |
-          wuppiefuzz fuzz --report --log-level info --initial-corpus corpus_directory \
-          --timeout 300 openapi.yaml
-
-      - name: Upload WuppieFuzz report
-        uses: actions/upload-artifact@v4
-        with:
-          name: wuppiefuzz-report
-          path: reports/
-
-      - name: Stop and remove Docker containers
-        if: always()
-        run: docker-compose down
+```bash
+python serve_dashboard.py
 ```
 
-## WuppieFuzz Integration
+This will start a local web server and open the dashboard in your default browser.
 
-The CI/CD pipeline automates the process of building and running WuppieFuzz, so no manual steps are needed.
+Alternatively, you can open the `dashboard/index.html` file directly in your browser.
 
-## Vulnerable REST API
+## CI/CD Integration
 
-The CI/CD pipeline automatically builds and deploys the Vulnerable REST API using Docker Compose. The source code is included in the repository under the `vulnerable-rest-api/` directory.
+The project includes GitHub Actions workflows for automating fuzzing and dashboard generation:
 
-### Including Vulnerable API Source Code
+1. **Fuzzing Workflow** (`wuppiefuzz_fuzz_and_RESTles.yaml`): 
+   - Runs the three fuzzers (WuppieFuzz, RESTler, and EvoMaster) against the VAmPI API
+   - Each fuzzer runs in its own job
+   - Uploads the fuzzing results as artifacts
 
-The source code for the Vulnerable REST API is included in the repository under the `vulnerable-rest-api/` directory. This API is intentionally designed with vulnerabilities for educational and testing purposes.
+2. **Dashboard Generation** (`dashboard-generation.yml`):
+   - Triggered after the fuzzing workflow completes
+   - Downloads the fuzzing results artifacts
+   - Processes the results using the parsers
+   - Generates the dashboard
+   - Packages and uploads the dashboard as an artifact
 
-## Visualizing Fuzzing Results
+## Fuzzer Integration
 
-The pipeline outputs the fuzzing reports in the `reports/` directory. To view the results:
+### WuppieFuzz
 
-1. Locate the `index.html` file in the `reports/` directory.
-2. Open it in your web browser to view the fuzzing results.
+The dashboard integrates with [WuppieFuzz](https://github.com/TNO-S3/WuppieFuzz), a fuzzer for RESTful APIs. The parser extracts information from WuppieFuzz's SQLite database output.
+
+### RESTler
+
+[RESTler](https://github.com/microsoft/restler-fuzzer) is Microsoft's stateful REST API fuzzer. The dashboard parses RESTler's output files to extract endpoint coverage and discovered vulnerabilities.
+
+### EvoMaster
+
+[EvoMaster](https://github.com/EMResearch/EvoMaster) is an evolutionary-based test generation tool for REST APIs. The dashboard integrates EvoMaster's test results and coverage information.
+
+## Dashboard Features
+
+The dashboard provides:
+
+- **Overview**: Summary of fuzzing results across all fuzzers
+- **Endpoint Coverage**: Visual representation of API endpoint coverage
+- **Status Code Distribution**: Analysis of HTTP status codes returned during fuzzing
+- **Vulnerability Detection**: Highlighting of potential security issues
+- **Detailed Response Data**: In-depth view of request and response data for each endpoint
+
+## Running Individual Parsers
+
+The parsers in this project are designed to be run as Python modules, not as standalone scripts. This ensures proper package imports and relative path resolution.
+
+### Running All Parsers
+
+To run all parsers at once:
+
+```bash
+python -m parsers
+```
+
+### Running a Specific Parser
+
+To run a specific parser:
+
+```bash
+python -m parsers.wuppiefuzz_parser
+python -m parsers.restler_parser
+python -m parsers.evomaster_parser
+```
+
+### Common Import Errors
+
+If you try to run a parser script directly (e.g., `python parsers/wuppiefuzz_parser.py`), you may encounter import errors like:
+
+```
+ModuleNotFoundError: No module named 'parsers'
+```
+
+This happens because the script is trying to import from the `parsers` package, but when run directly, Python doesn't recognize it as part of a package. Always use the module approach (`python -m parsers.wuppiefuzz_parser`) to avoid these issues.
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Disclaimer:** This project is intended for educational and testing purposes only. The use of vulnerable software should be done responsibly and ethically.
+**Disclaimer:** This project is intended for educational and testing purposes only. The use of fuzzing tools should be done responsibly and ethically.

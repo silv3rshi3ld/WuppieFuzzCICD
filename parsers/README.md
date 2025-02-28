@@ -24,15 +24,48 @@ dashboard/data/[fuzzer]/
 
 ## Usage
 
-### Running a Parser
-Each parser can be run independently:
+### Running Parsers as Modules
+
+The parsers in this project are designed to be run as Python modules, not as standalone scripts. This ensures proper package imports and relative path resolution.
+
+#### Running All Parsers
+
+To run all parsers at once:
+
+```bash
+python -m parsers
+```
+
+#### Running a Specific Parser
+
+To run a specific parser:
+
+```bash
+python -m parsers.wuppiefuzz_parser
+python -m parsers.restler_parser
+python -m parsers.evomaster_parser
+```
+
+#### Common Import Errors
+
+If you try to run a parser script directly (e.g., `python parsers/wuppiefuzz_parser.py`), you may encounter import errors like:
+
+```
+ModuleNotFoundError: No module named 'parsers'
+```
+
+This happens because the script is trying to import from the `parsers` package, but when run directly, Python doesn't recognize it as part of a package. Always use the module approach (`python -m parsers.wuppiefuzz_parser`) to avoid these issues.
+
+### Using Parser Classes Programmatically
+
+Each parser can be used programmatically:
 
 ```python
 from parsers.wuppiefuzz_parser import WuppieFuzzParser
 
 with WuppieFuzzParser(
     zip_path='output-fuzzers/Wuppiefuzz/fuzzing-report.zip',
-    output_dir='dashboard',
+    output_dir='dashboard/data/wuppiefuzz',
     chunk_size=100  # Optional, defaults to 100
 ) as parser:
     parser.process_data()
@@ -119,6 +152,12 @@ class NewFuzzerParser(BaseFuzzerParser):
 3. Add error handling and logging
 
 4. Test with various data sizes
+
+5. Update the `__init__.py` file to include your new parser:
+```python
+from .new_fuzzer_parser import NewFuzzerParser
+__all__ = [..., 'NewFuzzerParser']
+```
 
 ## Frontend Integration
 The chunked data structure works with the existing frontend data loader, which supports:

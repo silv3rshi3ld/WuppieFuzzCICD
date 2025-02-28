@@ -1,28 +1,28 @@
 window.summaryData = {
-  "total_requests": 7185,
-  "critical_issues": 186,
-  "unique_endpoints": 14,
-  "success_rate": 64.74,
+  "total_requests": 7159,
+  "critical_issues": 176,
+  "unique_endpoints": 12,
+  "success_rate": 64.88,
   "coverage": {
     "status_distribution": {
-      "hits": 4652,
-      "misses": 2519,
+      "hits": 4645,
+      "misses": 2514,
       "unspecified": 0
     },
     "method_coverage": {
       "GET": {
-        "hits": 4326,
-        "misses": 1149,
+        "hits": 4320,
+        "misses": 1147,
         "unspecified": 0
       },
       "POST": {
-        "hits": 326,
-        "misses": 581,
+        "hits": 325,
+        "misses": 580,
         "unspecified": 0
       },
       "PUT": {
         "hits": 0,
-        "misses": 475,
+        "misses": 473,
         "unspecified": 0
       },
       "DELETE": {

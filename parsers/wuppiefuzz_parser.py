@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import tempfile
 import shutil
-from parsers.base_parser import BaseFuzzerParser
+from .base_parser import BaseFuzzerParser
 
 class WuppieFuzzParser(BaseFuzzerParser):
     def __init__(self, zip_path, output_dir, chunk_size=100):
@@ -213,3 +213,24 @@ class WuppieFuzzParser(BaseFuzzerParser):
             
         finally:
             self.cleanup()
+
+# Add this main block to handle direct execution
+if __name__ == "__main__":
+    import os
+    import sys
+    
+    # Get the base directory (project root)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    output_dir = os.path.join(base_dir, 'dashboard', 'data')
+    
+    # Set up the parser with the correct paths
+    zip_path = os.path.join(base_dir, 'output-fuzzers', 'Wuppiefuzz', 'fuzzing-report.zip')
+    parser = WuppieFuzzParser(zip_path, os.path.join(output_dir, 'wuppiefuzz'))
+    
+    try:
+        # Process the data
+        parser.process_data()
+        print("WuppieFuzz data processed successfully")
+    except Exception as e:
+        print(f"Error processing WuppieFuzz data: {e}")
+        sys.exit(1)
