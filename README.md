@@ -298,4 +298,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Disclaimer:** This project is intended for educational and testing purposes only. The use of fuzzing tools should be done responsibly and ethically.
+**Disclaimer:** This project is intended for educational and testing purposes only. The use of fuzzing tools should be done responsibly and ethically. #
