@@ -36,6 +36,8 @@ To run all parsers at once:
 python -m parsers
 ```
 
+This command will automatically process all available fuzzer results without requiring any additional arguments. It includes robust error handling to ensure that if one parser fails, the others will still run.
+
 #### Running a Specific Parser
 
 To run a specific parser:
@@ -97,6 +99,7 @@ with WuppieFuzzParser(
 - Each parser implements robust error handling
 - Failed chunks don't stop entire process
 - Detailed error logging for debugging
+- The main module (`__main__.py`) includes error handling for each parser to ensure that if one parser fails, the others will still run
 
 ## Performance Considerations
 - Memory efficient processing
@@ -159,8 +162,14 @@ from .new_fuzzer_parser import NewFuzzerParser
 __all__ = [..., 'NewFuzzerParser']
 ```
 
+6. Update the `__main__.py` file to include your new parser in the "run all parsers" functionality
+
 ## Frontend Integration
 The chunked data structure works with the existing frontend data loader, which supports:
 - Progressive loading
 - Chunk caching
 - Error handling
+
+## CI/CD Integration
+
+The parsers are integrated into the CI/CD pipeline as part of the fuzzing workflow. After all fuzzing jobs complete, the parsers are automatically run to process the results before generating the dashboard. This ensures that the dashboard always reflects the latest fuzzing results.
