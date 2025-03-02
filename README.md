@@ -1,4 +1,4 @@
-# Fuzzing Dashboard Generator2
+# Fuzzing Dashboard Generator3
 
 This project generates a comprehensive dashboard for visualizing and analyzing API fuzzing results from multiple fuzzers: **WuppieFuzz**, **RESTler**, and **EvoMaster**. The dashboard provides insights into API endpoint coverage, status codes, and potential vulnerabilities discovered during fuzzing.
 
