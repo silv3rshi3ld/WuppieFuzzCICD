@@ -1,6 +1,6 @@
 window.summaryData = {
   "total_requests": 7185,
-  "critical_issues": 186,
+  "critical_issues": 25,
   "unique_endpoints": 14,
   "success_rate": 64.8,
   "coverage": {

@@ -182,7 +182,7 @@ class WuppieFuzzParser(BaseFuzzerParser):
         return value if value is not None else ""
 
     def process_endpoints(self):
-        """Process and write endpoint data in chunks."""
+        """Process and write endpoint data in chunks, filtering out duplicates."""
         query = """
         SELECT 
             r.path,
@@ -195,28 +195,73 @@ class WuppieFuzzParser(BaseFuzzerParser):
         """
         
         self.cursor.execute(query)
-        chunk_count = 0
         
-        while True:
-            rows = self.cursor.fetchmany(self.chunk_size)
-            if not rows:
-                break
+        # Set to track unique endpoints
+        unique_endpoints = set()
+        all_endpoints = []
+        
+        # Process all rows and filter out duplicates
+        for row in self.cursor.fetchall():
+            path = self.decode_if_bytes(row[0])
+            http_method = self.decode_if_bytes(row[1])
+            status_code = row[2]
+            
+            # Create a unique key for this endpoint
+            # We consider an endpoint unique based on path, method, and status code
+            endpoint_key = f"{path}|{http_method}|{status_code}"
+            
+            # Only add this endpoint if we haven't seen it before
+            if endpoint_key not in unique_endpoints:
+                unique_endpoints.add(endpoint_key)
                 
-            chunk = []
-            for row in rows:
                 endpoint_info = {
-                    "path": self.decode_if_bytes(row[0]),
-                    "http_method": self.decode_if_bytes(row[1]),
-                    "status_code": row[2],
-                    "type": "hit" if row[2] and 200 <= row[2] < 300 else "miss",
+                    "path": path,
+                    "http_method": http_method,
+                    "status_code": status_code,
+                    "type": "hit" if status_code and 200 <= status_code < 300 else "miss",
                     "request_details": self.decode_if_bytes(row[3]),
                     "response_data": self.decode_if_bytes(row[4]),
                 }
-                chunk.append(endpoint_info)
-            
-            # Write this chunk
+                all_endpoints.append(endpoint_info)
+        
+        # Write the unique endpoints in chunks
+        chunk_count = 0
+        for i in range(0, len(all_endpoints), self.chunk_size):
+            chunk = all_endpoints[i:i + self.chunk_size]
             self.write_chunked_data(chunk, f'endpoints/chunk_{chunk_count}')
             chunk_count += 1
+            
+        # Update metadata with the correct count of unique bugs
+        unique_bugs = len([ep for ep in all_endpoints if ep["status_code"] and ep["status_code"] >= 400])
+        metadata = {
+            "duration": self.get_metadata().get("duration", ""),
+            "total_requests": self.get_metadata().get("total_requests", 0),
+            "unique_bugs": unique_bugs,
+            "critical_issues": unique_bugs
+        }
+        self.write_chunked_data(metadata, 'metadata')
+
+    def get_metadata(self):
+        """Get the current metadata."""
+        query = """
+        SELECT 
+            MIN(r.timestamp) as start_time,
+            MAX(r.timestamp) as end_time,
+            COUNT(*) as total_requests
+        FROM requests r
+        """
+        self.cursor.execute(query)
+        start_time, end_time, total_requests = self.cursor.fetchone()
+        
+        # Calculate duration
+        start = datetime.strptime(start_time.split('.')[0], '%Y-%m-%dT%H:%M:%S')
+        end = datetime.strptime(end_time.split('.')[0], '%Y-%m-%dT%H:%M:%S')
+        duration = end - start
+        
+        return {
+            "duration": str(duration),
+            "total_requests": total_requests
+        }
 
     def process_data(self):
         """Process all data in chunks."""
@@ -225,9 +270,8 @@ class WuppieFuzzParser(BaseFuzzerParser):
             self.connect_db()
             
             # Process each data type
-            self.process_metadata()
             self.process_coverage()
-            self.process_endpoints()
+            self.process_endpoints()  # This will also update metadata with correct unique bug count
             
         finally:
             self.cleanup()
