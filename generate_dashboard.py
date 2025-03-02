@@ -180,7 +180,8 @@ def generate_summary_js(evomaster_data, restler_data, wuppiefuzz_data):
                 "POST": {"hits": 0, "misses": 0, "unspecified": 0},
                 "PUT": {"hits": 0, "misses": 0, "unspecified": 0},
                 "DELETE": {"hits": 0, "misses": 0, "unspecified": 0}
-            }
+            },
+            "status_codes": []  # Added to store aggregated status codes
         }
         
         # Process each fuzzer's data
@@ -217,6 +218,10 @@ def generate_summary_js(evomaster_data, restler_data, wuppiefuzz_data):
                         aggregated_coverage['method_coverage'][method][key] += (
                             method_coverage[method].get(key, 0)
                         )
+            
+            # Aggregate status codes
+            if 'status_codes' in coverage:
+                aggregated_coverage['status_codes'].extend(coverage['status_codes'])
         
         # Calculate final success rate
         avg_success_rate = (

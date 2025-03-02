@@ -341,45 +341,59 @@
                     }
                 });
 
-                // Calculate status code distribution from endpoints
-                const statusCodes = {};
-                fuzzerData.endpoints.forEach(endpoint => {
-                    const code = endpoint.status_code;
-                    if (code) {
-                        statusCodes[code] = (statusCodes[code] || 0) + 1;
-                    }
-                });
-
                 // Status Code Distribution Chart
-                new Chart(document.getElementById('statusChart').getContext('2d'), {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(statusCodes),
-                        datasets: [{
-                            data: Object.values(statusCodes),
-                            backgroundColor: Object.keys(statusCodes).map(code => {
-                                code = parseInt(code);
-                                if (code >= 500) return '#ef4444';
-                                if (code >= 400) return '#f59e0b';
-                                return '#22c55e';
-                            })
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
+                // First check if we have status_codes in the coverage data
+                let statusCodes = {};
+                
+                if (fuzzerData.coverage.status_codes && fuzzerData.coverage.status_codes.length > 0) {
+                    // Use status_codes from coverage data
+                    fuzzerData.coverage.status_codes.forEach(code => {
+                        statusCodes[code] = (statusCodes[code] || 0) + 1;
+                    });
+                } else {
+                    // Fall back to calculating from endpoints
+                    fuzzerData.endpoints.forEach(endpoint => {
+                        const code = endpoint.status_code;
+                        if (code) {
+                            statusCodes[code] = (statusCodes[code] || 0) + 1;
+                        }
+                    });
+                }
+                
+                // Only create chart if we have status codes
+                if (Object.keys(statusCodes).length > 0) {
+                    new Chart(document.getElementById('statusChart').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(statusCodes),
+                            datasets: [{
+                                data: Object.values(statusCodes),
+                                backgroundColor: Object.keys(statusCodes).map(code => {
+                                    code = parseInt(code);
+                                    if (code >= 500) return '#ef4444';
+                                    if (code >= 400) return '#f59e0b';
+                                    return '#22c55e';
+                                })
+                            }]
                         },
-                        plugins: {
-                            legend: {
-                                display: false
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                } else {
+                    handleChartError('statusChartContainer', 'No status code data available');
+                }
             } catch (error) {
                 console.error('Error initializing charts:', error);
                 handleChartError('coverageChartContainer', 'Failed to initialize coverage chart');

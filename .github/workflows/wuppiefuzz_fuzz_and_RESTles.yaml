@@ -266,3 +266,19 @@ jobs:
           name: fuzzing-dashboard
           path: fuzzing-dashboard.zip
           retention-days: 90
+          
+      # New step to upload the processed JSON files
+      - name: Package Processed Data Files
+        run: |
+          # Create a zip file with all the processed data files
+          zip -r processed-data.zip dashboard/data/
+          
+          # List the contents of the zip file for debugging
+          unzip -l processed-data.zip
+
+      - name: Upload Processed Data Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-data-files
+          path: processed-data.zip
+          retention-days: 90

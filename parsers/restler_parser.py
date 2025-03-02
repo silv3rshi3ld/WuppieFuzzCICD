@@ -153,28 +153,39 @@ class RestlerParser(BaseFuzzerParser):
 
         status_dist = {'hits': 0, 'misses': 0, 'unspecified': 0}
         method_coverage = {}
+        status_codes = []  # Added to store status codes
 
         try:
-            if self.response_data and 'summary' in self.response_data:
-                for endpoint_stats in self.response_data['summary'].get('endpointStats', {}).values():
-                    for method, stats in endpoint_stats.get('methods', {}).items():
-                        success_count = stats.get('successCount', 0)
-                        failure_count = stats.get('failureCount', 0)
-
-                        status_dist['hits'] += success_count
-                        status_dist['misses'] += failure_count
-
-                        if method not in method_coverage:
-                            method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
-                        method_coverage[method]['hits'] += success_count
-                        method_coverage[method]['misses'] += failure_count
+            # Process all endpoints to collect status codes
+            all_endpoints = self.process_all_endpoints()
+            
+            for endpoint in all_endpoints:
+                if endpoint.get('status_code'):
+                    status_codes.append(endpoint['status_code'])
+                    
+                    # Update status distribution
+                    if endpoint['type'] == 'hit':
+                        status_dist['hits'] += 1
+                    else:
+                        status_dist['misses'] += 1
+                        
+                    # Update method coverage
+                    method = endpoint.get('http_method', 'GET')
+                    if method not in method_coverage:
+                        method_coverage[method] = {'hits': 0, 'misses': 0, 'unspecified': 0}
+                    
+                    if endpoint['type'] == 'hit':
+                        method_coverage[method]['hits'] += 1
+                    else:
+                        method_coverage[method]['misses'] += 1
 
         except Exception as e:
             print(f"Warning: Error in process_coverage: {e}")
 
         coverage_data = {
             "status_distribution": status_dist,
-            "method_coverage": method_coverage
+            "method_coverage": method_coverage,
+            "status_codes": status_codes  # Added status_codes to coverage data
         }
 
         self.write_chunked_data(coverage_data, 'coverage')
@@ -236,11 +247,8 @@ class RestlerParser(BaseFuzzerParser):
 
         return result
 
-    def process_endpoints(self):
-        """Process and write endpoint data in chunks."""
-        self._load_bug_data()
-        self._load_response_data()
-
+    def process_all_endpoints(self):
+        """Process all endpoints and return them as a list."""
         all_endpoints = []
 
         try:
@@ -277,13 +285,19 @@ class RestlerParser(BaseFuzzerParser):
                             }
                             all_endpoints.append(endpoint_info)
 
-            # Write endpoints in chunks
-            for i in range(0, len(all_endpoints), self.chunk_size):
-                chunk = all_endpoints[i:i + self.chunk_size]
-                self.write_chunked_data(chunk, f'endpoints/chunk_{i//self.chunk_size}')
-
         except Exception as e:
-            print(f"Warning: Error in process_endpoints: {e}")
+            print(f"Warning: Error in process_all_endpoints: {e}")
+
+        return all_endpoints
+
+    def process_endpoints(self):
+        """Process and write endpoint data in chunks."""
+        all_endpoints = self.process_all_endpoints()
+
+        # Write endpoints in chunks
+        for i in range(0, len(all_endpoints), self.chunk_size):
+            chunk = all_endpoints[i:i + self.chunk_size]
+            self.write_chunked_data(chunk, f'endpoints/chunk_{i//self.chunk_size}')
 
     def process_data(self):
         """Process all data in chunks."""

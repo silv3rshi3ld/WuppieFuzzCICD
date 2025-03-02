@@ -144,13 +144,30 @@ class WuppieFuzzParser(BaseFuzzerParser):
                 method_coverage[method] = {"hits": 0, "misses": 0, "unspecified": 0}
             method_coverage[method][result_type] = count
         
+        # Status codes query
+        query = """
+        SELECT 
+            resp.status,
+            COUNT(*) as count
+        FROM requests r
+        LEFT JOIN responses resp ON r.id = resp.reqid
+        WHERE resp.status IS NOT NULL
+        GROUP BY resp.status
+        """
+        self.cursor.execute(query)
+        status_codes = []
+        for status, count in self.cursor.fetchall():
+            # Add each status code to the list count times
+            status_codes.extend([status] * count)
+        
         coverage_data = {
             "status_distribution": {
                 "hits": status_dist.get("hits", 0),
                 "misses": status_dist.get("misses", 0),
                 "unspecified": status_dist.get("unspecified", 0)
             },
-            "method_coverage": method_coverage
+            "method_coverage": method_coverage,
+            "status_codes": status_codes
         }
         
         self.write_chunked_data(coverage_data, 'coverage')
@@ -191,6 +208,7 @@ class WuppieFuzzParser(BaseFuzzerParser):
                     "path": self.decode_if_bytes(row[0]),
                     "http_method": self.decode_if_bytes(row[1]),
                     "status_code": row[2],
+                    "type": "hit" if row[2] and 200 <= row[2] < 300 else "miss",
                     "request_details": self.decode_if_bytes(row[3]),
                     "response_data": self.decode_if_bytes(row[4]),
                 }
