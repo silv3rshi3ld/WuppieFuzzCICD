@@ -37,7 +37,7 @@ jobs:
             --blackBox true \
             --bbSwaggerUrl services/vampi/openapi_specs/openapi3.yml \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 60s \
+            --maxTime 3600s \
             --outputFolder generated_tests \
             --ratePerMinute 60
 
@@ -87,7 +87,7 @@ jobs:
             --report \
             --log-level info \
             --initial-corpus corpus_directory \
-            --timeout 60 \
+            --timeout 3600 \
             ../services/vampi/openapi_specs/openapi3.yml
 
       - name: Upload Fuzzing Report
