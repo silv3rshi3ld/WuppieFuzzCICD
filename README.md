@@ -45,8 +45,8 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
 - **generate_dashboard.py**: Main script to generate the dashboard
 - **serve_dashboard.py**: Simple HTTP server for testing the dashboard locally
 - **.github/workflows/**: GitHub Actions workflow files
-  - `wuppiefuzz_fuzz_and_RESTles.yaml`: Workflow for running the fuzzers
-  - `dashboard-generation.yml`: Workflow for generating the dashboard
+  - `wuppiefuzz_fuzz_and_RESTles.yaml`: Workflow for running the fuzzers and generating the dashboard
+  - `dashboard-generation.yml`: (Deprecated) Previous workflow for generating the dashboard
 - **services/**: Contains service configurations for the fuzzers and target API
   - `vampi/`: The vulnerable API used as the fuzzing target
   - `wuppiefuzz/`: Configuration for WuppieFuzz
@@ -144,20 +144,18 @@ python serve_dashboard.py
 
 The project includes GitHub Actions workflows for automating fuzzing and dashboard generation:
 
-1. **Fuzzing Workflow** (`wuppiefuzz_fuzz_and_RESTles.yaml`): 
+1. **Fuzzing and Dashboard Generation Workflow** (`wuppiefuzz_fuzz_and_RESTles.yaml`): 
    - Runs the three fuzzers (WuppieFuzz, RESTler, and EvoMaster) against the VAmPI API
    - Each fuzzer runs in its own job
    - Uploads the fuzzing results as artifacts
+   - After all fuzzing jobs complete, a dashboard generation job:
+     - Downloads the fuzzing results artifacts
+     - Extracts the artifacts to the appropriate directories
+     - Processes the results using the parsers
+     - Generates the dashboard
+     - Packages and uploads the dashboard as an artifact
 
-2. **Dashboard Generation** (`dashboard-generation.yml`):
-   - Automatically triggered after the fuzzing workflow completes
-   - Downloads the fuzzing results artifacts
-   - Extracts the artifacts to the appropriate directories
-   - Processes the results using the parsers
-   - Generates the dashboard
-   - Packages and uploads the dashboard as an artifact
-
-This automated pipeline ensures that whenever fuzzing is performed, the dashboard is automatically generated with the latest results, requiring no manual intervention.
+This integrated workflow ensures that whenever fuzzing is performed, the dashboard is automatically generated with the latest results, requiring no manual intervention.
 
 ## Fuzzer Integration
 
@@ -264,11 +262,13 @@ The parsers in this project are designed to be run as Python modules, not as sta
 
 ### Running All Parsers
 
-To run all parsers at once:
+To run all parsers at once (no arguments needed):
 
 ```bash
 python -m parsers
 ```
+
+This command will automatically process all available fuzzer results without requiring any additional arguments.
 
 ### Running a Specific Parser
 

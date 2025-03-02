@@ -9,6 +9,8 @@ on:
 
 jobs:
   generate-dashboard:
+    # Disable this job since dashboard generation is now integrated into the fuzzing workflow
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

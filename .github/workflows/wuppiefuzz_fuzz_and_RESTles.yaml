@@ -157,3 +157,112 @@ jobs:
         with:
           name: restler-fuzz-results
           path: ${{ github.workspace }}/services/restler/output/Fuzz/
+
+  # New job for dashboard generation
+  generate-dashboard:
+    needs: [evomaster, wuppiefuzz, restler]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Download artifacts from previous jobs
+      - name: Download EvoMaster Results
+        uses: actions/download-artifact@v4
+        with:
+          name: evomaster-results
+          path: output-fuzzers/evomaster-results
+
+      - name: Download WuppieFuzz Results
+        uses: actions/download-artifact@v4
+        with:
+          name: fuzzing-report
+          path: output-fuzzers/fuzzing-report
+
+      - name: Download RESTler Results
+        uses: actions/download-artifact@v4
+        with:
+          name: restler-fuzz-results
+          path: output-fuzzers/restler-fuzz-results
+
+      # Organize files
+      - name: Organize Files
+        run: |
+          # Create necessary directories
+          mkdir -p output-fuzzers/{Evomaster,Wuppiefuzz,Restler}
+          
+          # Move evomaster results
+          if [ -d "output-fuzzers/evomaster-results" ]; then
+            mkdir -p output-fuzzers/Evomaster/evomaster-results
+            cp -r output-fuzzers/evomaster-results/* output-fuzzers/Evomaster/evomaster-results/
+            # Create zip file for parser
+            cd output-fuzzers/Evomaster
+            zip -r evomaster-results.zip evomaster-results/
+            cd ../.. 
+          fi
+          
+          # Move wuppiefuzz results
+          if [ -d "output-fuzzers/fuzzing-report" ]; then
+            mkdir -p output-fuzzers/Wuppiefuzz/fuzzing-report
+            cp -r output-fuzzers/fuzzing-report/* output-fuzzers/Wuppiefuzz/fuzzing-report/
+            # Create zip file for parser
+            cd output-fuzzers/Wuppiefuzz
+            zip -r fuzzing-report.zip fuzzing-report/
+            cd ../.. 
+          fi
+          
+          # Move restler results
+          if [ -d "output-fuzzers/restler-fuzz-results" ]; then
+            mkdir -p output-fuzzers/Restler/restler-fuzz-results
+            cp -r output-fuzzers/restler-fuzz-results/* output-fuzzers/Restler/restler-fuzz-results/
+            # Create zip file for parser
+            cd output-fuzzers/Restler
+            zip -r restler-fuzz-results.zip restler-fuzz-results/
+            cd ../.. 
+          fi
+          
+          # Cleanup temporary directories
+          rm -rf output-fuzzers/evomaster-results
+          rm -rf output-fuzzers/fuzzing-report
+          rm -rf output-fuzzers/restler-fuzz-results
+          
+          # List the organized files for debugging
+          find output-fuzzers -type f | sort
+
+      # Parse results and generate dashboard
+      - name: Parse Results
+        run: |
+          # Run all parsers
+          python -m parsers
+          
+          # List generated data files for debugging
+          find dashboard/data -type f | sort
+
+      - name: Generate Dashboard
+        run: |
+          python generate_dashboard.py
+          
+          # List generated dashboard files for debugging
+          find dashboard -type f -name "*.html" | sort
+
+      - name: Package Dashboard
+        run: |
+          zip -r fuzzing-dashboard.zip dashboard/
+
+      - name: Upload Dashboard
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzzing-dashboard
+          path: fuzzing-dashboard.zip
+          retention-days: 90
