@@ -27,7 +27,7 @@ if [ ! -d "FuzzLean" ]; then
 fi
 
 echo "Step 4: Fuzz"
-/service/config/entrypoint.sh fuzz --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=1
+/service/config/entrypoint.sh fuzz --api_spec=/workspace/openapi3.yml --dictionary=/service/config/restler-custom-dictionary.json --time_budget=0.017
 if [ ! -d "Fuzz" ]; then
     echo "Error: Fuzz directory not created"
     exit 1

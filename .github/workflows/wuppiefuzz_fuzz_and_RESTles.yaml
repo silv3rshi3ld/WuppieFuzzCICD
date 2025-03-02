@@ -37,7 +37,7 @@ jobs:
             --blackBox true \
             --bbSwaggerUrl services/vampi/openapi_specs/openapi3.yml \
             --outputFormat PYTHON_UNITTEST \
-            --maxTime 1h \
+            --maxTime 60s \
             --outputFolder generated_tests \
             --ratePerMinute 60
 
@@ -87,7 +87,7 @@ jobs:
             --report \
             --log-level info \
             --initial-corpus corpus_directory \
-            --timeout 3600 \
+            --timeout 60 \
             ../services/vampi/openapi_specs/openapi3.yml
 
       - name: Upload Fuzzing Report
@@ -261,7 +261,7 @@ jobs:
           zip -r fuzzing-dashboard.zip dashboard/
 
       - name: Upload Dashboard
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fuzzing-dashboard
           path: fuzzing-dashboard.zip
