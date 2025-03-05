@@ -121,6 +121,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BASE_DIR: ${{ github.workspace }}
+      # Enable Docker BuildKit
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -136,7 +139,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-restler-
 
-      # Add caching for Docker layers
+      # Set up Docker Buildx for better caching
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Cache Docker layers
       - name: Cache Docker layers
         uses: actions/cache@v4.2.2
         with:
@@ -144,9 +151,6 @@ jobs:
           key: ${{ runner.os }}-docker-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-docker-
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
 
       - name: Prepare Environment
         run: |
@@ -163,8 +167,11 @@ jobs:
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
-          docker compose -f docker-compose.restler.yml up --abort-on-container-exit \
-            --build-arg BUILDKIT_INLINE_CACHE=1
+          # Export BuildKit environment variables
+          export DOCKER_BUILDKIT=1
+          export COMPOSE_DOCKER_CLI_BUILD=1
+          # Run docker compose
+          docker compose -f docker-compose.restler.yml up --abort-on-container-exit
           echo "=== Listing output directory structure ==="
           ls -R $BASE_DIR/services/restler/output || true
           echo "=== Detailed output directory listing ==="
