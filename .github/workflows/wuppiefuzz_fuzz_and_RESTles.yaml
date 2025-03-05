@@ -53,6 +53,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Add caching for Rust dependencies
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4.2.2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            WuppieFuzz/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Start VAmPI Container (Vulnerable Mode)
         run: |
           docker run -d --name vampi -e vulnerable=1 -p 5000:5000 erev0s/vampi:latest
@@ -74,6 +88,13 @@ jobs:
         run: |
           cd WuppieFuzz
           cargo build --release
+
+      # Add caching for WuppieFuzz corpus
+      - name: Cache WuppieFuzz corpus
+        uses: actions/cache@v4.2.2
+        with: 
+          path: WuppieFuzz/corpus_directory
+          key: ${{ runner.os }}-corpus-${{ hashFiles('services/vampi/openapi_specs/openapi3.yml') }}
 
       - name: Generate Initial Corpus for Fuzzing
         run: |
@@ -104,6 +125,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Add caching for RESTler builds
+      - name: Cache RESTler builds
+        uses: actions/cache@v4.2.2
+        with:
+          path: |
+            ${{ github.workspace }}/services/restler/output/**
+            ${{ github.workspace }}/services/restler/config/*.json
+          key: ${{ runner.os }}-restler-${{ hashFiles('services/restler/config/compile-config.json') }}
+          restore-keys: |
+            ${{ runner.os }}-restler-
+
+      # Add caching for Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v4.2.2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Prepare Environment
         run: |
           mkdir -p $BASE_DIR/services/restler/output
@@ -119,7 +163,8 @@ jobs:
       - name: Run RESTler and VAmPI
         run: |
           cd services/restler
-          docker compose -f docker-compose.restler.yml up --abort-on-container-exit
+          docker compose -f docker-compose.restler.yml up --abort-on-container-exit \
+            --build-arg BUILDKIT_INLINE_CACHE=1
           echo "=== Listing output directory structure ==="
           ls -R $BASE_DIR/services/restler/output || true
           echo "=== Detailed output directory listing ==="
@@ -171,6 +216,7 @@ jobs:
         with:
           python-version: '3.10'
           cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
 
       - name: Install Dependencies
         run: |
