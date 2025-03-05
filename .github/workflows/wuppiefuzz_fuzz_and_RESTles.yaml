@@ -53,8 +53,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Add caching for Rust dependencies
-      - name: Cache Rust dependencies
+      # Set up Rust Toolchain first so cargo is available
+      - name: Set up Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # Clone WuppieFuzz Repository before caching
+      - name: Clone WuppieFuzz Repository
+        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
+
+      # Add caching for Rust dependencies and build artifacts
+      - name: Cache Rust dependencies and build artifacts
+        id: cache-cargo
         uses: actions/cache@v4.2.2
         with:
           path: |
@@ -63,9 +75,29 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             WuppieFuzz/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('WuppieFuzz/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      # Build WuppieFuzz only if cache miss
+      - name: Build WuppieFuzz
+        if: steps.cache-cargo.outputs.cache-hit != 'true'
+        run: |
+          cd WuppieFuzz
+          cargo build --release
+          # Touch a file to indicate the build is complete
+          touch target/release/.build-complete
+
+      # Verify build artifacts exist
+      - name: Verify WuppieFuzz Build
+        run: |
+          if [ ! -f "WuppieFuzz/target/release/wuppiefuzz" ]; then
+            echo "WuppieFuzz binary not found, building..."
+            cd WuppieFuzz
+            cargo build --release
+          else
+            echo "Using cached WuppieFuzz binary"
+          fi
 
       - name: Start VAmPI Container (Vulnerable Mode)
         run: |
@@ -74,20 +106,6 @@ jobs:
 
       - name: Initialize VAmPI Database
         run: curl -s http://localhost:5000/createdb
-
-      - name: Set up Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-
-      - name: Clone WuppieFuzz Repository
-        run: git clone https://github.com/TNO-S3/WuppieFuzz.git
-
-      - name: Build WuppieFuzz
-        run: |
-          cd WuppieFuzz
-          cargo build --release
 
       # Add caching for WuppieFuzz corpus
       - name: Cache WuppieFuzz corpus
