@@ -2,9 +2,9 @@ name: Fuzz VAmPI with WuppieFuzz, EvoMaster, RESTler
 
 on:
   push:
-    branches: [Data-parsing-dashboards]
+    branches: [Main]
   pull_request:
-    branches: [Data-parsing-dashboards]
+    branches: [Main]
 
 jobs:
   evomaster:
