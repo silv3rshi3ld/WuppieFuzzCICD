@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{fuzzer_name}} Results</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="../styles.css" rel="stylesheet">
+    
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex items-center mb-8">
+            <a href="../index.html" class="text-gray-500 hover:text-gray-700 mr-4 flex items-center gap-2">
+                <i data-feather="arrow-left" class="h-6 w-6"></i>
+                <span>Back to Overview</span>
+            </a>
+            <h1 class="text-2xl font-bold flex items-center">
+                <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+                {{fuzzer_name}} Results
+            </h1>
+            <div class="ml-auto text-gray-500" id="duration">Duration: -</div>
+        </div>
+
+        <!-- Progressive Loading State -->
+        <div id="progressiveLoader" class="mb-8 hidden">
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div class="flex items-center mb-2">
+                    <i data-feather="loader" class="h-5 w-5 text-blue-500 mr-2 animate-spin"></i>
+                    <span class="font-medium">Loading: <span id="loadingComponent">metadata</span></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="loadingProgress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Partial Data Warning -->
+        <div id="partialData" class="mb-8 hidden">
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                <div class="flex items-center">
+                    <i data-feather="alert-triangle" class="h-5 w-5 text-yellow-400 mr-2"></i>
+                    <div>
+                        <p class="font-medium text-yellow-700">Some data could not be loaded</p>
+                        <p class="text-yellow-600 text-sm">Showing partial results. Some features may be limited.</p>
+                    </div>
+                    <button id="retryLoad" class="ml-auto bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200">
+                        Retry Loading
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Component Errors -->
+        <div id="componentErrors" class="space-y-4 mb-8 hidden"></div>
+
+        <!-- Content (hidden until data loads) -->
+        <div id="content" class="hidden">
+            <!-- Overall Statistics -->
+            <div class="mb-12" data-component="metadata">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                        Overall Statistics
+                    </h2>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="stats-card">
+                        <div class="stats-value" id="totalRequests">-</div>
+                        <div class="stats-label">Total Requests</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value critical-error" id="criticalErrors">-</div>
+                        <div class="stats-label">Critical Errors (500+)</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="uniqueEndpoints">-</div>
+                        <div class="stats-label">Unique Endpoints</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="successRate">-</div>
+                        <div class="stats-label">Success Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Analysis -->
+            <div class="mb-12" data-component="coverage">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                        Response Analysis
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Coverage Distribution -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                            Coverage Distribution
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="coverageChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Method Coverage -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                            Method Coverage
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="methodChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Status Codes -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                            Status Code Distribution
+                        </h3>
+                        <div class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoint Tree -->
+            <div class="mb-12" data-component="endpoints">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="git-merge" class="h-6 w-6 text-gray-400"></i>
+                        Endpoint Tree
+                    </h2>
+                    <div class="flex items-center gap-4">
+                        <input 
+                            type="text" 
+                            placeholder="Search endpoints..."
+                            class="search-input"
+                            id="endpointSearch"
+                        >
+                        <div id="endpointLoadingStatus" class="text-sm text-gray-500 hidden">
+                            Loading chunk <span id="currentChunk">1</span>...
+                        </div>
+                    </div>
+                </div>
+                <div id="endpointTree" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <!-- Endpoint tree will be loaded here -->
+                </div>
+                <div id="loadMoreEndpoints" class="text-center mt-4 hidden">
+                    <button class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200">
+                        Load More Endpoints
+                    </button>
+                </div>
+            </div>
+
+            <!-- Issues Found -->
+            <div data-component="bugs">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="alert-triangle" class="h-6 w-6 text-gray-400"></i>
+                        Issues Found
+                    </h2>
+                </div>
+                <div id="bugList" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <!-- Bug list will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Libraries -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/core/data-loader.js"></script>
+    <script src="../js/core/state-manager.js"></script>
+    <script src="../js/components/endpoint-tree.js"></script>
+    <script src="../js/components/bug-list.js"></script>
+    <script src="../js/components/charts.js"></script>
+
+    <!-- Data Files -->
+    <script src="data/{{fuzzer_name.lower}}/metadata.js"></script>
+    <script src="data/{{fuzzer_name.lower}}/coverage.js"></script>
+    <script src="data/{{fuzzer_name.lower}}/endpoints_0.js"></script>
+    
+    <!-- Initialize Components -->
+    <script>
+        // Component dependency definitions
+        const componentDeps = {
+            'charts': ['coverage'],
+            'endpointTree': ['endpoints'],
+            'bugList': ['metadata', 'endpoints']
+        };
+
+        // Cache for loaded data
+        const dataCache = {
+            metadata: null,
+            coverage: null,
+            endpoints: new Map(),
+            bugs: null
+        };
+
+        async function loadComponent(component) {
+            const progressBar = document.getElementById('loadingProgress');
+            const loadingText = document.getElementById('loadingComponent');
+            const components = ['metadata', 'coverage', 'endpoints', 'bugs'];
+            const progress = ((components.indexOf(component) + 1) / components.length) * 100;
+
+            loadingText.textContent = component;
+            progressBar.style.width = `${progress}%`;
+
+            try {
+                // Load component data
+                const data = await window.currentStateManager.loadComponentData(component);
+                dataCache[component] = data;
+                return true;
+            } catch (error) {
+                handleComponentError(component, error);
+                return false;
+            }
+        }
+
+        function handleComponentError(component, error) {
+            const errorList = document.getElementById('componentErrors');
+            errorList.classList.remove('hidden');
+            
+            const errorHtml = `
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded" id="error-${component}">
+                    <div class="flex items-center">
+                        <i data-feather="alert-circle" class="h-5 w-5 text-red-400 mr-2"></i>
+                        <div>
+                            <p class="font-medium text-red-700">${component} failed to load</p>
+                            <p class="text-red-600 text-sm">${error.message}</p>
+                        </div>
+                        <button onclick="retryComponent('${component}')" class="ml-auto bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add error if not already shown
+            if (!document.getElementById(`error-${component}`)) {
+                errorList.innerHTML += errorHtml;
+                feather.replace();
+            }
+        }
+
+        async function retryComponent(component) {
+            const errorElement = document.getElementById(`error-${component}`);
+            if (errorElement) {
+                errorElement.remove();
+                if (document.getElementById('componentErrors').children.length === 0) {
+                    document.getElementById('componentErrors').classList.add('hidden');
+                }
+            }
+            
+            document.getElementById('progressiveLoader').classList.remove('hidden');
+            const success = await loadComponent(component);
+            
+            if (success) {
+                // Update UI for the component
+                window.currentStateManager.updateComponent(component);
+                
+                // Hide loader if all components are loaded
+                if (checkAllComponentsLoaded()) {
+                    document.getElementById('progressiveLoader').classList.add('hidden');
+                    document.getElementById('content').classList.remove('hidden');
+                }
+            }
+        }
+
+        function checkAllComponentsLoaded() {
+            return ['metadata', 'coverage', 'endpoints', 'bugs'].every(
+                component => dataCache[component] !== null
+            );
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize icons
+            feather.replace();
+            
+            // Show progressive loader
+            document.getElementById('progressiveLoader').classList.remove('hidden');
+            
+            try {
+                // Initialize state manager
+                const stateManager = new StateManager('{{fuzzer_name}}');
+                window.currentStateManager = stateManager;
+                
+                // Load components progressively
+                let hasErrors = false;
+                for (const component of ['metadata', 'coverage', 'endpoints', 'bugs']) {
+                    if (!await loadComponent(component)) {
+                        hasErrors = true;
+                    }
+                }
+                
+                // Initialize components
+                new EndpointTree('endpointTree', stateManager);
+                new BugList('bugList', stateManager);
+                new Charts(stateManager);
+                
+                // Add search functionality
+                const searchInput = document.getElementById('endpointSearch');
+                searchInput.addEventListener('input', (e) => {
+                    stateManager.setSearchQuery(e.target.value);
+                });
+                
+                // Hide loader and show appropriate state
+                document.getElementById('progressiveLoader').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                
+                if (hasErrors) {
+                    document.getElementById('partialData').classList.remove('hidden');
+                }
+                
+            } catch (error) {
+                console.error('Error initializing dashboard:', error);
+                handleComponentError('initialization', error);
+            }
+        });
+
+        // Initialize lazy loading for endpoints
+        const endpointObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    window.currentStateManager.loadNextEndpointChunk();
+                }
+            });
+        });
+
+        document.getElementById('loadMoreEndpoints').addEventListener('click', () => {
+            window.currentStateManager.loadNextEndpointChunk();
+        });
+    </script>
+</body>
+</html>

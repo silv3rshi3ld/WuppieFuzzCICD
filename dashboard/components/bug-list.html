@@ -1,0 +1,84 @@
+<!-- Bug List Section -->
+<div class="mb-8">
+    <div class="section-header">
+        <div class="flex-1">
+            <h2 class="section-title">
+                <i data-feather="alert-circle" class="h-6 w-6 text-gray-400"></i>
+                All Issues
+            </h2>
+            <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredBugs.length + ' total)'"></p>
+        </div>
+        <input 
+            type="text" 
+            placeholder="Search issues..."
+            class="search-input"
+            x-model="searchQuery"
+            @input="filterBugs"
+        >
+    </div>
+    <div class="bug-list-container">
+        <table class="bug-list">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th>Type</th>
+                    <th>Request</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="bug in filteredBugs" :key="bug.id">
+                    <tr 
+                        @click="selectedEndpoint = bug" 
+                        class="cursor-pointer"
+                        :class="{'critical': parseInt(bug.status) >= 500}"
+                    >
+                        <td>
+                            <span 
+                                :class="getStatusClass(bug.status)"
+                                :data-status-tooltip="getStatusDescription(bug.status)"
+                                x-text="bug.status"
+                            ></span>
+                        </td>
+                        <td class="font-mono text-sm" x-text="bug.endpoint"></td>
+                        <td class="font-mono text-sm" x-text="bug.method"></td>
+                        <td>
+                            <span x-html="getStatusIcon(bug.type, true)"></span>
+                        </td>
+                        <td class="font-mono text-sm truncate max-w-md" x-text="bug.request"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Request/Response Section -->
+<template x-if="selectedEndpoint">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="arrow-right" class="h-5 w-5 text-gray-400"></i>
+                Request
+            </h3>
+            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.request || 'No request data available'"></pre>
+        </div>
+        
+        <div class="chart-card">
+            <h3 class="chart-title">
+                <i data-feather="arrow-left" class="h-5 w-5 text-gray-400"></i>
+                Response
+            </h3>
+            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.response || 'No response data available'"></pre>
+        </div>
+    </div>
+</template>
+<template x-if="!selectedEndpoint">
+    <div class="chart-card">
+        <div class="text-center py-12 text-gray-500">
+            <i data-feather="info" class="h-6 w-6 mx-auto mb-2"></i>
+            Select an endpoint to view details
+        </div>
+    </div>
+</template>

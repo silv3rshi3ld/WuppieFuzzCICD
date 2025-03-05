@@ -1,0 +1,17 @@
+--- simple_fuzzer.html
++++ simple_fuzzer.html
+@@ -87,7 +87,7 @@
+             code = parseInt(code);
+             if (code >= 500) return 'critical';
+             if (code === 401 || code === 403) return 'high';
+-            if (code === 400) return 'medium';
++            if (code >= 200 && code < 300) return 'medium';
+             if (code === 200) return 'medium';
+             if (code === 404) return 'low';
+             if (code >= 300 && code < 400) return 'info';
+@@ -114,7 +114,6 @@
+                 <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+                 {{fuzzer_name}} Results
+             </h1>
+-            <div class="ml-auto text-gray-500" id="duration">Duration: {{duration}}</div>
+         </div>

@@ -9,390 +9,408 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
     <link href="styles.css" rel="stylesheet">
     
-    <!-- JavaScript Dependencies - Load in correct order -->
+    <!-- JavaScript Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/feather-icons"></script>
-    <script src="dashboard.js"></script>
-    
-    <!-- Initialize Data Before Alpine Loads -->
-    <script>
-        window.fuzzerData = {
-            metadata: {
-                duration: "2h 15m",
-                totalRequests: 33,
-                uniqueBugs: 8,
-                criticalIssues: 4
-            },
-            endpoints: [
-                {
-                    path: '/api/adminAuth',
-                    methods: {
-                        POST: [
-                            { status: '200', type: 'miss' },
-                            { status: '401', type: 'miss' },
-                            { 
-                                status: '500', 
-                                type: 'unspecified',
-                                request: 'curl http://localhost:3001/api/adminAuth',
-                                response: 'Server Error'
-                            }
-                        ]
-                    }
-                },
-                {
-                    path: '/api/categories/{id}',
-                    methods: {
-                        GET: [
-                            { status: '200', type: 'miss' },
-                            { status: '404', type: 'hit' }
-                        ],
-                        DELETE: [
-                            { status: '204', type: 'miss' },
-                            { status: '404', type: 'hit' }
-                        ]
-                    }
-                }
-            ],
-            stats: {
-                statusDistribution: [
-                    { name: 'Hits', value: 3, color: '#22c55e' },
-                    { name: 'Misses', value: 35, color: '#ef4444' },
-                    { name: 'Unspecified', value: 4, color: '#f59e0b' }
-                ],
-                methodCoverage: [
-                    { method: 'POST', hits: 0, misses: 12, unspecified: 2 },
-                    { method: 'GET', hits: 2, misses: 8, unspecified: 1 },
-                    { method: 'PUT', hits: 0, misses: 8, unspecified: 1 },
-                    { method: 'DELETE', hits: 1, misses: 7, unspecified: 0 }
-                ],
-                statusCodes: [
-                    { status: '200', count: 12 },
-                    { status: '401', count: 8 },
-                    { status: '404', count: 6 },
-                    { status: '500', count: 4 },
-                    { status: '204', count: 3 }
-                ]
-            }
-        };
-
-        // Process endpoints into a flat list of bugs
-        window.allBugs = [];
-        window.fuzzerData.endpoints.forEach(endpoint => {
-            Object.entries(endpoint.methods).forEach(([method, statuses]) => {
-                statuses.forEach((status, idx) => {
-                    window.allBugs.push({
-                        id: `${endpoint.path}-${method}-${idx}`,
-                        endpoint: endpoint.path,
-                        method: method,
-                        ...status
-                    });
-                });
-            });
-        });
-
-        // Define dashboard function before Alpine loads
-        function dashboard() {
-            return {
-                endpoints: window.fuzzerData.endpoints,
-                selectedEndpoint: null,
-                searchQuery: '',
-                bugs: window.allBugs,
-                filteredBugs: window.allBugs,
-                filters: {
-                    hits: true,
-                    misses: true,
-                    unspecified: true
-                },
-                charts: {},
-
-                init() {
-                    // Initialize icons first
-                    initializeIcons();
-
-                    // Initialize charts after a small delay to ensure DOM is ready
-                    this.$nextTick(() => {
-                        setTimeout(() => {
-                            const coverageChart = document.getElementById('coverageChart');
-                            const methodChart = document.getElementById('methodChart');
-                            const statusChart = document.getElementById('statusChart');
-
-                            if (coverageChart && methodChart && statusChart) {
-                                initializeCharts(this.charts);
-                            }
-                        }, 100);
-                    });
-
-                    // Watch for changes that require icon updates
-                    this.$watch('filteredBugs', () => {
-                        setTimeout(initializeIcons, 50);
-                    });
-                },
-
-                filterBugs() {
-                    this.filteredBugs = filterBugs(this.bugs, this.searchQuery);
-                },
-
-                getStatusIcon(type, small = false) {
-                    const size = small ? 16 : 20;
-                    switch (type) {
-                        case 'hit':
-                            return `<i data-feather="check-circle" class="icon-success" width="${size}" height="${size}"></i>`;
-                        case 'miss':
-                            return `<i data-feather="x-circle" class="icon-error" width="${size}" height="${size}"></i>`;
-                        case 'unspecified':
-                            return `<i data-feather="alert-triangle" class="icon-warning" width="${size}" height="${size}"></i>`;
-                        default:
-                            return '';
-                    }
-                },
-
-                getStatusClass,
-                getStatusDescription,
-
-                getTotalRequests() {
-                    return window.fuzzerData.metadata.totalRequests;
-                },
-
-                getCriticalErrors() {
-                    return window.fuzzerData.metadata.criticalIssues;
-                },
-
-                getUniqueEndpoints() {
-                    return window.fuzzerData.endpoints.length;
-                },
-
-                getSuccessRate() {
-                    const successCodes = window.fuzzerData.stats.statusCodes
-                        .filter(item => parseInt(item.status) >= 200 && parseInt(item.status) < 300)
-                        .reduce((sum, item) => sum + item.count, 0);
-                    const total = this.getTotalRequests();
-                    return total > 0 ? Math.round((successCodes / total) * 100) : 0;
-                }
-            };
-        }
-    </script>
-
-    <!-- Load Alpine.js last -->
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
-<body class="bg-gray-50" x-data="dashboard()" x-init="init">
-    <div>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
         <!-- Header -->
-        <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
-            <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
-                <h1 class="text-xl font-semibold">Fuzzing Results Dashboard</h1>
-                <div class="flex items-center gap-4">
-                    <template x-for="(enabled, type) in filters" :key="type">
-                        <label class="flex items-center gap-2 text-sm cursor-pointer">
-                            <input
-                                type="checkbox"
-                                x-model="filters[type]"
-                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            >
-                            <span x-html="getStatusIcon(type)"></span>
-                            <span x-text="type.charAt(0).toUpperCase() + type.slice(1)"></span>
-                        </label>
-                    </template>
+        <div class="flex items-center mb-12">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i data-feather="activity" class="inline-block h-8 w-8 text-gray-400 mr-2"></i>
+                Fuzzing Results Dashboard
+            </h1>
+        </div>
+
+        <!-- Loading State -->
+        <div id="progressiveLoader" class="mb-8 hidden">
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div class="flex items-center mb-2">
+                    <i data-feather="loader" class="h-5 w-5 text-blue-500 mr-2 animate-spin"></i>
+                    <span class="font-medium">Loading dashboard data...</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="loadingProgress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
             </div>
         </div>
 
-        <div class="flex mt-16">
-            <!-- Left Sidebar: Endpoint Tree -->
-            <div class="w-72 border-r border-gray-200 overflow-y-auto h-[calc(100vh-4rem)] bg-gray-50 fixed">
-                <div class="p-4">
-                    <template x-for="(endpoint, idx) in endpoints" :key="idx">
-                        <div class="mb-6">
-                            <div class="text-sm font-mono font-medium text-gray-700 mb-2" x-text="endpoint.path"></div>
-                            <template x-for="(statuses, method) in endpoint.methods" :key="method">
-                                <div class="pl-4">
-                                    <div class="text-xs font-medium text-gray-500 mb-1" x-text="method"></div>
-                                    <div class="space-y-2">
-                                        <template x-for="(status, statusIdx) in statuses" :key="statusIdx">
-                                            <template x-if="filters[status.type === 'hit' ? 'hits' : status.type === 'miss' ? 'misses' : 'unspecified']">
-                                                <button
-                                                    @click="selectedEndpoint = status"
-                                                    class="w-full text-left p-2 text-xs flex items-center gap-2 hover:bg-gray-200 rounded transition-colors duration-150"
-                                                    :class="{'bg-gray-200': selectedEndpoint === status}"
-                                                >
-                                                    <span x-html="getStatusIcon(status.type, true)"></span>
-                                                    <span class="font-mono" 
-                                                          :class="getStatusClass(status.status)"
-                                                          :data-status-tooltip="getStatusDescription(status.status)"
-                                                          x-text="status.status"></span>
-                                                </button>
-                                            </template>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
+        <!-- Error State -->
+        <div id="errorContainer" class="mb-8 hidden">
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+                <div class="flex items-center">
+                    <i data-feather="alert-circle" class="h-5 w-5 text-red-400 mr-2"></i>
+                    <div>
+                        <p class="font-medium text-red-700" id="errorTitle"></p>
+                        <p class="text-red-600 text-sm" id="errorMessage"></p>
+                    </div>
+                    <button onclick="retryLoading()" class="ml-auto bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200">
+                        Retry
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content (hidden until data loads) -->
+        <div id="content" class="hidden">
+            <!-- Overall Summary -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
+                        Overall Summary
+                    </h2>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="stats-card">
+                        <div class="stats-value" id="totalRequests">7185</div>
+                        <div class="stats-label">Total Requests</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value critical-error" id="criticalErrors">25</div>
+                        <div class="stats-label">Critical Errors (500+)</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="uniqueEndpoints">14</div>
+                        <div class="stats-label">Unique Endpoints</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-value" id="successRate">64.8%</div>
+                        <div class="stats-label">Success Rate</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Main Content Area -->
-            <div class="ml-72 p-6 flex-1 max-w-screen-2xl">
-                <!-- Overall Statistics Section -->
-                <div class="mb-8">
-                    <div class="section-header">
-                        <h2 class="section-title">
-                            <i data-feather="bar-chart-2" class="h-6 w-6 text-gray-400"></i>
-                            Overall Statistics
-                        </h2>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        <div class="stats-card">
-                            <div class="stats-value" x-text="getTotalRequests()"></div>
-                            <div class="stats-label">Total Requests</div>
-                        </div>
-                        <div class="stats-card">
-                            <div class="stats-value critical-error" x-text="getCriticalErrors()"></div>
-                            <div class="stats-label">Critical Errors (500+)</div>
-                        </div>
-                        <div class="stats-card">
-                            <div class="stats-value" x-text="getUniqueEndpoints()"></div>
-                            <div class="stats-label">Unique Endpoints</div>
-                        </div>
-                        <div class="stats-card">
-                            <div class="stats-value" 
-                                 :class="getSuccessRate() >= 80 ? 'text-green-600' : getSuccessRate() >= 50 ? 'text-yellow-600' : 'text-red-600'"
-                                 x-text="getSuccessRate() + '%'"></div>
-                            <div class="stats-label">Success Rate</div>
-                        </div>
-                    </div>
+            <!-- Fuzzer Results -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="zap" class="h-6 w-6 text-gray-400"></i>
+                        Fuzzer Results
+                        <span class="text-sm font-normal text-gray-500 ml-2">(Click for details)</span>
+                    </h2>
                 </div>
-
-                <!-- Charts Section -->
-                <div class="mb-8">
-                    <div class="section-header">
-                        <h2 class="section-title">
-                            <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
-                            Response Analysis
-                        </h2>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Coverage Distribution -->
-                        <div class="chart-card">
-                            <h3 class="chart-title">
-                                <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
-                                Coverage Distribution
-                            </h3>
-                            <div class="chart-container">
-                                <canvas id="coverageChart"></canvas>
-                            </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                <a href="pages/wuppiefuzz.html" class="fuzzer-card">
+                    <h3 class="text-lg font-semibold mb-4">WuppieFuzz Results</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total Requests</span>
+                            <span class="font-medium">7159</span>
                         </div>
-
-                        <!-- Coverage by Method -->
-                        <div class="chart-card">
-                            <h3 class="chart-title">
-                                <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
-                                Coverage by Method
-                            </h3>
-                            <div class="chart-container">
-                                <canvas id="methodChart"></canvas>
-                            </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Critical Issues</span>
+                            <span class="font-medium  text-red-600">15</span>
                         </div>
-
-                        <!-- Status Codes -->
-                        <div class="chart-card">
-                            <h3 class="chart-title">
-                                <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
-                                Status Code Distribution
-                            </h3>
-                            <div class="chart-container">
-                                <canvas id="statusChart"></canvas>
-                            </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">64.88%</span>
                         </div>
                     </div>
+                </a>
+            
+                <a href="pages/restler.html" class="fuzzer-card">
+                    <h3 class="text-lg font-semibold mb-4">Restler Results</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total Requests</span>
+                            <span class="font-medium">14</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Critical Issues</span>
+                            <span class="font-medium  text-red-600">10</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">28.57%</span>
+                        </div>
+                    </div>
+                </a>
+            
+                <a href="pages/evomaster.html" class="fuzzer-card">
+                    <h3 class="text-lg font-semibold mb-4">Evomaster Results</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total Requests</span>
+                            <span class="font-medium">12</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Critical Issues</span>
+                            <span class="font-medium  text-gray-600">0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Success Rate</span>
+                            <span class="font-medium">58.33%</span>
+                        </div>
+                    </div>
+                </a>
+            
                 </div>
+            </div>
 
-                <!-- Bug List Section -->
-                <div class="mb-8">
-                    <div class="section-header">
-                        <div class="flex-1">
-                            <h2 class="section-title">
-                                <i data-feather="alert-circle" class="h-6 w-6 text-gray-400"></i>
-                                All Issues
-                            </h2>
-                            <p class="text-sm text-gray-500 mt-1" x-text="'(' + filteredBugs.length + ' total)'"></p>
-                        </div>
-                        <input 
-                            type="text" 
-                            placeholder="Search issues..."
-                            class="search-input"
-                            x-model="searchQuery"
-                            @input="filterBugs"
-                        >
-                    </div>
-                    <div class="bug-list-container">
-                        <table class="bug-list">
-                            <thead>
-                                <tr>
-                                    <th>Status</th>
-                                    <th>Endpoint</th>
-                                    <th>Method</th>
-                                    <th>Type</th>
-                                    <th>Request</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="bug in filteredBugs" :key="bug.id">
-                                    <tr 
-                                        @click="selectedEndpoint = bug" 
-                                        class="cursor-pointer"
-                                        :class="{'critical': parseInt(bug.status) >= 500}"
-                                    >
-                                        <td>
-                                            <span 
-                                                :class="getStatusClass(bug.status)"
-                                                :data-status-tooltip="getStatusDescription(bug.status)"
-                                                x-text="bug.status"
-                                            ></span>
-                                        </td>
-                                        <td class="font-mono text-sm" x-text="bug.endpoint"></td>
-                                        <td class="font-mono text-sm" x-text="bug.method"></td>
-                                        <td>
-                                            <span x-html="getStatusIcon(bug.type, true)"></span>
-                                        </td>
-                                        <td class="font-mono text-sm truncate max-w-md" x-text="bug.request"></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- Response Analysis -->
+            <div class="mb-12">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <i data-feather="pie-chart" class="h-6 w-6 text-gray-400"></i>
+                        Response Analysis
+                    </h2>
                 </div>
-
-                <!-- Request/Response Section -->
-                <template x-if="selectedEndpoint">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="chart-card">
-                            <h3 class="chart-title">
-                                <i data-feather="arrow-right" class="h-5 w-5 text-gray-400"></i>
-                                Request
-                            </h3>
-                            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.request || 'No request data available'"></pre>
-                        </div>
-                        
-                        <div class="chart-card">
-                            <h3 class="chart-title">
-                                <i data-feather="arrow-left" class="h-5 w-5 text-gray-400"></i>
-                                Response
-                            </h3>
-                            <pre class="bg-gray-50 p-4 rounded text-sm font-mono overflow-x-auto" x-text="selectedEndpoint.response || 'No response data available'"></pre>
-                        </div>
-                    </div>
-                </template>
-                <template x-if="!selectedEndpoint">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Coverage Distribution -->
                     <div class="chart-card">
-                        <div class="text-center py-12 text-gray-500">
-                            <i data-feather="info" class="h-6 w-6 mx-auto mb-2"></i>
-                            Select an endpoint to view details
+                        <h3 class="chart-title">
+                            <i data-feather="pie-chart" class="h-5 w-5 text-gray-400"></i>
+                            Coverage Distribution
+                        </h3>
+                        <div class="chart-container bg-gray-50">
+                            <canvas id="coverageChart"></canvas>
                         </div>
                     </div>
-                </template>
+                    
+                    <!-- Method Coverage -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="bar-chart" class="h-5 w-5 text-gray-400"></i>
+                            Method Coverage
+                        </h3>
+                        <div class="chart-container bg-gray-50">
+                            <canvas id="methodChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Status Codes -->
+                    <div class="chart-card">
+                        <h3 class="chart-title">
+                            <i data-feather="activity" class="h-5 w-5 text-gray-400"></i>
+                            Status Code Distribution
+                        </h3>
+                        <div class="chart-container bg-gray-50">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Core Libraries -->
+    <script src="js/utils.js"></script>
+    <script src="js/core/data-loader.js"></script>
+    <script src="js/core/state-manager.js"></script>
+    <script src="js/components/charts.js"></script>
+
+    <!-- Data Files -->
+    <script src="data/summary.js"></script>
+    
+    <!-- Initialize -->
+    <script>
+        function showError(title, message) {
+            const errorContainer = document.getElementById('errorContainer');
+            const errorTitle = document.getElementById('errorTitle');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            errorTitle.textContent = title;
+            errorMessage.textContent = message;
+            errorContainer.classList.remove('hidden');
+        }
+
+        function hideError() {
+            document.getElementById('errorContainer').classList.add('hidden');
+        }
+
+        function showLoading() {
+            document.getElementById('progressiveLoader').classList.remove('hidden');
+            document.getElementById('content').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('progressiveLoader').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('loadingProgress').style.width = `${percent}%`;
+        }
+
+        function updateStatistics(data) {
+            const stats = {
+                totalRequests: data.total_requests || 0,
+                criticalErrors: data.critical_issues || 0,
+                uniqueEndpoints: data.unique_endpoints || 0,
+                successRate: data.success_rate || 0
+            };
+
+            Object.entries(stats).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = id === 'successRate' ? `${value}%` : value;
+                }
+            });
+        }
+
+        async function initCharts(data) {
+            try {
+                const coverage = data.coverage;
+                
+                // Coverage Distribution Chart
+                const coverageChart = document.getElementById('coverageChart');
+                if (coverageChart) {
+                    new Chart(coverageChart.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Hits', 'Misses', 'Unspecified'],
+                            datasets: [{
+                                data: [
+                                    coverage.status_distribution.hits || 0,
+                                    coverage.status_distribution.misses || 0,
+                                    coverage.status_distribution.unspecified || 0
+                                ],
+                                backgroundColor: ['#22c55e', '#ef4444', '#f59e0b']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Method Coverage Chart
+                const methodChart = document.getElementById('methodChart');
+                if (methodChart) {
+                    const methods = ['GET', 'POST', 'PUT', 'DELETE'];
+                    new Chart(methodChart.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: methods,
+                            datasets: [{
+                                label: 'Hits',
+                                data: methods.map(m => coverage.method_coverage[m]?.hits || 0),
+                                backgroundColor: '#22c55e'
+                            }, {
+                                label: 'Misses',
+                                data: methods.map(m => coverage.method_coverage[m]?.misses || 0),
+                                backgroundColor: '#ef4444'
+                            }, {
+                                label: 'Unspecified',
+                                data: methods.map(m => coverage.method_coverage[m]?.unspecified || 0),
+                                backgroundColor: '#f59e0b'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    stacked: true
+                                },
+                                y: {
+                                    stacked: true,
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Status Code Distribution Chart
+                const statusChart = document.getElementById('statusChart');
+                if (statusChart) {
+                    // Calculate status code distribution from endpoints
+                    const statusCodes = {};
+                    data.coverage.status_codes?.forEach(code => {
+                        statusCodes[code] = (statusCodes[code] || 0) + 1;
+                    });
+
+                    const labels = Object.keys(statusCodes).sort((a, b) => parseInt(a) - parseInt(b));
+                    const values = labels.map(code => statusCodes[code]);
+
+                    new Chart(statusChart.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: labels.map(code => {
+                                    code = parseInt(code);
+                                    if (code >= 500) return '#ef4444';
+                                    if (code >= 400) return '#f59e0b';
+                                    return '#22c55e';
+                                })
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing charts:', error);
+                showError('Chart Error', 'Failed to initialize charts. Please try again.');
+            }
+        }
+
+        async function loadDashboardData() {
+            showLoading();
+            hideError();
+            updateProgress(30);
+
+            try {
+                if (!window.summaryData) {
+                    throw new Error('Summary data not found');
+                }
+
+                updateProgress(60);
+                updateStatistics(window.summaryData);
+
+                updateProgress(90);
+                await initCharts(window.summaryData);
+
+                updateProgress(100);
+                hideLoading();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showError('Loading Error', 'Failed to load dashboard data. Please try again.');
+                hideLoading();
+            }
+        }
+
+        async function retryLoading() {
+            hideError();
+            await loadDashboardData();
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize icons
+            feather.replace();
+            
+            // Load dashboard data
+            await loadDashboardData();
+        });
+    </script>
 </body>
 </html>

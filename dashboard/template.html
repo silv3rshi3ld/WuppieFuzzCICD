@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuzzing Results Dashboard</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2/dist/tailwind.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    
+    <!-- JavaScript Dependencies - Load in correct order -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Load our JavaScript modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/dashboard.js"></script>
+    
+    <!-- Initialize Data -->
+    <script>
+        window.fuzzerData = {};
+        window.allBugs = [];
+    </script>
+
+    <!-- Dashboard Data Will Be Injected Here -->
+
+    <!-- Load Alpine.js last -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-50" x-data="dashboard()" x-init="init">
+    <div>
+        <!-- Main Header -->
+        <div class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
+            <div class="flex justify-between items-center max-w-screen-2xl mx-auto">
+                <h1 class="text-xl font-semibold">Fuzzing Results Dashboard</h1>
+                <div class="flex items-center gap-4">
+                    <template x-for="(enabled, type) in filters" :key="type">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer">
+                            <input
+                                type="checkbox"
+                                x-model="filters[type]"
+                                @change="filterBugs"
+                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            >
+                            <span x-html="getStatusIcon(type)"></span>
+                            <span x-text="type.charAt(0).toUpperCase() + type.slice(1)"></span>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fuzzer Tabs -->
+        <div class="mt-16 px-4 border-b border-gray-200">
+            <div class="max-w-screen-2xl mx-auto">
+                <div class="flex space-x-4" role="tablist">
+                    <template x-for="fuzzer in Object.keys(fuzzerData)" :key="fuzzer">
+                        <button
+                            class="px-4 py-2 text-sm font-medium"
+                            :class="selectedFuzzer === fuzzer ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
+                            @click="selectedFuzzer = fuzzer"
+                            role="tab"
+                            x-text="fuzzerData[fuzzer].name"
+                        ></button>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="container mx-auto px-4 py-6">
+            <!-- Loading State -->
+            <template x-if="loading">
+                <div class="flex items-center justify-center py-12">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+            </template>
+
+            <!-- Fuzzer Content -->
+            <template x-if="!loading && selectedFuzzer">
+                <div>
+                    <!-- Fuzzer Header -->
+                    <div x-html="getFuzzerComponent(selectedFuzzer, 'header')"></div>
+
+                    <!-- Statistics Section -->
+                    <div x-html="getFuzzerComponent(selectedFuzzer, 'statistics')"></div>
+
+                    <!-- Charts Section -->
+                    <div x-html="getFuzzerComponent(selectedFuzzer, 'charts')"></div>
+
+                    <!-- Endpoints Section -->
+                    <div x-html="getFuzzerComponent(selectedFuzzer, 'endpoints')"></div>
+                </div>
+            </template>
+
+            <!-- No Data State -->
+            <template x-if="!loading && Object.keys(fuzzerData).length === 0">
+                <div class="text-center py-12">
+                    <div class="text-gray-500">
+                        <i data-feather="alert-circle" class="h-12 w-12 mx-auto mb-4"></i>
+                        <p class="text-lg">No fuzzer data available</p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Component Templates -->
+    <template id="loading-spinner">
+        <div class="flex items-center justify-center p-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+    </template>
+</body>
+</html>

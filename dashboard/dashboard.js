@@ -2,7 +2,7 @@
 let chartInstances = {};
 
 // Enhanced chart initialization with better error handling
-function initializeCharts(charts) {
+function initializeCharts() {
     // Clean up existing charts
     Object.entries(chartInstances).forEach(([key, chart]) => {
         if (chart && typeof chart.destroy === 'function') {
