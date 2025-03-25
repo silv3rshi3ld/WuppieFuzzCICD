@@ -8,7 +8,9 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     build-essential \
-    libssl-dev && \
+    libssl-dev \
+    libicu-dev \
+    icu-devtools && \
     # Download and install specific .NET SDK version
     wget https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh && \
     chmod +x dotnet-install.sh && \
