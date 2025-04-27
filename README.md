@@ -66,7 +66,7 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/fuzzing-dashboard.git
+   git clone https://github.com/silv3rshi3ld/WuppieFuzzCICD.git
    cd fuzzing-dashboard
    ```
 
