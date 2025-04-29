@@ -1,6 +1,14 @@
-# Fuzzing Dashboard Generator
+# Fuzzing Dashboard CI/CD Pipeline
 
-This project generates a comprehensive dashboard for visualizing and analyzing API fuzzing results from multiple fuzzers: **WuppieFuzz**, **RESTler**, and **EvoMaster**. The dashboard provides insights into API endpoint coverage, status codes, and potential vulnerabilities discovered during fuzzing.
+This project provides a complete CI/CD pipeline for running three API fuzzers (**WuppieFuzz**, **RESTler**, and **EvoMaster**) and automatically generating a comprehensive dashboard visualizing their results. The primary use case is automated fuzzing and dashboard generation through GitHub Actions.
+
+Key features:
+- Automated parallel execution of all three fuzzers
+- Results processing and dashboard generation
+- Artifact storage of both raw results and generated dashboard
+- Configurable fuzzing time budgets
+
+While local execution is supported, the system is primarily designed for CI/CD automation.
 
 ## Table of Contents
 
@@ -34,6 +42,9 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
 
 ## Project Structure
 
+- **.github/workflows/**: GitHub Actions workflow files (primary CI/CD pipeline)
+  - `wuppiefuzz_fuzz_and_RESTles.yaml`: Main workflow for running fuzzers and generating dashboard
+  - `dashboard-generation.yml`: (Deprecated) Previous workflow
 - **parsers/**: Contains parsers for each fuzzer's output format
   - `wuppiefuzz_parser.py`: Parser for WuppieFuzz results
   - `restler_parser.py`: Parser for RESTler results
@@ -62,7 +73,20 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
 
 ## Getting Started
 
-### Installation
+### CI/CD Setup (Primary Usage)
+
+1. The CI/CD pipeline runs automatically on push to main branch
+2. No setup required - GitHub Actions will:
+   - Run all three fuzzers in parallel
+   - Process the results
+   - Generate the dashboard
+   - Store artifacts
+
+View workflow runs and artifacts in your repository's Actions tab.
+
+### Local Development Setup (Optional)
+
+#### Installation
 
 1. Clone this repository:
    ```bash
@@ -75,7 +99,7 @@ The primary target for fuzzing is [VAmPI](https://github.com/erev0s/VAmPI), a pu
    pip install -r requirements.txt
    ```
 
-### Running the Fuzzers
+#### Running the Fuzzers Locally
 
 The first step in the process is to run the fuzzers against the target API to generate fuzzing results:
 
@@ -87,7 +111,9 @@ The first step in the process is to run the fuzzers against the target API to ge
    docker-compose -f docker-compose.wuppie.yml up
    ```
 
-   Similar commands can be used for RESTler and EvoMaster. Alternatively, you can use the GitHub Actions workflow to run all fuzzers automatically.
+   Similar commands can be used for RESTler and EvoMaster. 
+
+   Note: While the project includes GitHub Actions workflows (in .github/workflows/) for CI/CD automation, these workflows can only run on GitHub's infrastructure. For local execution, use the Docker commands shown above.
 
 2. **Verify fuzzing results**: After running the fuzzers, verify that the results are available in the appropriate directories:
    - WuppieFuzz results: `output-fuzzers/Wuppiefuzz/fuzzing-report.zip`
@@ -140,22 +166,54 @@ Alternatively, you can use the included server script for testing:
 python serve_dashboard.py
 ```
 
-## CI/CD Integration
+## CI/CD Setup Guide
 
-The project includes GitHub Actions workflows for automating fuzzing and dashboard generation:
+### Setting Up the Pipeline in Your Repository
 
-1. **Fuzzing and Dashboard Generation Workflow** (`wuppiefuzz_fuzz_and_RESTles.yaml`): 
-   - Runs the three fuzzers (WuppieFuzz, RESTler, and EvoMaster) against the VAmPI API
-   - Each fuzzer runs in its own job
-   - Uploads the fuzzing results as artifacts
-   - After all fuzzing jobs complete, a dashboard generation job:
-     - Downloads the fuzzing results artifacts
-     - Extracts the artifacts to the appropriate directories
-     - Processes the results using the parsers
-     - Generates the dashboard
-     - Packages and uploads the dashboard as an artifact
+1. **Fork or clone the repository**:
+   ```bash
+   git clone https://github.com/silv3rshi3ld/WuppieFuzzCICD.git
+   cd WuppieFuzzCICD
+   ```
 
-This integrated workflow ensures that whenever fuzzing is performed, the dashboard is automatically generated with the latest results, requiring no manual intervention.
+2. **Enable GitHub Actions**:
+   - Go to your repository's "Actions" tab
+   - Click "I understand my workflows, go ahead and enable them"
+
+3. **Configure workflow triggers**:
+   - The workflow is pre-configured to run on push to main branch
+   - To modify triggers, edit `.github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml`
+
+4. **Running the pipeline**:
+   - Push changes to your main branch to trigger the workflow
+   - Or manually trigger via Actions tab → "Run workflow"
+
+### Accessing Results
+
+1. **View workflow runs**:
+   - Go to Actions tab → "Fuzzing and Dashboard Generation"
+   - Click on a run to see detailed logs
+
+2. **Download artifacts**:
+   - After workflow completes, find the "Artifacts" section
+   - Download either:
+     - `fuzzing-dashboard`: Complete dashboard package
+     - Individual fuzzer results
+
+3. **Customizing the workflow**:
+   - Edit time budgets in the workflow file
+   - Adjust fuzzer configurations in respective service directories
+
+### Key Files
+
+- `.github/workflows/wuppiefuzz_fuzz_and_RESTles.yaml`: Main workflow definition
+- `services/`: Contains fuzzer configurations
+- `parsers/`: Result processing scripts
+
+The pipeline will automatically:
+1. Run all three fuzzers in parallel
+2. Process results and generate dashboard
+3. Package artifacts for download
 
 ## Fuzzer Integration
 
@@ -258,9 +316,13 @@ The dashboard provides:
 
 ## Running Individual Parsers
 
-The parsers in this project are designed to be run as Python modules, not as standalone scripts. This ensures proper package imports and relative path resolution.
+The parsers in this project can be run in two ways:
 
-### Running All Parsers
+### 1. Using Python Modules (Recommended)
+
+The parsers are designed to be run as Python modules, which ensures proper package imports and relative path resolution.
+
+#### Running All Parsers
 
 To run all parsers at once (no arguments needed):
 
@@ -270,7 +332,7 @@ python -m parsers
 
 This command will automatically process all available fuzzer results without requiring any additional arguments.
 
-### Running a Specific Parser
+#### Running a Specific Parser
 
 To run a specific parser:
 
@@ -280,6 +342,20 @@ python -m parsers.restler_parser
 python -m parsers.evomaster_parser
 ```
 
+### 2. Using run_parsers.py Script
+
+Alternatively, you can use the `run_parsers.py` script which provides more control and error handling:
+
+```bash
+python run_parsers.py
+```
+
+This script:
+1. Runs all parsers sequentially
+2. Shows success/failure status for each parser
+3. Generates the dashboard after all parsers complete
+4. Provides more detailed error output if something fails
+
 ### Common Import Errors
 
 If you try to run a parser script directly (e.g., `python parsers/wuppiefuzz_parser.py`), you may encounter import errors like:
@@ -288,7 +364,7 @@ If you try to run a parser script directly (e.g., `python parsers/wuppiefuzz_par
 ModuleNotFoundError: No module named 'parsers'
 ```
 
-This happens because the script is trying to import from the `parsers` package, but when run directly, Python doesn't recognize it as part of a package. Always use the module approach (`python -m parsers.wuppiefuzz_parser`) to avoid these issues.
+This happens because the script is trying to import from the `parsers` package, but when run directly, Python doesn't recognize it as part of a package. Always use either the module approach (`python -m parsers.wuppiefuzz_parser`) or the `run_parsers.py` script to avoid these issues.
 
 ## Contributing
 
