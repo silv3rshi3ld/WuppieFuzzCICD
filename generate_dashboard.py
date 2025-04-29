@@ -115,7 +115,7 @@ def generate_fuzzer_card(name, data):
                             <span class="font-medium {' text-red-600' if metadata.get('critical_issues', 0) > 0 else ' text-gray-600'}">{metadata.get('critical_issues', 0)}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-600">Success Rate</span>
+                            <span class="text-gray-600">2xx Response Rate</span>
                             <span class="font-medium">{success_rate}%</span>
                         </div>
                     </div>
