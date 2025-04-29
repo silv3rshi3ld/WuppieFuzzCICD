@@ -13,6 +13,7 @@ window.Dashboard = {
         document.getElementById('totalRequests').textContent = summary.total_requests || 0;
         document.getElementById('criticalErrors').textContent = summary.critical_issues || 0;
         document.getElementById('uniqueEndpoints').textContent = summary.unique_endpoints || 0;
+        // 2xx Success Rate: Percentage of HTTP responses with status codes 200-299 indicating successful requests
         document.getElementById('successRate').textContent = (summary.success_rate || 0) + '%';
         
         // Update fuzzer cards

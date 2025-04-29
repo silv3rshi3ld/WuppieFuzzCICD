@@ -44,6 +44,52 @@ class RestlerParser(BaseFuzzerParser):
         self.results_dir = self.temp_dir
         self.bug_buckets_dir = os.path.join(self.results_dir, 'RestlerResults', 'experiment135', 'bug_buckets')
         self.response_buckets_dir = os.path.join(self.results_dir, 'ResponseBuckets')
+        self.experiment_dir = None # To store the found experiment directory
+
+    def _find_experiment_dir(self):
+        """Find the experiment directory containing logs/request_rendering.txt."""
+        restler_results_path = os.path.join(self.results_dir, 'RestlerResults')
+        if not os.path.exists(restler_results_path):
+            print(f"Warning: RestlerResults directory not found at {restler_results_path}")
+            return None
+
+        for item in os.listdir(restler_results_path):
+            item_path = os.path.join(restler_results_path, item)
+            if os.path.isdir(item_path):
+                logs_path = os.path.join(item_path, 'logs')
+                request_rendering_path = os.path.join(logs_path, 'request_rendering.txt')
+                if os.path.exists(request_rendering_path):
+                    self.experiment_dir = item_path
+                    print(f"Found experiment directory: {self.experiment_dir}")
+                    return self.experiment_dir
+        
+        print("Warning: Could not find experiment directory with logs/request_rendering.txt")
+        return None
+
+    def _get_total_requests_from_logs(self):
+        """Read request_rendering.txt and sum the rendered requests."""
+        if not self.experiment_dir:
+            self._find_experiment_dir()
+            if not self.experiment_dir:
+                return 0
+
+        request_rendering_path = os.path.join(self.experiment_dir, 'logs', 'request_rendering.txt')
+        if not os.path.exists(request_rendering_path):
+            print(f"Warning: request_rendering.txt not found at {request_rendering_path}")
+            return 0
+
+        total_rendered_requests = 0
+        try:
+            with open(request_rendering_path, 'r') as f:
+                for line in f:
+                    match = re.search(r'Rendered requests: (\d+)', line)
+                    if match:
+                        total_rendered_requests += int(match.group(1))
+        except Exception as e:
+            print(f"Error reading or parsing {request_rendering_path}: {e}")
+            return 0
+
+        return total_rendered_requests
 
     def _load_bug_data(self):
         """Load and parse bug data from bug_buckets directory."""
@@ -100,24 +146,10 @@ class RestlerParser(BaseFuzzerParser):
         self._load_response_data()
 
         duration = "Unknown"
-        total_requests = 0
         unique_bugs = 0
         critical_issues = 0
 
         try:
-            # Calculate total requests
-            summary = self.response_data.get('summary', {})
-            if summary:
-                for endpoint_stats in summary.get('endpointStats', {}).values():
-                    for method_stats in endpoint_stats.get('methods', {}).values():
-                        total_requests += method_stats.get('successCount', 0)
-                        total_requests += method_stats.get('failureCount', 0)
-
-            # Add requests from bug sequences
-            for details in self.bugs_data['bug_details'].values():
-                if 'request_sequence' in details:
-                    total_requests += len(details['request_sequence'])
-
             # Extract duration from engine output
             engine_out = os.path.join(self.results_dir, 'EngineStdOut.txt')
             if os.path.exists(engine_out):
@@ -136,6 +168,9 @@ class RestlerParser(BaseFuzzerParser):
 
         except Exception as e:
             print(f"Warning: Error in process_metadata: {e}")
+
+        # Get total requests from logs
+        total_requests = self._get_total_requests_from_logs()
 
         metadata = {
             "duration": duration,

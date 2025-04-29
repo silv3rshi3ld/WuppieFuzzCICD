@@ -1,22 +1,22 @@
 window.summaryData = {
-  "total_requests": 7185,
+  "total_requests": 7213,
   "critical_issues": 25,
-  "unique_endpoints": 14,
-  "success_rate": 64.8,
+  "unique_endpoints": 13,
+  "success_rate": 64.63,
   "coverage": {
     "status_distribution": {
-      "hits": 4656,
+      "hits": 4655,
       "misses": 2529,
       "unspecified": 0
     },
     "method_coverage": {
       "GET": {
-        "hits": 4328,
+        "hits": 4329,
         "misses": 1159,
         "unspecified": 0
       },
       "POST": {
-        "hits": 328,
+        "hits": 326,
         "misses": 581,
         "unspecified": 0
       },
@@ -45,17 +45,16 @@ window.summaryData = {
       401,
       401,
       500,
-      500,
-      500,
-      200,
-      200,
-      500,
-      500,
       200,
       500,
       500,
       500,
+      500,
       200,
+      500,
+      500,
+      200,
+      500,
       500,
       500,
       200,
